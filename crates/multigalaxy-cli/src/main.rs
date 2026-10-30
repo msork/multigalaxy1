@@ -1,4 +1,5 @@
 mod controller_patch;
+mod dev_config;
 mod gdb;
 mod player_probe;
 mod startup;
@@ -28,7 +29,7 @@ fn timestamp_unix_ms() -> u128 {
         .as_millis()
 }
 
-fn dolphin_config(port: Option<u16>, mute: bool, enable_cheats: bool) -> String {
+fn dolphin_config(port: Option<u16>, mute: bool, enable_cheats: bool, development: bool) -> String {
     let mut config = String::new();
     if let Some(port) = port {
         config.push_str(&format!("[General]\nGDBPort = {port}\n"));
@@ -36,10 +37,174 @@ fn dolphin_config(port: Option<u16>, mute: bool, enable_cheats: bool) -> String 
     if enable_cheats {
         config.push_str("\n[Core]\nEnableCheats = True\n");
     }
+    if development {
+        if !config.contains("[Core]") {
+            config.push_str("\n[Core]\n");
+        }
+        config.push_str("GFXBackend = D3D12\n");
+    }
     if mute {
         config.push_str("\n[DSP]\nMuted = True\nVolume = 0\n");
     }
     config
+}
+
+fn validate_dev_inputs(config: &dev_config::DevelopmentConfig) -> Result<(), String> {
+    for (label, path) in [
+        ("Dolphin executable", &config.dolphin),
+        ("PAL game image", &config.game),
+        ("AllStars patch folder", &config.patch_folder),
+        ("PAL main.dol", &config.pal_dol),
+        ("Petari symbol map", &config.pal_symbols),
+        ("Wii save export", &config.wii_save),
+        ("controller profile", &config.controller_profile),
+    ] {
+        if !path.exists() {
+            return Err(format!(
+                "required development {label} is missing: {}",
+                path.display()
+            ));
+        }
+    }
+    if !config.dolphin.is_file()
+        || !config.game.is_file()
+        || !config.pal_dol.is_file()
+        || !config.pal_symbols.is_file()
+        || !config.wii_save.is_file()
+        || !config.controller_profile.is_file()
+    {
+        return Err("a required development input is not a regular file".into());
+    }
+    if !config.patch_folder.is_dir() {
+        return Err("development AllStars patch path is not a directory".into());
+    }
+    verify_pal_game_image(&config.dolphin, &config.game)?;
+    Ok(())
+}
+
+fn parse_dolphintool_header(output: &str) -> Result<(), String> {
+    let value = |label: &str| {
+        output
+            .lines()
+            .find_map(|line| line.strip_prefix(&format!("{label}: ")))
+            .ok_or_else(|| format!("DolphinTool header output is missing {label}"))
+    };
+    let game_id = value("Game ID")?;
+    let region = value("Region")?;
+    let revision = value("Revision")?;
+    if game_id != "RMGP01" || region != "PAL" || revision != "0" {
+        return Err(format!(
+            "MultiGalaxy1 supports only PAL RMGP01 revision 0; image reports ID={game_id}, region={region}, revision={revision}"
+        ));
+    }
+    Ok(())
+}
+
+fn verify_pal_game_image(dolphin: &std::path::Path, game: &std::path::Path) -> Result<(), String> {
+    let dolphin = dolphin
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve Dolphin executable path: {e}"))?;
+    let game = game
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve game image path: {e}"))?;
+    let tool_name = if cfg!(windows) {
+        "DolphinTool.exe"
+    } else {
+        "dolphin-tool"
+    };
+    let tool = dolphin
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join(tool_name);
+    if !tool.is_file() {
+        return Err(format!(
+            "cannot verify PAL game revision: DolphinTool is missing beside Dolphin at {}",
+            tool.display()
+        ));
+    }
+    let mut child = process::Command::new(&tool)
+        .current_dir(
+            dolphin
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new(".")),
+        )
+        .arg("header")
+        .arg("-i")
+        .arg(game)
+        .stdout(process::Stdio::piped())
+        .stderr(process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("cannot start DolphinTool for PAL image validation: {e}"))?;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let output = child
+                    .wait_with_output()
+                    .map_err(|e| format!("cannot collect DolphinTool header output: {e}"))?;
+                if !status.success() {
+                    return Err(format!(
+                        "DolphinTool could not inspect the game image ({status}): {}",
+                        String::from_utf8_lossy(&output.stderr).trim()
+                    ));
+                }
+                return parse_dolphintool_header(&String::from_utf8_lossy(&output.stdout));
+            }
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("DolphinTool PAL image validation exceeded 10 seconds; stopped the validation process".into());
+            }
+            Err(error) => return Err(format!("cannot inspect DolphinTool process: {error}")),
+        }
+    }
+}
+
+fn configure_isolated_profile(
+    user_dir: &std::path::Path,
+    patch: &controller_patch::PreparedPatch,
+    controller_profile: Option<&std::path::Path>,
+    development: bool,
+    gdb_port: Option<u16>,
+    mute: bool,
+) -> Result<(), String> {
+    let config_dir = user_dir.join("Config");
+    fs::create_dir_all(&config_dir)
+        .map_err(|e| format!("cannot create isolated Dolphin config directory: {e}"))?;
+    fs::write(
+        config_dir.join("Dolphin.ini"),
+        dolphin_config(gdb_port, mute, true, development),
+    )
+    .map_err(|e| format!("cannot write isolated Dolphin configuration: {e}"))?;
+    let settings_dir = user_dir.join("GameSettings");
+    fs::create_dir_all(&settings_dir)
+        .map_err(|e| format!("cannot create isolated GameSettings directory: {e}"))?;
+    let mut settings = controller_patch::allstars_game_settings(patch).to_owned();
+    if let Some(profile_path) = controller_profile {
+        let profile_name = "Pro Con to Classic Con";
+        let profile_dir = config_dir.join("Profiles").join("Wiimote");
+        fs::create_dir_all(&profile_dir)
+            .map_err(|e| format!("cannot create isolated Wii Remote profile directory: {e}"))?;
+        let bytes = fs::read(profile_path)
+            .map_err(|e| format!("cannot read requested controller profile: {e}"))?;
+        let text = std::str::from_utf8(&bytes)
+            .map_err(|e| format!("controller profile is not UTF-8: {e}"))?;
+        if !text.contains("[Profile]") || !text.contains("Extension = Classic") {
+            return Err("controller profile is not a Dolphin Classic Controller profile".into());
+        }
+        fs::write(profile_dir.join(format!("{profile_name}.ini")), &bytes).map_err(|e| {
+            format!("cannot install controller profile into isolated Dolphin config: {e}")
+        })?;
+        settings.push_str(&format!(
+            "\n[Controls]\nWiimoteSource0 = 1\nWiimoteProfile1 = {profile_name}\n"
+        ));
+    }
+    fs::write(settings_dir.join("RMGP01.ini"), settings)
+        .map_err(|e| format!("cannot write isolated PAL game settings: {e}"))?;
+    Ok(())
 }
 
 fn port_is_available(port: u16) -> bool {
@@ -105,8 +270,204 @@ fn wait_for_dolphin_window(
     }
 }
 
+fn spawn_game(
+    dolphin: &std::path::Path,
+    user_dir: &std::path::Path,
+    game: &std::path::Path,
+    gdb_enabled: bool,
+    port: u16,
+    mute: bool,
+    patch: &controller_patch::PreparedPatch,
+) -> Result<(), String> {
+    let dolphin = dolphin
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve Dolphin executable path: {e}"))?;
+    let user_dir = user_dir
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve isolated user directory: {e}"))?;
+    let game = game
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve game image path: {e}"))?;
+    let stdout_path = user_dir.join("dolphin.stdout.log");
+    let stderr_path = user_dir.join("dolphin.stderr.log");
+    let mut child = process::Command::new(&dolphin)
+        .current_dir(
+            dolphin
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new(".")),
+        )
+        .arg("-u")
+        .arg(&user_dir)
+        .stdin(process::Stdio::null())
+        .stdout(process::Stdio::from(
+            fs::File::create(&stdout_path)
+                .map_err(|e| format!("cannot create isolated Dolphin stdout log: {e}"))?,
+        ))
+        .stderr(process::Stdio::from(
+            fs::File::create(&stderr_path)
+                .map_err(|e| format!("cannot create isolated Dolphin stderr log: {e}"))?,
+        ))
+        .arg("-e")
+        .arg(game)
+        .spawn()
+        .map_err(|e| format!("cannot launch Dolphin: {e}"))?;
+    let window = wait_for_dolphin_window(&mut child, &stdout_path, &stderr_path)?;
+    println!(
+        "Started Dolphin window {:?}, PID {}, with isolated user data at {}",
+        window.title,
+        child.id(),
+        user_dir.display()
+    );
+    println!("Mandatory pinned PAL AllStars + both shoulder swaps are enabled in this isolated profile ({} writes).", patch.total_writes);
+    if gdb_enabled {
+        println!("GDB is enabled on port {port}. Dolphin starts paused; run probe-mario, which attaches once and sends the GDB continue packet before sampling.");
+    } else {
+        println!("GDB is disabled; emulation starts normally.");
+    }
+    if mute {
+        println!("Dolphin test/debug audio mute enabled.");
+    }
+    println!("Dolphin logs: {}", user_dir.display());
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 3 && args[0] == "dev-setup" {
+        let config_text = fs::read_to_string(&args[1])
+            .map_err(|e| format!("cannot read local development config: {e}"))?;
+        let config = dev_config::parse(&config_text)?;
+        validate_dev_inputs(&config)?;
+        let dol =
+            fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
+        let patch = controller_patch::prepare_allstars(&config.patch_folder, &dol)?;
+        let user_dir = std::path::PathBuf::from(&args[2]);
+        if user_dir.exists() {
+            let has_entries = fs::read_dir(&user_dir)
+                .map_err(|e| format!("cannot inspect isolated profile: {e}"))?
+                .next()
+                .is_some();
+            if has_entries {
+                let marker = fs::read_to_string(user_dir.join(".mg1-development-profile"))
+                    .map_err(|_| {
+                        "dev-setup refuses a non-empty directory not prepared by MultiGalaxy1"
+                            .to_owned()
+                    })?;
+                if marker.trim() != config.fingerprint {
+                    return Err("development profile was prepared from a different local config; choose a fresh isolated directory".into());
+                }
+            }
+        }
+        fs::create_dir_all(&user_dir)
+            .map_err(|e| format!("cannot create isolated development profile: {e}"))?;
+        let user_dir = user_dir
+            .canonicalize()
+            .map_err(|e| format!("cannot resolve isolated development profile: {e}"))?;
+        let dolphin = config
+            .dolphin
+            .canonicalize()
+            .map_err(|e| format!("cannot resolve Dolphin executable path: {e}"))?;
+        configure_isolated_profile(
+            &user_dir,
+            &patch,
+            Some(&config.controller_profile),
+            true,
+            None,
+            false,
+        )?;
+        fs::write(
+            user_dir.join(".mg1-development-profile"),
+            &config.fingerprint,
+        )
+        .map_err(|e| format!("cannot write development profile marker: {e}"))?;
+        let stdout_path = user_dir.join("dolphin.stdout.log");
+        let stderr_path = user_dir.join("dolphin.stderr.log");
+        let mut child = process::Command::new(&dolphin)
+            .current_dir(
+                dolphin
+                    .parent()
+                    .unwrap_or_else(|| std::path::Path::new(".")),
+            )
+            .arg("-u")
+            .arg(&user_dir)
+            .stdin(process::Stdio::null())
+            .stdout(process::Stdio::from(
+                fs::File::create(&stdout_path)
+                    .map_err(|e| format!("cannot create isolated Dolphin stdout log: {e}"))?,
+            ))
+            .stderr(process::Stdio::from(
+                fs::File::create(&stderr_path)
+                    .map_err(|e| format!("cannot create isolated Dolphin stderr log: {e}"))?,
+            ))
+            .spawn()
+            .map_err(|e| format!("cannot launch Dolphin setup window: {e}"))?;
+        let window = wait_for_dolphin_window(&mut child, &stdout_path, &stderr_path)?;
+        println!("Started Dolphin setup window {:?}, PID {}. Import the Wii save using Tools > Import Wii Save, select {}, then close Dolphin before running dev-launch.", window.title, child.id(), config.wii_save.display());
+        println!("This uses Dolphin's own importer; the source save and regular Dolphin profile are untouched. D3D12, the copied controller profile, and AllStars are isolated under {}.", user_dir.display());
+        return Ok(());
+    }
+    if args.len() >= 4 && args[0] == "dev-launch" {
+        let config_text = fs::read_to_string(&args[1])
+            .map_err(|e| format!("cannot read local development config: {e}"))?;
+        let config = dev_config::parse(&config_text)?;
+        validate_dev_inputs(&config)?;
+        let user_dir = std::path::PathBuf::from(&args[2])
+            .canonicalize()
+            .map_err(|_| "isolated profile path does not exist; run dev-setup first".to_owned())?;
+        let marker = fs::read_to_string(user_dir.join(".mg1-development-profile"))
+            .map_err(|_| "isolated profile is not prepared; run dev-setup first".to_owned())?;
+        if marker.trim() != config.fingerprint {
+            return Err("development config differs from the config used by dev-setup; prepare a fresh profile".into());
+        }
+        let port = args[3]
+            .to_str()
+            .ok_or("GDB port must be valid UTF-8")?
+            .parse::<u16>()
+            .map_err(|_| "GDB port must be between 1 and 65535")?;
+        let mut debug = false;
+        let mut mute = true;
+        for option in &args[4..] {
+            match option.to_str() {
+                Some("--debug") if !debug => debug = true,
+                Some("--unmute") if mute => mute = false,
+                _ => return Err("dev-launch options: [--debug] [--unmute]".into()),
+            }
+        }
+        if debug && (port == 0 || !port_is_available(port)) {
+            return Err(format!(
+                "debug GDB port {port} is invalid or already in use"
+            ));
+        }
+        let dol =
+            fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
+        let patch = controller_patch::prepare_allstars(&config.patch_folder, &dol)?;
+        configure_isolated_profile(
+            &user_dir,
+            &patch,
+            Some(&config.controller_profile),
+            true,
+            if debug { Some(port) } else { None },
+            mute,
+        )?;
+        spawn_game(
+            &config.dolphin,
+            &user_dir,
+            &config.game,
+            debug,
+            port,
+            mute,
+            &patch,
+        )?;
+        if debug {
+            println!("Next, attach the persistent sampler in another terminal:");
+            println!(
+                ".\\target\\debug\\multigalaxy.exe probe-mario {port} \"{}\" \"{}\" 200",
+                config.pal_dol.display(),
+                config.pal_symbols.display()
+            );
+        }
+        return Ok(());
+    }
     if args.len() == 3 && args[0] == "validate-mario-map" {
         let dol = fs::read(&args[1]).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
         let symbols = fs::read(&args[2]).map_err(|e| format!("cannot read Petari symbols: {e}"))?;
@@ -139,7 +500,14 @@ fn run() -> Result<(), String> {
         println!("No game image or Dolphin configuration was modified.");
         return Ok(());
     }
-    if args.len() >= 5 && args[0] == "launch" {
+    if args.len() == 3 && args[0] == "validate-pal-game" {
+        let dolphin = std::path::PathBuf::from(&args[1]);
+        let game = std::path::PathBuf::from(&args[2]);
+        verify_pal_game_image(&dolphin, &game)?;
+        println!("DolphinTool verified the game image as PAL RMGP01 revision 0; source image was read only.");
+        return Ok(());
+    }
+    if args.len() >= 7 && args[0] == "launch" {
         let dolphin = std::path::PathBuf::from(&args[1]);
         let user_dir = std::path::PathBuf::from(&args[2]);
         let game = std::path::PathBuf::from(&args[3]);
@@ -151,8 +519,9 @@ fn run() -> Result<(), String> {
         let mut mute = false;
         let mut gdb_enabled = false;
         let mut gdb_mode_selected = false;
-        let mut allstars = None;
-        let mut index = 5;
+        let patch_dir = std::path::PathBuf::from(&args[5]);
+        let dol_path = std::path::PathBuf::from(&args[6]);
+        let mut index = 7;
         while index < args.len() {
             match args[index].to_str() {
                 Some("--mute") if !mute => {
@@ -169,16 +538,9 @@ fn run() -> Result<(), String> {
                     gdb_mode_selected = true;
                     index += 1;
                 }
-                Some("--allstars") if allstars.is_none() && index + 2 < args.len() => {
-                    allstars = Some((
-                        std::path::PathBuf::from(&args[index + 1]),
-                        std::path::PathBuf::from(&args[index + 2]),
-                    ));
-                    index += 3;
-                }
                 _ => {
                     return Err(
-                        "launch options: [--mute] [--gdb|--no-gdb] [--allstars <patch-folder> <PAL-main.dol>]"
+                        "launch requires <AllStars-patch-folder> <PAL-main.dol>; options: [--mute] [--gdb|--no-gdb]"
                             .into(),
                     )
                 }
@@ -196,17 +558,14 @@ fn run() -> Result<(), String> {
         if !game.is_file() {
             return Err(format!("game image does not exist: {}", game.display()));
         }
+        verify_pal_game_image(&dolphin, &game)?;
         if gdb_enabled && !port_is_available(port) {
             return Err(format!(
                 "GDB port {port} is already in use; refusing to launch against another process"
             ));
         }
-        let prepared_allstars = if let Some((patch_dir, dol_path)) = &allstars {
-            let dol = fs::read(dol_path).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
-            Some(controller_patch::prepare_allstars(patch_dir, &dol)?)
-        } else {
-            None
-        };
+        let dol = fs::read(&dol_path).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
+        let prepared_allstars = controller_patch::prepare_allstars(&patch_dir, &dol)?;
         if user_dir.exists() {
             let mut entries = fs::read_dir(&user_dir)
                 .map_err(|e| format!("cannot inspect isolated Dolphin user directory: {e}"))?;
@@ -217,77 +576,26 @@ fn run() -> Result<(), String> {
             fs::create_dir_all(&user_dir)
                 .map_err(|e| format!("cannot create isolated Dolphin user directory: {e}"))?;
         }
-        let config_dir = user_dir.join("Config");
-        fs::create_dir_all(&config_dir)
-            .map_err(|e| format!("cannot create isolated Dolphin config directory: {e}"))?;
-        let dolphin_ini = config_dir.join("Dolphin.ini");
-        let config_text = dolphin_config(
+        let user_dir = user_dir
+            .canonicalize()
+            .map_err(|e| format!("cannot resolve isolated Dolphin user directory: {e}"))?;
+        configure_isolated_profile(
+            &user_dir,
+            &prepared_allstars,
+            None,
+            false,
             if gdb_enabled { Some(port) } else { None },
             mute,
-            prepared_allstars.is_some(),
+        )?;
+        return spawn_game(
+            &dolphin,
+            &user_dir,
+            &game,
+            gdb_enabled,
+            port,
+            mute,
+            &prepared_allstars,
         );
-        if !config_text.is_empty() {
-            fs::write(&dolphin_ini, config_text)
-                .map_err(|e| format!("cannot write isolated Dolphin configuration: {e}"))?;
-        }
-        if let Some(patch) = &prepared_allstars {
-            let settings_dir = user_dir.join("GameSettings");
-            fs::create_dir_all(&settings_dir)
-                .map_err(|e| format!("cannot create isolated GameSettings directory: {e}"))?;
-            fs::write(
-                settings_dir.join("RMGP01.ini"),
-                controller_patch::allstars_game_settings(patch),
-            )
-            .map_err(|e| format!("cannot write isolated AllStars GameSettings: {e}"))?;
-        }
-        let mut command = process::Command::new(&dolphin);
-        command.arg("-u").arg(&user_dir);
-        let stdout_log = fs::File::create(user_dir.join("dolphin.stdout.log"))
-            .map_err(|e| format!("cannot create isolated Dolphin stdout log: {e}"))?;
-        let stderr_log = fs::File::create(user_dir.join("dolphin.stderr.log"))
-            .map_err(|e| format!("cannot create isolated Dolphin stderr log: {e}"))?;
-        let stdout_path = user_dir.join("dolphin.stdout.log");
-        let stderr_path = user_dir.join("dolphin.stderr.log");
-        let mut child = command
-            .current_dir(
-                dolphin
-                    .parent()
-                    .unwrap_or_else(|| std::path::Path::new(".")),
-            )
-            .stdin(process::Stdio::null())
-            .stdout(process::Stdio::from(stdout_log))
-            .stderr(process::Stdio::from(stderr_log))
-            .arg("-e")
-            .arg(&game)
-            .spawn()
-            .map_err(|e| format!("cannot launch Dolphin: {e}"))?;
-        let window = wait_for_dolphin_window(&mut child, &stdout_path, &stderr_path)?;
-        println!(
-            "Started responsive Dolphin window {:?}, PID {}, with isolated user data at {}",
-            window.title,
-            child.id(),
-            user_dir.display()
-        );
-        if gdb_enabled {
-            if port_is_available(port) {
-                println!("Warning: GDB listener was not detected on port {port} within startup timeout; game launch continues.");
-            } else {
-                println!("GDB listener detected on port {port} without opening a connection.");
-            }
-            println!("Dolphin's GDB mode starts the emulated CPU paused; use this only for debugging and resume it in Dolphin after attaching.");
-        } else {
-            println!("GDB is disabled; the game uses Dolphin's normal running startup state.");
-        }
-        println!("Dolphin logs are isolated under {}", user_dir.display());
-        if mute {
-            println!("Dolphin test/debug audio mute enabled.");
-        } else {
-            println!("Dolphin audio retains its normal default setting.");
-        }
-        if let Some(patch) = &prepared_allstars {
-            println!("Enabled pinned PAL AllStars + L/ZL + R/ZR in this isolated profile only ({} writes; {} match PAL text).", patch.total_writes, patch.dol_text_writes);
-        }
-        return Ok(());
     }
     if (args.len() == 4 || args.len() == 5) && args[0] == "probe-mario" {
         let port = args[1]
@@ -316,7 +624,8 @@ fn run() -> Result<(), String> {
         let mut client = gdb::DolphinGdb::connect(
             format!("127.0.0.1:{port}").parse().unwrap(),
             std::time::Duration::from_secs(1),
-        )?;
+        )
+        .map_err(|e| format!("{e}; start Dolphin with dev-launch --debug on this port and wait for its GDB listener"))?;
         let disc_id = client.read_memory(0x8000_0000, 6)?;
         if disc_id != b"RMGP01" {
             return Err(format!(
@@ -325,7 +634,10 @@ fn run() -> Result<(), String> {
             ));
         }
         println!("Verified PAL Rev 0 DOL and Petari map; live Dolphin identity RMGP01.");
-        println!("Persistent GDB session open on port {port}; no memory writes are available.");
+        client
+            .continue_execution()
+            .map_err(|e| format!("could not resume Dolphin through GDB: {e}"))?;
+        println!("Persistent GDB session open on port {port}; sent the GDB continue packet. Gameplay is running while this read-only sampler polls memory.");
         println!("Type START then Enter to sample, STOP to pause, Q to quit. Use a controller to move Mario while this terminal has focus.");
         println!("Position field: MarioActor + 0x0c (three big-endian f32 values); sample interval: {interval} ms.");
         let (tx, rx) = std::sync::mpsc::channel::<String>();
@@ -371,7 +683,11 @@ fn run() -> Result<(), String> {
                         p.mario_actor, p.x, p.y, p.z
                     ),
                     Ok(Err(waiting)) => println!("unix_ms={timestamp} state=waiting {waiting:?}"),
-                    Err(error) => eprintln!("unix_ms={timestamp} state=error {error}"),
+                    Err(error) => {
+                        eprintln!("unix_ms={timestamp} state=error {error}");
+                        eprintln!("GDB session is no longer usable. Dolphin accepts one GDB connection per process; close this sampler and restart Dolphin before reconnecting.");
+                        break;
+                    }
                 }
                 let _ = std::io::stdout().flush();
             }
@@ -532,7 +848,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy <original.dol> <modified.dol> | multigalaxy identify <disc-header.bin> <main.dol> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> [--mute] [--gdb|--no-gdb] [--allstars <patch-folder> <PAL-main.dol>] | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port> [--debug] [--unmute] | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
@@ -614,7 +930,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{dolphin_config, parse_dol, port_is_available, verification_offsets, TcpListener};
+    use super::*;
 
     #[test]
     fn sampled_validation_reads_start_middle_and_end_without_scanning_section() {
@@ -625,16 +941,77 @@ mod tests {
 
     #[test]
     fn test_mute_is_opt_in_and_does_not_change_normal_audio_defaults() {
-        let normal = dolphin_config(Some(55173), false, false);
+        let normal = dolphin_config(Some(55173), false, false, false);
         assert!(normal.contains("GDBPort = 55173"));
         assert!(!normal.contains("[DSP]"));
-        let no_gdb = dolphin_config(None, false, false);
+        let no_gdb = dolphin_config(None, false, false, false);
         assert!(no_gdb.is_empty());
         assert!(!no_gdb.contains("GDBPort"));
-        let muted = dolphin_config(None, true, false);
+        let muted = dolphin_config(None, true, false, false);
         assert!(muted.contains("Muted = True"));
         assert!(muted.contains("Volume = 0"));
-        assert!(dolphin_config(None, false, true).contains("EnableCheats = True"));
+        assert!(dolphin_config(None, false, true, false).contains("EnableCheats = True"));
+        let development = dolphin_config(Some(55176), false, true, true);
+        assert!(development.contains("GFXBackend = D3D12"));
+        assert!(development.contains("GDBPort = 55176"));
+        assert!(!no_gdb.contains("GFXBackend"));
+    }
+
+    #[test]
+    fn isolated_dev_profile_activates_mandatory_patch_and_profile_without_touching_sources() {
+        let root = std::env::temp_dir().join(format!(
+            "mg1-profile-test-{}-{}",
+            std::process::id(),
+            super::timestamp_unix_ms()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let source_profile = root.join("source-controller.ini");
+        let profile_bytes = b"[Profile]\nExtension = Classic\nDevice = SDL/0/Test Pad\n";
+        fs::write(&source_profile, profile_bytes).unwrap();
+        let patch = controller_patch::PreparedPatch {
+            settings: "[OnFrame]\n$ AllStars\n0x80004000:dword:0x60000000\n\n[OnFrame_Enabled]\n$ AllStars\n".into(),
+            total_writes: 1,
+            dol_text_writes: 1,
+            dol_changed_words: 1,
+            changed_sites: Vec::new(),
+        };
+        let user = root.join("isolated");
+        configure_isolated_profile(
+            &user,
+            &patch,
+            Some(&source_profile),
+            true,
+            Some(55221),
+            true,
+        )
+        .unwrap();
+        let dolphin_ini = fs::read_to_string(user.join("Config/Dolphin.ini")).unwrap();
+        let game_ini = fs::read_to_string(user.join("GameSettings/RMGP01.ini")).unwrap();
+        let copied_profile =
+            fs::read(user.join("Config/Profiles/Wiimote/Pro Con to Classic Con.ini")).unwrap();
+        assert!(dolphin_ini.contains("GFXBackend = D3D12"));
+        assert!(dolphin_ini.contains("GDBPort = 55221"));
+        assert!(game_ini.contains("[OnFrame_Enabled]"));
+        assert!(game_ini.contains("WiimoteSource0 = 1"));
+        assert!(game_ini.contains("WiimoteProfile1 = Pro Con to Classic Con"));
+        assert_eq!(copied_profile, profile_bytes);
+        assert_eq!(fs::read(source_profile).unwrap(), profile_bytes);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn accepts_only_pal_rmgp01_revision_zero_game_images() {
+        assert!(parse_dolphintool_header("Game ID: RMGP01\nRevision: 0\nRegion: PAL\n").is_ok());
+        assert!(
+            parse_dolphintool_header("Game ID: RMGP01\nRevision: 1\nRegion: PAL\n")
+                .unwrap_err()
+                .contains("revision 0")
+        );
+        assert!(
+            parse_dolphintool_header("Game ID: RMGE01\nRevision: 0\nRegion: USA\n")
+                .unwrap_err()
+                .contains("only PAL RMGP01")
+        );
     }
 
     #[test]

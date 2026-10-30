@@ -8,7 +8,7 @@ Rust-first, online-only multiplayer modification research for PAL Super Mario Ga
 - The Rust CLI parses and compares DOLs; multiplayer runtime behavior is not implemented.
 - Exact PAL revision maps and a Dolphin game-side bridge remain unverified.
 - Russian, French, and English client-local localization is a required acceptance case, not a tested feature.
-- The PAL AllStars controller patch with both shoulder swaps has a pinned, optional isolated-profile launcher path; static checks pass, but Dolphin gameplay testing remains pending.
+- The PAL AllStars controller patch with both shoulder swaps is mandatory on every launcher path; source fingerprints and PAL Rev 0 compatibility are checked before Dolphin starts.
 - See [milestones](docs/milestones.md), [testing evidence](docs/testing.md), and [online architecture](docs/networking.md).
 
 ## Development
@@ -27,4 +27,4 @@ Original MultiGalaxy1 code is released under the [WTFPL Version 2](LICENSE). Thi
 
 ## Dolphin debug bridge status
 
-The CLI can launch Dolphin in a fresh isolated user directory and read guest memory through Dolphin 2609a's GDB stub. Normal launcher runs leave GDB disabled because Dolphin starts its emulated CPU paused when GDB is enabled. The test/debug-only `--mute` option silences that isolated run; without it, normal audio settings remain in effect. This is not a production mute setting. The supplied PAL RVZ identifies as `RMGP01` revision 0, and the current PAL `main.dol` matches every loaded Dolphin section. No player coordinate address or game hook is verified yet. See [runtime research](docs/research.md), [testing evidence](docs/testing.md), and [debug launch instructions](docs/building.md).
+The CLI supports isolated Dolphin profiles and read-only memory inspection. Debug launch enables GDB; the Rust sampler attaches persistently, sends the GDB continue command, and then polls while emulation runs. Actual player coordinates during movement are still awaiting hands-on gameplay verification. AllStars is mandatory, validated against PAL `RMGP01` Rev 0, and enabled in the per-game profile. PC-specific D3D12, Wii save, and controller profile inputs live only in ignored `development.local.toml`; production paths remain user-selected. See [building and debug instructions](docs/building.md).

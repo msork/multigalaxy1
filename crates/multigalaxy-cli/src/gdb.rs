@@ -46,6 +46,22 @@ impl DolphinGdb {
         })
     }
 
+    /// Resume a CPU paused by Dolphin's GDB startup path. Dolphin acknowledges
+    /// the `c` packet but intentionally sends no stop reply until a breakpoint.
+    /// Keep this same socket open for subsequent memory reads while it runs.
+    pub fn continue_execution(&mut self) -> Result<(), String> {
+        self.stream
+            .write_all(&encode_packet("c"))
+            .map_err(|e| format!("cannot send GDB continue request: {e}"))?;
+        let ack = read_byte_until(&mut self.stream, Instant::now() + self.request_timeout)?;
+        if ack != b'+' {
+            return Err(format!(
+                "expected GDB acknowledgement for continue, received 0x{ack:02x}"
+            ));
+        }
+        Ok(())
+    }
+
     /// Read emulated guest RAM. This client intentionally exposes no write operation.
     pub fn read_memory(&mut self, address: u32, length: usize) -> Result<Vec<u8>, String> {
         if length == 0 || length > MAX_READ {
@@ -215,6 +231,50 @@ mod tests {
             assert_eq!(read_byte(&mut stream).unwrap(), b'+');
         });
         let mut client = DolphinGdb::connect(address, Duration::from_secs(2)).unwrap();
+        assert_eq!(
+            client.read_memory(0x8000_4000, 4).unwrap(),
+            [0x3f, 0x80, 0, 0]
+        );
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn continue_ack_is_followed_by_memory_reads_on_same_session() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut packet = Vec::new();
+            loop {
+                let byte = read_byte(&mut stream).unwrap();
+                packet.push(byte);
+                if byte == b'#' {
+                    packet.push(read_byte(&mut stream).unwrap());
+                    packet.push(read_byte(&mut stream).unwrap());
+                    break;
+                }
+            }
+            assert_eq!(packet, encode_packet("c"));
+            stream.write_all(b"+").unwrap();
+
+            packet.clear();
+            loop {
+                let byte = read_byte(&mut stream).unwrap();
+                packet.push(byte);
+                if byte == b'#' {
+                    packet.push(read_byte(&mut stream).unwrap());
+                    packet.push(read_byte(&mut stream).unwrap());
+                    break;
+                }
+            }
+            assert_eq!(packet, encode_packet("m80004000,4"));
+            stream.write_all(b"+").unwrap();
+            stream.write_all(&encode_packet("3f800000")).unwrap();
+            assert_eq!(read_byte(&mut stream).unwrap(), b'+');
+        });
+
+        let mut client = DolphinGdb::connect(address, Duration::from_secs(2)).unwrap();
+        client.continue_execution().unwrap();
         assert_eq!(
             client.read_memory(0x8000_4000, 4).unwrap(),
             [0x3f, 0x80, 0, 0]

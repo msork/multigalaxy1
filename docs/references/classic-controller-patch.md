@@ -24,7 +24,7 @@ Current MultiGalaxy1 has no game-side hooks registered, so there are no current 
 
 ## Dolphin installation and launcher behavior
 
-The source file uses Dolphin `[OnFrame]` entries in `0xADDRESS:dword:0xVALUE` form. Dolphin's official SMG `RMG.ini` has an `[OnFrame]` section for these frame patches; enabled patch names are listed in `[OnFrame_Enabled]`, and cheats are gated by `Core.EnableCheats`. The launcher supports an explicit `--allstars <patch-folder> <PAL-main.dol>` option. It verifies the exact PAL Rev 0 DOL and the three patch hashes, merges the swaps, writes only `GameSettings/RMGP01.ini` plus the cheat enable setting inside the fresh isolated Dolphin user directory, and leaves the RVZ and normal Dolphin profile untouched. With no option, it does not install or enable controller patches.
+The source file uses Dolphin `[OnFrame]` entries in `0xADDRESS:dword:0xVALUE` form. Dolphin's official SMG `RMG.ini` has an `[OnFrame]` section for these frame patches; enabled patch names are listed in `[OnFrame_Enabled]`, and cheats are gated by `Core.EnableCheats`. Every launcher invocation requires the patch folder and PAL `main.dol`. It verifies the exact PAL Rev 0 DOL and the three patch hashes, merges the swaps, writes `GameSettings/RMGP01.ini` plus the cheat enable setting inside an isolated Dolphin profile, and fails closed when validation fails. It never edits the RVZ or regular Dolphin profile.
 
 No patch assets are committed. The upstream repository has no license file or explicit redistribution grant in the inspected tree, so retain its third-party status and attribution. WTFPL applies only to original MultiGalaxy1 code.
 

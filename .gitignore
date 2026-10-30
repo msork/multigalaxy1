@@ -4,6 +4,7 @@ __pycache__/
 build/
 dist/
 /target/
+/development.local.toml
 *.elf
 *.dol
 *.iso

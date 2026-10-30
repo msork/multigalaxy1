@@ -1,0 +1,9 @@
+# Copy this to development.local.toml and set only your local paths.
+# development.local.toml is git-ignored; never commit it.
+dolphin = 'C:\Games\Dolphin-x64\Dolphin.exe'
+game = 'C:\Games\Super Mario Galaxy (Europe).rvz'
+patch_folder = 'C:\Patches\SMG\PAL\Individual Patches'
+pal_dol = 'reference\original\main.dol'
+pal_symbols = 'target\petari-rmgp01-symbols.txt'
+wii_save = 'C:\Saves\super-mario-galaxy.bin'
+controller_profile = 'C:\Controllers\Pro Con to Classic Con.ini'
