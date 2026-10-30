@@ -1,22 +1,46 @@
 # Architecture
 
-## Language policy
+## Product shape
 
-Rust is primary. Use Rust for portable gameplay rules, player-slot and controller models, deterministic synchronization logic, camera planning, patch generation, host tools, and tests. PowerPC assembly is restricted to verified trampolines and ABI-sensitive hooks. C/C++ is limited to requirements imposed by the original engine, Petari, or Wii toolchains. Python is for exceptional supporting scripts only.
+MultiGalaxy1 is an online-only Rust launcher/mod stack. Each participant runs a separate local PAL Galaxy 1 session in Dolphin and renders their own full-screen camera. There is no local split-screen and no Dolphin NetPlay. Game simulation executes in each client; the custom online layer communicates actor snapshots and shared events.
 
-## Workspace
+```text
+Rust launcher/client
+  ├─ lobby, identity, game/revision/localization validation
+  ├─ Rust transport, prediction, and reconciliation
+  ├─ Dolphin process lifecycle (one instance per player)
+  └─ versioned local IPC
+       └─ injected game-side bridge (verified PPC/C++ shim; Rust where target permits)
+            └─ SMG1 actor, input, progression, and rendering hooks
 
-Current crates:
+Authoritative session server
+  ├─ lobby/membership/character reservations
+  ├─ tick and protocol negotiation
+  ├─ shared progression and contested interaction arbitration
+  └─ validation, snapshots, reconnect policy
+```
 
-- `multigalaxy-patch`: safe DOL parsing and comparison; eventual validation and patch conflict model.
-- `multigalaxy` CLI: host-facing inspection and patch commands.
+## Rust-first workspace
 
-Planned crates (introduced as their APIs become testable): `multigalaxy-core`, `multigalaxy-player`, `multigalaxy-characters`, `multigalaxy-input`, `multigalaxy-camera`, `multigalaxy-network`. Wii runtime integration belongs in `game/hooks`, `game/bindings`, and `game/runtime`; use `no_std` only after target feasibility passes.
+- `multigalaxy-patch`: safe DOL parsing, PAL revision fingerprints, hook conflict validation.
+- `multigalaxy` CLI/launcher: game validation, Dolphin lifecycle, local IPC startup.
+- Planned `multigalaxy-protocol`: versioned wire messages and state types.
+- Planned `multigalaxy-network`: client/server transport, lobby, authoritative session model.
+- Planned `multigalaxy-game-bridge`: launcher-side IPC client and bridge protocol.
+- Game runtime modules contain only narrow verified hooks/bindings. Keep portable character rules in Rust when Wii toolchain capabilities permit; C++/PPC may be unavoidable.
 
-## Boundaries
+No standard Rust target establishes Wii Broadway ABI/link compatibility. Rust runtime support is conditional on proving big-endian PPC EABI, compiler/linker, runtime, panic handling, and DOL integration. Launcher, networking, protocol, tests, and patch tools remain Rust.
 
-Portable Rust logic must not read arbitrary game memory. A narrow game binding layer exposes verified engine operations; every unsafe operation stays there with documented assumptions. Player identity is a fixed slot enum and per-player state is indexed by slot, avoiding accidental shared mutable controller or camera state. Deterministic gameplay state is separated from presentation state so each online peer may render a local camera arrangement.
+## State and authority
 
-## Engine integration
+Player slots are stable session identities and own transform, velocity, facing, animation, gravity frame, ability state, health, and life state. Bridge messages include session tick and build identity. Camera and locale are per-client presentation state and excluded from authoritative simulation hashes.
 
-The initial implementation must identify one verified SMG1 revision. Hooks require source-backed symbols or reproducible disassembly, expected original instructions, overwrite size, ABI, and collision detection. The Rust code cannot replace the game's native C++ engine. A hook can dispatch to Rust only if the compiler ABI/linker/runtime are proven compatible.
+Clients predict responsive local movement and cosmetic animation where correction is safe. The server arbitrates progression, stars, boss phase transitions, shared item ownership, death/respawn, stage transitions, and contested interactions. It publishes sequenced authoritative events and periodic snapshots. Client reconciliation occurs through verified bridge hooks; never write arbitrary game memory through guessed offsets.
+
+## Dolphin integration
+
+A separate launcher cannot expose game actors by itself. The minimal runtime proof needs a game-side bridge to read local Mario state, represent remote characters as rendered actors, and accept authoritative events. BSMSO documents a RAM-mailbox bridge between its launcher and game module, with a custom PPC module and relay server. That is a relevant precedent; its GPL-3.0 license is not compatible with this repository's MIT license for direct incorporation without a deliberate licensing change. Independently investigate Dolphin debugger, memory and source IPC options before selecting a versioned mailbox/injected bridge or a small emulator fork. Do not rely on brittle UI automation or unbounded raw memory scanning.
+
+## PAL and localization identity
+
+Support only PAL SMG1 builds with exact verified ID/revision/DOL maps. Reject unknown versions. Gameplay payloads must match across peers. Russian, French, and English presentation assets remain local and can differ only after audit proves they cannot affect simulation. See `docs/localization.md` and `docs/references/russian-patch.md`.

@@ -1,5 +1,12 @@
 //! Safe, read-only DOL inspection and comparison primitives.
+mod revision;
+
 use std::fmt;
+
+pub use revision::{
+    BuildFingerprint, DiscIdentity, HookSite, HookSiteStatus, RevisionCatalog, RevisionError,
+    VersionMap,
+};
 
 pub const DOL_HEADER_SIZE: usize = 0x100;
 const TEXT_COUNT: usize = 7;

@@ -2,29 +2,33 @@
 
 ## SMG1 reverse engineering
 
-Petari is a public, work-in-progress SMG1 decompilation with a CC0-1.0 repository license. Its README says it contains no game assets or assembly, requires the user's own regional `main.dol`, and builds through its Python configure script and Ninja. It is the preferred source for SMG1-specific symbols, structures, and function context; pin a revision and verify against the selected executable before use. It uses a C++ decompilation/build pipeline rather than a Rust-native engine replacement.
+Petari is a public work-in-progress SMG1 decompilation with a CC0-1.0 repository license. It requires a user-supplied regional `main.dol` and builds with Python/Ninja. Prefer it for symbols and structures, then verify all mappings against the exact supported executable. Its engine pipeline is C++, not a Rust replacement.
 
-Bussun describes itself as a WIP SMG1 custom-code injector with region symbol maps, Kamek headers/linker, and a memory loader. Its README says CodeWarrior PPC EABI 4.1 is required for C++ ABI compatibility, and its loader currently only works with USA. GitHub's visible root file list has no license file, so do not copy/reuse its code until licensing is clarified. It is useful evidence for existing Galaxy 1 integration constraints, not a chosen dependency.
+Bussun is a WIP SMG1 injector with region maps and a Kamek/toolchain workflow. Its README requires CodeWarrior PPC EABI for C++ ABI compatibility and says its loader supports USA only. No root license was visible; do not reuse its code without license clarification.
 
-The SMG2 multiplayer repository is CC0-1.0 and contains PPC assembly hooks, multiple SMG2 symbol maps, and split-screen work. Use it only for conceptual comparison; those symbols and hook sites are not Galaxy 1 compatible. It also contains an `.arc` asset in the root; do not redistribute or assume the code license clears game-derived assets.
+The SMG2 multiplayer repository is CC0-1.0 and contains PPC hooks and SMG2-specific maps. It is conceptual comparison only; no SMG1 compatibility is assumed and game-derived assets must not be redistributed.
 
-The local reference files provide a controlled binary comparison target. The Rust CLI confirms sizes, SHA-256, DOL sections, changed-byte ranges, and PPC branch destinations. Full instruction/function disassembly remains pending. The AllReds file is compiled code, not source. Do not copy it into release artifacts.
+Local original and AllReds DOLs permit reproducible static comparison. The Rust CLI reproduced their hashes, DOL sections, changed bytes/runs, and branch targets. AllReds is a compiled binary, not source. Do not copy it into releases. No production PAL revision mapping exists yet because the known original DOL hash is not tied to a verified disc ID/revision.
 
-## Rust target feasibility
+## Rust runtime feasibility
 
-Rust is the default for new portable and host-side code. The host-side DOL library and CLI are Rust. Rust's official target list includes 32-bit `powerpc-unknown-linux-gnu`, but that target describes Linux/glibc and is not the Wii's bare-metal ABI. The current target list does not provide a standard bare-metal 32-bit PowerPC target. Therefore direct Rust injection is **not yet proven**; a custom target specification/build-std approach or another maintained PPC Rust toolchain may be necessary, and neither has been validated here. Before injecting Rust, verify code generation for the Wii Broadway CPU, big-endian PPC EABI/calling convention, relocations/linker, runtime symbols, panic behavior, and final DOL integration. Rust's PowerPC backend alone does not prove compatibility. Keep a C/C++ or assembly integration shim when the decompilation/build toolchain requires it; do not rewrite engine code merely to satisfy a language preference. See the [official Rust platform support list](https://doc.rust-lang.org/rustc/platform-support.html).
+Rust is primary for host tools, launcher, network, protocol, portable game rules, and tests. `powerpc-unknown-linux-gnu` is not a Wii bare-metal target and no target/toolchain has been validated for Galaxy runtime injection. Before Rust runtime use, prove Broadway code generation, big-endian PPC EABI, linker relocations, runtime symbols, panic behavior, and DOL integration. Keep narrow C/C++/assembly shims when the engine/toolchain requires them. See [Rust platform support](https://doc.rust-lang.org/rustc/platform-support.html).
 
-## Online model
+## Online architecture
 
-Dolphin NetPlay forwards/synchronizes controller input through deterministic lockstep; it does not provide a generic game-state replication API. A mod can synchronize player actors if each peer deterministically simulates all actors from the same inputs and game state. This is an inference requiring in-game validation, especially across custom code, floating point, randomness, stage transitions, and saves. Per-client camera presentation may be local-only if view state is excluded from simulation determinism; full-screen per remote player is a presentation feature that ordinary NetPlay does not itself supply.
+The selected product architecture is custom online-only, one Dolphin instance per participant, with independent full-screen cameras. Dolphin's built-in NetPlay and local split-screen are not requirements. An injected game-side bridge must expose local actor state and remote-actor operations through versioned IPC; launcher orchestration alone cannot instantiate in-game characters. No supported generic remote game-state API has been verified. Inspect Dolphin's debugger/memory facilities and source interfaces before deciding whether a narrow Dolphin fork is required. Do not use brittle memory scanning as a product interface.
+
+SM64CoopDX documents client/server, direct/relay transports, network player records, reliable packet support, and game/mod synchronization hooks. That suggests separating transport from a game-level sync API; SM64's engine logic is not portable to Galaxy. Better Sunshine Online (BSMSO) is an especially close reference: its README describes one Dolphin per player, a dedicated state relay, a launcher bridging Dolphin memory through a RAM mailbox, a PPC game module exporting Mario state/rendering remote players, and TCP+UDP server networking. Its repository labels the code GPL-3.0. This is evidence the architecture is plausible, not evidence that Galaxy hooks or integration exist. MultiGalaxy1 currently copies no BSMSO code; any future reuse must preserve GPL obligations and undergo a license compatibility review against this project's MIT license, or be independently implemented.
+
+Russian, French, and English are client-local presentation targets. The requested Russian archive is unaudited; see `docs/references/russian-patch.md`. No multiplayer or locale behavior is runtime verified.
 
 ## Sources
 
-- [Petari](https://github.com/SMGCommunity/Petari) — WIP SMG1 decompilation; CC0-1.0; uses user-provided game executable and Python/Ninja build setup.
-- [Bussun](https://github.com/SMGCommunity/Bussun) — WIP SMG1 injector; no license file visible in repository root; USA-only current loader per README; CodeWarrior PPC EABI requirement.
-- [SMG2 multiplayer](https://github.com/galaxymaster2007/smg2-multiplayer) — CC0-1.0 source, comparative reference only; no SMG1 compatibility assumed.
-- [Luma's Workshop guides](https://lumasworkshop.com/guides/) — WIP Galaxy modding guide describing module-based code injection, models, animations, levels, and other topics; individual game-specific details still require verification.
-- [Dolphin NetPlay guide](https://dolphin-emu.org/docs/guides/netplay-guide/) — official operational constraints.
-- [Dolphin NetPlay server source](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/Core/NetPlayServer.cpp) — current upstream implementation, subject to change.
-- [Galaxy Patch](https://github.com/Wii-Patches/Galaxy-Patch) — MIT-licensed SMG1 control patch description and region support; review revision-specific hooks before integration.
-- [Galaxy Patch license](https://github.com/Wii-Patches/Galaxy-Patch/blob/main/LICENSE) — MIT.
+- [Petari](https://github.com/SMGCommunity/Petari) — WIP SMG1 decompilation; CC0-1.0; user-provided game executable and Python/Ninja build.
+- [Bussun](https://github.com/SMGCommunity/Bussun) — WIP SMG1 injector; USA loader and CodeWarrior PPC EABI constraints per README; license unclear.
+- [SMG2 multiplayer](https://github.com/galaxymaster2007/smg2-multiplayer) — comparative source only; no SMG1 compatibility.
+- [Luma's Workshop guides](https://lumasworkshop.com/guides/) — Galaxy modding research; verify each game-specific claim.
+- [SM64CoopDX](https://github.com/coop-deluxe/sm64coopdx) and [sync hooks](https://github.com/coop-deluxe/sm64coopdx/blob/main/docs/lua/guides/hooks.md) — multiplayer/synchronization reference; verify license before code reuse.
+- [Better Super Mario Sunshine Online](https://github.com/Daytendo64/Better-Super-Mario-Sunshine-Online-BSMSO-) — Dolphin-era architecture reference; verify license before code reuse.
+- [Galaxy Patch](https://github.com/Wii-Patches/Galaxy-Patch) and [MIT license](https://github.com/Wii-Patches/Galaxy-Patch/blob/main/LICENSE) — SMG1 controller patch reference; exact four-player integration remains unverified.
+- [Dolphin source](https://github.com/dolphin-emu/dolphin) — inspect debugger and source integration options for the game-side bridge.

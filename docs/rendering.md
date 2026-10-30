@@ -1,7 +1,5 @@
 # Rendering
 
-Independent player views require independent camera transforms and projection state, viewport/scissor management, repeated scene rendering, and HUD decisions. The original renderer may keep global camera, GX state, visibility, and render-pass data; each must be investigated before adding extra passes.
+MultiGalaxy1 is online-only. Every participant runs one Dolphin instance and receives the original full-screen camera behavior locally. Multi-client rendering means rendering remote player actors in each independent game instance; it does not mean split-screen.
 
-Target layouts: one full viewport; two horizontal or vertical; three independently framed; four quadrants. Online client-specific full-screen camera is a local presentation mode; local split screen remains supported. Multi-pass rendering increases scene cost and may multiply expensive render work. Measure on Dolphin and inspect framebuffer/XFB constraints before selecting implementation.
-
-No viewport support is implemented yet. Camera APIs and addresses remain unknown until confirmed in Petari/disassembly for the selected revision.
+The game-side bridge must create/update remote character actors through verified Galaxy engine operations, including model, animation, gravity-relative orientation, and appropriate effects. Remote actors must not take over local camera ownership or consume local controller input. No engine addresses or actor APIs are known to be verified yet. Two-instance visible remote-actor rendering is the M3 runtime acceptance gate.

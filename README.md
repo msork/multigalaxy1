@@ -1,25 +1,21 @@
 # MultiGalaxy1
 
-An open source multiplayer modification research and development project for the original Super Mario Galaxy on Wii, intended for Dolphin Emulator. The project is early-stage: current work establishes binary-analysis tooling and evidence; no multiplayer runtime feature is implemented yet.
+Rust-first, online-only multiplayer modification research for PAL Super Mario Galaxy 1, with Dolphin as the local emulation backend. Each participant runs a separate Dolphin instance and sees a full-screen local camera. MultiGalaxy1 supplies the launcher, game-side bridge, and online session layer; it does not use Dolphin NetPlay.
 
 ## Current status
 
-- M0 research and feasibility is in progress.
-- `multigalaxy-patch` and the `multigalaxy` CLI provide Rust DOL inspection and comparison.
-- Local reference executables are analysis inputs only and must not be redistributed.
-- See [docs/milestones.md](docs/milestones.md) for acceptance status and [docs/testing.md](docs/testing.md) for evidence levels.
+- M0 research and PAL DOL analysis tooling are in progress.
+- The Rust CLI parses and compares DOLs; multiplayer runtime behavior is not implemented.
+- Exact PAL revision maps and a Dolphin game-side bridge remain unverified.
+- Russian, French, and English client-local localization is a required acceptance case, not a tested feature.
+- See [milestones](docs/milestones.md), [testing evidence](docs/testing.md), and [online architecture](docs/networking.md).
 
 ## Development
-
-Requires Rust and Cargo (see the workspace `rust-version`).
 
 ```powershell
 cargo test --workspace
 cargo run -p multigalaxy -- reference/original/main.dol reference/allreds/main.dol
+cargo run -p multigalaxy -- identify disc-header.bin main.dol
 ```
 
-Only use game files you are legally entitled to use. The patch workflow is intended to consume a user-supplied clean executable and never downloads proprietary files.
-
-## Project documents
-
-See `docs/` for research, feasibility, architecture, controls, networking, rendering, compatibility, and milestone specifications. Binary findings are recorded in `docs/references/`.
+Use only game files you are legally entitled to use. The launcher must not download or bundle proprietary game files.

@@ -1,5 +1,5 @@
 # Compatibility
 
-Initial revision is not selected yet. The supplied original hash is the candidate baseline; verify game ID/revision from a legal disc image and reconcile with toolchain symbols before allowing patching. Patch generation must require an exact expected hash/revision, preserve its input, be deterministic, and reject overlapping hunks/hooks.
+Current target scope is PAL SMG1 only. No PAL revision is yet accepted for patching. The supplied original DOL hash is a candidate executable fingerprint, but it is not tied to a verified game ID/revision because the DOL does not contain the full disc identity. Read `RMGPxx` game ID and revision from the user's disc header, then match both and exact main.dol SHA-256 to a verified map. The Rust detector returns unknown for unmapped identities/hashes. A map requires expected original bytes and provenance for each hook; map validation rejects unverified sites, out-of-text addresses, signature mismatches, and overlaps.
 
-Classic Controller support is an integration target, not a present compatibility claim. See `docs/references/classic-controller-patch.md`. Regional variants require separate hashes and hook validation.
+Classic Controller support is an integration target, not a present compatibility claim. See `docs/references/classic-controller-patch.md`. Each PAL revision needs a separate DOL hash and hook validation even when its game ID is the same.

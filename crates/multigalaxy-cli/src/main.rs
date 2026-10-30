@@ -1,10 +1,31 @@
-use multigalaxy_patch::{branch_target, changed_ranges, parse_dol, sha256, SectionKind};
+use multigalaxy_patch::{
+    branch_target, changed_ranges, parse_dol, sha256, DiscIdentity, RevisionCatalog, SectionKind,
+};
 use std::{env, fs, process};
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 3 && args[0] == "identify" {
+        let header = fs::read(&args[1]).map_err(|e| format!("cannot read disc header: {e}"))?;
+        let dol = fs::read(&args[2]).map_err(|e| format!("cannot read main.dol: {e}"))?;
+        let disc = DiscIdentity::from_header(&header).map_err(|e| e.to_string())?;
+        let digest = sha256(&dol)
+            .iter()
+            .map(|v| format!("{v:02x}"))
+            .collect::<String>();
+        println!(
+            "Disc: {} revision {}; main.dol SHA-256 {digest}",
+            disc.game_id, disc.revision
+        );
+        let catalog = RevisionCatalog::new();
+        let map = catalog
+            .identify(&disc, &dol)
+            .map_err(|e| format!("{e}; no verified PAL build maps are registered yet"))?;
+        println!("Verified PAL map: {}", map.provenance);
+        return Ok(());
+    }
     if args.len() != 2 {
-        return Err("usage: multigalaxy <original.dol> <modified.dol>".into());
+        return Err("usage: multigalaxy <original.dol> <modified.dol> | multigalaxy identify <disc-header.bin> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;

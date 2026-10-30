@@ -1,18 +1,35 @@
-# Networking
+# Online networking
 
-## M0 finding
+## Product decision
 
-Dolphin NetPlay is the first option to investigate. Wii NetPlay is officially described as experimental. It supports assigning Wii Remote slots among remote peers, including multiple slots on one host/client PC, and standard NetPlay assignment can accommodate up to four participating input slots. Its lockstep model depends on matching game region/revision, Dolphin version, and emulated environment. It is not an actor replication service. If every instance executes identical mod logic and receives synchronized input, each may simulate all four actors locally without sending actor transforms. This is an architectural inference, not a tested result.
+MultiGalaxy1 is online-only and does not use Dolphin NetPlay. Every participant runs a separate local PAL Galaxy 1 session in Dolphin and sees their own full-screen camera. MultiGalaxy1 owns the lobby, transport, game-side synchronization, and shared session state.
 
-Fair Input Delay is Dolphin's default and gives all players the same delay; Host Input Authority trades zero host latency for higher client latency. The mod should avoid peer-specific authoritative gameplay state. NetPlay can load/save host progress, but this does not overwrite client saves; it can synchronize Wii saves for a session. Saves and progression should therefore be deterministic/shared by construction or have an explicit host-authority/save-copy policy. A disconnect is a session failure/restart unless NetPlay itself handles the client departure without changing input topology; gameplay recovery is unverified.
+## Reference architecture research
 
-Camera and viewport choices should be local presentation state. This supports each client viewing the full-screen camera for its own player while preserving local split-screen, provided camera updates and render choices do not alter simulation.
+SM64CoopDX describes a client/server network system with direct socket and relay-backed transports, network player records, reliable packet paths, and synchronization support exposed to game/mod state. Its key lesson is an explicit game-level sync API and transport abstraction. Better Sunshine Online is a closer GameCube-era reference; its current source, license, and client/server details must be verified before reuse. These projects are design references, not dependencies. Do not copy code until license and compatibility are verified. SM64 mechanics are not directly portable to Galaxy.
 
-## Experiment plan
+## State and authority
 
-1. Confirm four virtual Wii Remote slots synchronize in a stock/local multiplayer test.
-2. Add a deterministic synthetic actor driven by a distinct slot and compare state across peers.
-3. Test input delay, desync detection, reset/reconnect behavior, save timing, transitions, random events, and mixed performance.
-4. Only consider a custom network protocol if required semantics cannot be expressed through NetPlay.
+State snapshots carry stable player ID, character, tick, stage/scene, position, orientation, velocity, animation/movement state, gravity-relative frame, health/life state, and ability state. Reliable sequenced events carry interactions, damage/death, respawn, star/boss/progression changes, and stage transitions. Cadence, quantization, interpolation, loss handling, and tick rules need runtime measurements.
 
-Custom networking would need state authority, transport, rollback/interpolation, prediction, version negotiation, and save ownership, while Dolphin still emulates each console. This complexity is unjustified until NetPlay experiments fail.
+The server owns lobby membership, character reservations, session tick, and arbitration for shared progression and contested interactions. Clients may predict local movement and reconcile to authoritative snapshots. Progression, boss phases, shared rewards, respawn arbitration, and transitions use idempotent event IDs. Disconnect/reconnect must not duplicate rewards or corrupt progress.
+
+## Dolphin boundary
+
+A launcher can start one Dolphin process per player and configure local controls, locale, and game path, but cannot make game actors appear by itself. A game-side bridge is required to read local player state and create/update remote rendered actors. Use verified injected hooks with a versioned local IPC channel to the Rust launcher. Investigate Dolphin debugger, memory, FIFO, and source-level embedding APIs. A generic supported remote game-state API has not been established. Prefer bridge IPC; use a Dolphin fork only if upstream launch/control/debug interfaces cannot safely support it. Raw memory scanning and UI automation are unacceptable.
+
+Bridge messages need bounded sizes, protocol/build negotiation, lifecycle/error reporting, backpressure, and safe shutdown. Every game memory access must bind to an exact verified PAL revision and hook signature.
+
+## Client-local localization
+
+Each client chooses Russian, French, or English presentation locally. Locale assets may differ only after audit proves they do not affect simulation, timing, collision, branching, or progression. Session negotiation verifies common gameplay hashes and an audited locale package identity. No Dolphin NetPlay checks exist in this architecture; do not imply their absence is a compatibility validation.
+
+## Two-Dolphin proof
+
+1. Start two separate Dolphin processes using the same verified PAL build.
+2. Connect two Rust clients to one local session server.
+3. Read local player state through the game-side bridge and transmit sequenced snapshots.
+4. Apply the remote state through a remote-actor bridge and render it in each full-screen view.
+5. Measure latency, packet loss, correction, and teardown; repeat with different local languages.
+
+Synthetic protocol tests do not pass this proof. Require Dolphin boot, a visible remote character on both clients, independent control, and correct player identity before claiming runtime multiplayer.

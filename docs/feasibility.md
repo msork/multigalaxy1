@@ -2,25 +2,26 @@
 
 ## Current assessment
 
-Four locally simulated players are technically plausible but require substantial work: the original game is built around one Mario and global camera/render state. A second full actor is not obtained by allocating another Mario object; the actor lifecycle, update loops, collision, world interactions, HUD, and progression hooks must all be understood.
+Four-player online play is technically plausible but requires modifying the game engine path. Each user runs their own Dolphin and the mod renders remote actors locally. SMG1 was built around one Mario and global state; a second character requires understanding actor lifecycle, update, collision, gravity, interactions, camera ownership, HUD, and progression.
 
-Online is not inherently ruled out by Dolphin NetPlay. Lockstep could make actors deterministic when all players run the same patched build and inputs are mapped to synchronized Wii Remote slots. Custom actors, save data, and local camera behavior still need verification. NetPlay does not synchronize mod state generically.
+BSMSO provides a concrete GameCube/Dolphin precedent: a PPC game module exports local player state and renders remote players, a launcher communicates through a RAM mailbox, and a relay server forwards state. Its GPL-3.0 code is not incorporated into this MIT project. Galaxy-specific bridge feasibility remains unproven.
 
-Classic Controller patches rewrite KPAD/game input handling and may overlap player-input hooks. Compose source-level changes or generate conflict-aware patches; never concatenate blind binary patches.
+The largest integration risk is a reliable game-side data path. A launcher alone cannot see structured gameplay state. First investigate Dolphin source/debugger/memory APIs, then prefer an injected bridge with versioned IPC. A small Dolphin fork is an option only if the needed lifecycle, memory, or process APIs are unavailable upstream. Do not use unverified address scanning.
+
+Classic Controller integration remains an independent input challenge. The patch may rewrite KPAD/game input and conflict with player-input hooks. Integrate at source level or generate conflict-aware patches; never concatenate blind binary patches.
 
 ## Rust-first go/no-go gates
 
-1. Confirm Rust target support and available PPC backend. The installed rustc lists Linux/FreeBSD/etc. PowerPC targets, but no standard bare-metal 32-bit PowerPC target; only the Windows host target is installed.
-2. Produce a minimal object for the exact Wii ABI and inspect its sections/relocations.
-3. Link through the selected Wii toolchain with known imports and no unexpected runtime symbols.
-4. Load the hook in Dolphin with a legal local game and verify a harmless observable effect.
+1. Continue Rust for launcher, networking, protocol, patch tooling, simulation data, and host tests.
+2. Prove object generation/linking for the Wii Broadway ABI before putting Rust in injected runtime.
+3. Select narrow C/C++/PPC hooks if Rust target, ABI, or linker feasibility fails.
+4. Boot a harmless verified hook on Dolphin before depending on it for multiplayer.
 
-Failure at a gate selects a hybrid model: Rust portable algorithms and host tools, minimal C/C++ for engine access, and assembly for proven hooks. Rust remains primary by code volume and new functionality where reliable.
+## Not established
 
-## Not yet established
-
-- Exact game revision targeted. Hash match is suggestive but needs disc ID/revision corroboration.
-- Availability of a Rust PPC cross toolchain in the current environment.
-- AllReds hook targets and their intended semantics.
-- NetPlay four-input behavior and custom actor determinism in this mod.
-- Maximum stable local viewport count and rendering cost.
+- Exact PAL revision mapping and hook semantics.
+- Dolphin bridge mechanism and any requirement for a fork.
+- Real game-state exchange or remote actor rendering.
+- Online latency, authority/prediction, four-player stability, progression, or locale separation.
+- Rust Wii runtime compilation.
+- Russian patch contents, revision, and license.
