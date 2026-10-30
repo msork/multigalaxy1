@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+/target/
+*.elf
+*.dol
+*.iso
+*.wbfs
+*.gcm
+*.map
+*.o
+*.a
+*.so
+*.dll
+*.exe

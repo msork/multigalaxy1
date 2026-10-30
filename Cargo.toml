@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/multigalaxy-patch",
+    "crates/multigalaxy-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.74"
+
+[workspace.dependencies]
+multigalaxy-patch = { path = "crates/multigalaxy-patch" }
