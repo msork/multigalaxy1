@@ -39,7 +39,7 @@ Clients predict responsive local movement and cosmetic animation where correctio
 
 ## Dolphin integration
 
-A separate launcher cannot expose game actors by itself. The minimal runtime proof needs a game-side bridge to read local Mario state, represent remote characters as rendered actors, and accept authoritative events. BSMSO documents a RAM-mailbox bridge between its launcher and game module, with a custom PPC module and relay server. That is a relevant precedent; its GPL-3.0 license is not compatible with this repository's MIT license for direct incorporation without a deliberate licensing change. Independently investigate Dolphin debugger, memory and source IPC options before selecting a versioned mailbox/injected bridge or a small emulator fork. Do not rely on brittle UI automation or unbounded raw memory scanning.
+A separate launcher cannot expose game actors by itself. The minimal runtime proof needs a game-side bridge to read local Mario state, represent remote characters as rendered actors, and accept authoritative events. BSMSO documents a RAM-mailbox bridge between its launcher and game module, with a custom PPC module and relay server. It is a reference only; retain its GPL-3.0 license and do not incorporate its code without a separate review. Independently investigate Dolphin debugger, memory and source IPC options before selecting a versioned mailbox/injected bridge or a small emulator fork. Do not rely on brittle UI automation or unbounded raw memory scanning.
 
 ## PAL and localization identity
 

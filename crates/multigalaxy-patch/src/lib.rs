@@ -30,6 +30,8 @@ pub enum SectionKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DolInfo {
     pub entry_point: u32,
+    pub bss_address: u32,
+    pub bss_size: u32,
     pub sections: Vec<Section>,
 }
 
@@ -96,6 +98,8 @@ pub fn parse_dol(data: &[u8]) -> Result<DolInfo, DolError> {
     }
     Ok(DolInfo {
         entry_point: be32(data, 0xe0),
+        bss_address: be32(data, 0xd8),
+        bss_size: be32(data, 0xdc),
         sections,
     })
 }
@@ -243,6 +247,8 @@ mod tests {
         d[0..4].copy_from_slice(&0x100u32.to_be_bytes());
         d[0x48..0x4c].copy_from_slice(&0x80004000u32.to_be_bytes());
         d[0x90..0x94].copy_from_slice(&0x10u32.to_be_bytes());
+        d[0xd8..0xdc].copy_from_slice(&0x80500000u32.to_be_bytes());
+        d[0xdc..0xe0].copy_from_slice(&0x2000u32.to_be_bytes());
         d[0xe0..0xe4].copy_from_slice(&0x80004000u32.to_be_bytes());
         for (i, b) in d[0x100..0x110].iter_mut().enumerate() {
             *b = i as u8;
@@ -253,6 +259,8 @@ mod tests {
     fn parses_header_sections_and_entry() {
         let info = parse_dol(&fixture()).unwrap();
         assert_eq!(info.entry_point, 0x80004000);
+        assert_eq!(info.bss_address, 0x80500000);
+        assert_eq!(info.bss_size, 0x2000);
         assert_eq!(
             info.sections,
             vec![Section {

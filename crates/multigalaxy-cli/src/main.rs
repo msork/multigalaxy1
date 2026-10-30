@@ -1,4 +1,5 @@
 mod gdb;
+mod player_probe;
 
 use multigalaxy_patch::{
     branch_target, changed_ranges, parse_dol, sha256, DiscIdentity, RevisionCatalog, SectionKind,
@@ -16,6 +17,13 @@ fn verification_offsets(section_len: usize, full_scan: bool) -> Vec<usize> {
     offsets
 }
 
+fn timestamp_unix_ms() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+}
+
 fn dolphin_config(port: u16, mute: bool) -> String {
     let mut config = format!("[General]\nGDBPort = {port}\n");
     if mute {
@@ -26,6 +34,24 @@ fn dolphin_config(port: u16, mute: bool) -> String {
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 3 && args[0] == "validate-mario-map" {
+        let dol = fs::read(&args[1]).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
+        let symbols = fs::read(&args[2]).map_err(|e| format!("cannot read Petari symbols: {e}"))?;
+        let map = player_probe::verify_pal_inputs(&dol, &symbols)?;
+        println!("PAL RMGP01 Rev 0 DOL and Petari symbol file fingerprints verified.");
+        println!(
+            "DOL BSS: 0x{:08x}..0x{:08x}",
+            map.bss_address,
+            map.bss_address + map.bss_size
+        );
+        println!(
+            "SingletonHolder<GameSystem>::sInstance: 0x{:08x}",
+            player_probe::GAME_SYSTEM_SINGLETON
+        );
+        println!("MarioActor::mPosition field offset: +0x0c (static Petari layout; live pointer not sampled by this command).");
+        println!("PAL MarioAccess/MarioHolder/SceneObjHolder function bytes and branch targets verified.");
+        return Ok(());
+    }
     if (args.len() == 5 || args.len() == 6) && args[0] == "launch" {
         let dolphin = std::path::PathBuf::from(&args[1]);
         let user_dir = std::path::PathBuf::from(&args[2]);
@@ -100,6 +126,96 @@ fn run() -> Result<(), String> {
         } else {
             println!("Dolphin audio retains its normal default setting.");
         }
+        return Ok(());
+    }
+    if (args.len() == 4 || args.len() == 5) && args[0] == "probe-mario" {
+        let port = args[1]
+            .to_str()
+            .ok_or("GDB port must be valid UTF-8")?
+            .parse::<u16>()
+            .map_err(|_| "GDB port must be between 1 and 65535")?;
+        if port == 0 {
+            return Err("GDB port 0 is not valid".into());
+        }
+        let interval = if args.len() == 5 {
+            args[4]
+                .to_str()
+                .ok_or("sampling interval must be valid UTF-8")?
+                .parse::<u64>()
+                .map_err(|_| "sampling interval must be milliseconds")?
+        } else {
+            200
+        };
+        if !(50..=5000).contains(&interval) {
+            return Err("sampling interval must be between 50 and 5000 ms".into());
+        }
+        let dol = fs::read(&args[2]).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
+        let symbols = fs::read(&args[3]).map_err(|e| format!("cannot read Petari symbols: {e}"))?;
+        let map = player_probe::verify_pal_inputs(&dol, &symbols)?;
+        let mut client = gdb::DolphinGdb::connect(
+            format!("127.0.0.1:{port}").parse().unwrap(),
+            std::time::Duration::from_secs(1),
+        )?;
+        let disc_id = client.read_memory(0x8000_0000, 6)?;
+        if disc_id != b"RMGP01" {
+            return Err(format!(
+                "expected live PAL RMGP01, found {}",
+                String::from_utf8_lossy(&disc_id)
+            ));
+        }
+        println!("Verified PAL Rev 0 DOL and Petari map; live Dolphin identity RMGP01.");
+        println!("Persistent GDB session open on port {port}; no memory writes are available.");
+        println!("Type START then Enter to sample, STOP to pause, Q to quit. Use a controller to move Mario while this terminal has focus.");
+        println!("Position field: MarioActor + 0x0c (three big-endian f32 values); sample interval: {interval} ms.");
+        let (tx, rx) = std::sync::mpsc::channel::<String>();
+        std::thread::spawn(move || {
+            let stdin = std::io::stdin();
+            loop {
+                let mut line = String::new();
+                if stdin.read_line(&mut line).is_err() {
+                    break;
+                }
+                if tx.send(line.trim().to_owned()).is_err() {
+                    break;
+                }
+            }
+        });
+        let mut sampling = false;
+        loop {
+            match rx.recv_timeout(std::time::Duration::from_millis(interval)) {
+                Ok(command) if command.eq_ignore_ascii_case("start") => {
+                    sampling = true;
+                    println!("sampling=started");
+                }
+                Ok(command) if command.eq_ignore_ascii_case("stop") => {
+                    sampling = false;
+                    println!("sampling=stopped");
+                }
+                Ok(command)
+                    if command.eq_ignore_ascii_case("q")
+                        || command.eq_ignore_ascii_case("quit") =>
+                {
+                    break
+                }
+                Ok(command) if command.is_empty() => {}
+                Ok(command) => println!("unknown command {command:?}; use START, STOP, or Q"),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+            if sampling {
+                let timestamp = timestamp_unix_ms();
+                match player_probe::sample_position(&mut client, &map) {
+                    Ok(Ok(p)) => println!(
+                        "unix_ms={timestamp} state=ready MarioActor=0x{:08x} x={:.3} y={:.3} z={:.3}",
+                        p.mario_actor, p.x, p.y, p.z
+                    ),
+                    Ok(Err(waiting)) => println!("unix_ms={timestamp} state=waiting {waiting:?}"),
+                    Err(error) => eprintln!("unix_ms={timestamp} state=error {error}"),
+                }
+                let _ = std::io::stdout().flush();
+            }
+        }
+        println!("sampling=exited; persistent GDB connection closed");
         return Ok(());
     }
     if args.len() == 4 && args[0] == "readmem" {
@@ -255,7 +371,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy <original.dol> <modified.dol> | multigalaxy identify <disc-header.bin> <main.dol> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port> [--mute] | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy <original.dol> <modified.dol> | multigalaxy identify <disc-header.bin> <main.dol> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port> [--mute] | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;

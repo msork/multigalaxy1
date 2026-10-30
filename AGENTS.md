@@ -10,3 +10,5 @@
 - Do not commit game executables, disc images, extracted proprietary assets, secrets, or generated binaries. Do not run unknown installers.
 - Specs precede implementation; milestone status must match evidence. Compilation does not establish Dolphin boot or online gameplay.
 - Do not push commits.
+- Original MultiGalaxy1 code uses WTFPL Version 2. Preserve all third-party licenses, copyright notices, and attribution; never imply project licensing applies to third-party code, patches, or assets.
+- Preferred Classic Controller path is Starlightbotanist's SMG/SMG2 Dolphin patch repository, with original patch attribution to SuperHackio. Do not bundle its patch files unless permission/license is verified. Validate the exact PAL build and conflicts before enabling alongside game hooks.
