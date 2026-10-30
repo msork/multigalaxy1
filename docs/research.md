@@ -8,7 +8,7 @@ Bussun describes itself as a WIP SMG1 custom-code injector with region symbol ma
 
 The SMG2 multiplayer repository is CC0-1.0 and contains PPC assembly hooks, multiple SMG2 symbol maps, and split-screen work. Use it only for conceptual comparison; those symbols and hook sites are not Galaxy 1 compatible. It also contains an `.arc` asset in the root; do not redistribute or assume the code license clears game-derived assets.
 
-The local reference files provide a controlled binary comparison target. Current evidence confirms sizes and SHA-256; DOL header parsing and actual hook disassembly remain pending tool execution. The AllReds file is compiled code, not source. Do not copy it into release artifacts.
+The local reference files provide a controlled binary comparison target. The Rust CLI confirms sizes, SHA-256, DOL sections, changed-byte ranges, and PPC branch destinations. Full instruction/function disassembly remains pending. The AllReds file is compiled code, not source. Do not copy it into release artifacts.
 
 ## Rust target feasibility
 
@@ -26,5 +26,5 @@ Dolphin NetPlay forwards/synchronizes controller input through deterministic loc
 - [Luma's Workshop guides](https://lumasworkshop.com/guides/) — WIP Galaxy modding guide describing module-based code injection, models, animations, levels, and other topics; individual game-specific details still require verification.
 - [Dolphin NetPlay guide](https://dolphin-emu.org/docs/guides/netplay-guide/) — official operational constraints.
 - [Dolphin NetPlay server source](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/Core/NetPlayServer.cpp) — current upstream implementation, subject to change.
-- [Galaxy Patch](https://github.com/Wii-Patches/Galaxy-Patch) — SMG1 control patch description and region support; inspect exact source/license before integration.
+- [Galaxy Patch](https://github.com/Wii-Patches/Galaxy-Patch) — MIT-licensed SMG1 control patch description and region support; review revision-specific hooks before integration.
 - [Galaxy Patch license](https://github.com/Wii-Patches/Galaxy-Patch/blob/main/LICENSE) — MIT.

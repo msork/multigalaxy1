@@ -10,7 +10,7 @@ Classic Controller patches rewrite KPAD/game input handling and may overlap play
 
 ## Rust-first go/no-go gates
 
-1. Confirm Rust target support and available PPC backend.
+1. Confirm Rust target support and available PPC backend. The installed rustc lists Linux/FreeBSD/etc. PowerPC targets, but no standard bare-metal 32-bit PowerPC target; only the Windows host target is installed.
 2. Produce a minimal object for the exact Wii ABI and inspect its sections/relocations.
 3. Link through the selected Wii toolchain with known imports and no unexpected runtime symbols.
 4. Load the hook in Dolphin with a legal local game and verify a harmless observable effect.
