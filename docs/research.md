@@ -2,7 +2,11 @@
 
 ## SMG1 reverse engineering
 
-Petari is the SMG1-specific community decompilation and is the most relevant source for named functions and structures. Treat its symbols as leads until revision and coverage are confirmed against the selected executable. The source repository and its license must be checked at a pinned revision before code or dependency reuse. Bussun and `smg2-multiplayer` are reference material only: SMG2 code and layouts are not presumed compatible with SMG1.
+Petari is a public, work-in-progress SMG1 decompilation with a CC0-1.0 repository license. Its README says it contains no game assets or assembly, requires the user's own regional `main.dol`, and builds through its Python configure script and Ninja. It is the preferred source for SMG1-specific symbols, structures, and function context; pin a revision and verify against the selected executable before use. It uses a C++ decompilation/build pipeline rather than a Rust-native engine replacement.
+
+Bussun describes itself as a WIP SMG1 custom-code injector with region symbol maps, Kamek headers/linker, and a memory loader. Its README says CodeWarrior PPC EABI 4.1 is required for C++ ABI compatibility, and its loader currently only works with USA. GitHub's visible root file list has no license file, so do not copy/reuse its code until licensing is clarified. It is useful evidence for existing Galaxy 1 integration constraints, not a chosen dependency.
+
+The SMG2 multiplayer repository is CC0-1.0 and contains PPC assembly hooks, multiple SMG2 symbol maps, and split-screen work. Use it only for conceptual comparison; those symbols and hook sites are not Galaxy 1 compatible. It also contains an `.arc` asset in the root; do not redistribute or assume the code license clears game-derived assets.
 
 The local reference files provide a controlled binary comparison target. Current evidence confirms sizes and SHA-256; DOL header parsing and actual hook disassembly remain pending tool execution. The AllReds file is compiled code, not source. Do not copy it into release artifacts.
 
@@ -16,10 +20,11 @@ Dolphin NetPlay forwards/synchronizes controller input through deterministic loc
 
 ## Sources
 
-- [Petari](https://github.com/SMGCommunity/Petari) — SMG1 decompilation.
-- [Bussun](https://github.com/SMGCommunity/Bussun) — inspect before relying; no compatibility assumed.
-- [SMG2 multiplayer](https://github.com/galaxymaster2007/smg2-multiplayer) — comparative reference only.
+- [Petari](https://github.com/SMGCommunity/Petari) — WIP SMG1 decompilation; CC0-1.0; uses user-provided game executable and Python/Ninja build setup.
+- [Bussun](https://github.com/SMGCommunity/Bussun) — WIP SMG1 injector; no license file visible in repository root; USA-only current loader per README; CodeWarrior PPC EABI requirement.
+- [SMG2 multiplayer](https://github.com/galaxymaster2007/smg2-multiplayer) — CC0-1.0 source, comparative reference only; no SMG1 compatibility assumed.
+- [Luma's Workshop guides](https://lumasworkshop.com/guides/) — WIP Galaxy modding guide describing module-based code injection, models, animations, levels, and other topics; individual game-specific details still require verification.
 - [Dolphin NetPlay guide](https://dolphin-emu.org/docs/guides/netplay-guide/) — official operational constraints.
 - [Dolphin NetPlay server source](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/Core/NetPlayServer.cpp) — current upstream implementation, subject to change.
 - [Galaxy Patch](https://github.com/Wii-Patches/Galaxy-Patch) — SMG1 control patch description and region support; inspect exact source/license before integration.
-- [Luma's Workshop guides](https://lumasworkshop.com/guides/) — community modding reference, verify individual guide content before relying.
+- [Galaxy Patch license](https://github.com/Wii-Patches/Galaxy-Patch/blob/main/LICENSE) — MIT.

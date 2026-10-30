@@ -2,9 +2,9 @@
 
 ## M0 finding
 
-Dolphin NetPlay is the first option to investigate. Its lockstep model synchronizes emulated controller input and depends on peers running matching deterministic emulation. It is not an actor replication service. If every instance executes identical mod logic and receives synchronized input, each may simulate all four actors locally without sending actor transforms. This is an architectural inference, not a tested result.
+Dolphin NetPlay is the first option to investigate. Wii NetPlay is officially described as experimental. It supports assigning Wii Remote slots among remote peers, including multiple slots on one host/client PC, and standard NetPlay assignment can accommodate up to four participating input slots. Its lockstep model depends on matching game region/revision, Dolphin version, and emulated environment. It is not an actor replication service. If every instance executes identical mod logic and receives synchronized input, each may simulate all four actors locally without sending actor transforms. This is an architectural inference, not a tested result.
 
-The mod must avoid peer-specific authoritative gameplay state. Saves and progression should be deterministic/shared by construction or have an explicit host-authority protocol; Dolphin does not merge divergent save files. A disconnect is a session failure/restart unless NetPlay itself handles the client departure without changing input topology; gameplay recovery is unverified.
+Fair Input Delay is Dolphin's default and gives all players the same delay; Host Input Authority trades zero host latency for higher client latency. The mod should avoid peer-specific authoritative gameplay state. NetPlay can load/save host progress, but this does not overwrite client saves; it can synchronize Wii saves for a session. Saves and progression should therefore be deterministic/shared by construction or have an explicit host-authority/save-copy policy. A disconnect is a session failure/restart unless NetPlay itself handles the client departure without changing input topology; gameplay recovery is unverified.
 
 Camera and viewport choices should be local presentation state. This supports each client viewing the full-screen camera for its own player while preserving local split-screen, provided camera updates and render choices do not alter simulation.
 
