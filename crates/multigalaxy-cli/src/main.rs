@@ -1,11 +1,14 @@
 mod controller_patch;
 mod gdb;
 mod player_probe;
+mod startup;
 
 use multigalaxy_patch::{
     branch_target, changed_ranges, parse_dol, sha256, DiscIdentity, RevisionCatalog, SectionKind,
 };
 use std::io::Write;
+use std::net::TcpListener;
+use std::time::{Duration, Instant};
 use std::{env, fs, process};
 
 fn verification_offsets(section_len: usize, full_scan: bool) -> Vec<usize> {
@@ -25,8 +28,11 @@ fn timestamp_unix_ms() -> u128 {
         .as_millis()
 }
 
-fn dolphin_config(port: u16, mute: bool, enable_cheats: bool) -> String {
-    let mut config = format!("[General]\nGDBPort = {port}\n");
+fn dolphin_config(port: Option<u16>, mute: bool, enable_cheats: bool) -> String {
+    let mut config = String::new();
+    if let Some(port) = port {
+        config.push_str(&format!("[General]\nGDBPort = {port}\n"));
+    }
     if enable_cheats {
         config.push_str("\n[Core]\nEnableCheats = True\n");
     }
@@ -34,6 +40,69 @@ fn dolphin_config(port: u16, mute: bool, enable_cheats: bool) -> String {
         config.push_str("\n[DSP]\nMuted = True\nVolume = 0\n");
     }
     config
+}
+
+fn port_is_available(port: u16) -> bool {
+    TcpListener::bind(("127.0.0.1", port)).is_ok()
+}
+
+fn log_tail(path: &std::path::Path) -> String {
+    fs::read(path)
+        .map(|bytes| {
+            let start = bytes.len().saturating_sub(4096);
+            String::from_utf8_lossy(&bytes[start..]).trim().to_owned()
+        })
+        .unwrap_or_default()
+}
+
+fn wait_for_dolphin_window(
+    child: &mut process::Child,
+    stdout_path: &std::path::Path,
+    stderr_path: &std::path::Path,
+) -> Result<startup::WindowState, String> {
+    const STARTUP_TIMEOUT: Duration = Duration::from_secs(15);
+    let deadline = Instant::now() + STARTUP_TIMEOUT;
+    if !startup::window_check_supported() {
+        std::thread::sleep(Duration::from_secs(2));
+        if child
+            .try_wait()
+            .map_err(|e| format!("cannot inspect Dolphin process state: {e}"))?
+            .is_none()
+        {
+            return Ok(startup::WindowState {
+                title: "process alive (window check unsupported on this platform)".into(),
+                hung: false,
+            });
+        }
+    }
+    loop {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|e| format!("cannot inspect Dolphin process state: {e}"))?
+        {
+            return Err(format!(
+                "Dolphin exited during startup ({status}). stdout: {}; stderr: {}",
+                log_tail(stdout_path),
+                log_tail(stderr_path)
+            ));
+        }
+        let last_windows = startup::visible_windows(child.id());
+        if let Some(window) = last_windows.iter().find(|window| !window.hung) {
+            return Ok(window.clone());
+        }
+        if Instant::now() >= deadline {
+            let window_state = if last_windows.is_empty() {
+                "no visible Dolphin window was created".to_owned()
+            } else {
+                format!("Dolphin windows are not responding: {last_windows:?}")
+            };
+            return Err(format!(
+                "Dolphin stayed alive but startup did not become responsive within 15 seconds ({window_state}). The test process was left open as PID {}. stdout: {}; stderr: {}",
+                child.id(), log_tail(stdout_path), log_tail(stderr_path)
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
 }
 
 fn run() -> Result<(), String> {
@@ -79,16 +148,25 @@ fn run() -> Result<(), String> {
             .ok_or("GDB port must be valid UTF-8")?
             .parse::<u16>()
             .map_err(|_| "GDB port must be between 1 and 65535")?;
-        if port == 0 {
-            return Err("GDB port 0 is not valid".into());
-        }
         let mut mute = false;
+        let mut gdb_enabled = false;
+        let mut gdb_mode_selected = false;
         let mut allstars = None;
         let mut index = 5;
         while index < args.len() {
             match args[index].to_str() {
                 Some("--mute") if !mute => {
                     mute = true;
+                    index += 1;
+                }
+                Some("--gdb") if !gdb_mode_selected => {
+                    gdb_enabled = true;
+                    gdb_mode_selected = true;
+                    index += 1;
+                }
+                Some("--no-gdb") if !gdb_mode_selected => {
+                    gdb_enabled = false;
+                    gdb_mode_selected = true;
                     index += 1;
                 }
                 Some("--allstars") if allstars.is_none() && index + 2 < args.len() => {
@@ -100,11 +178,14 @@ fn run() -> Result<(), String> {
                 }
                 _ => {
                     return Err(
-                        "launch options: [--mute] [--allstars <patch-folder> <PAL-main.dol>]"
+                        "launch options: [--mute] [--gdb|--no-gdb] [--allstars <patch-folder> <PAL-main.dol>]"
                             .into(),
                     )
                 }
             }
+        }
+        if gdb_enabled && port == 0 {
+            return Err("GDB port 0 is invalid when --gdb is enabled".into());
         }
         if !dolphin.is_file() {
             return Err(format!(
@@ -114,6 +195,11 @@ fn run() -> Result<(), String> {
         }
         if !game.is_file() {
             return Err(format!("game image does not exist: {}", game.display()));
+        }
+        if gdb_enabled && !port_is_available(port) {
+            return Err(format!(
+                "GDB port {port} is already in use; refusing to launch against another process"
+            ));
         }
         let prepared_allstars = if let Some((patch_dir, dol_path)) = &allstars {
             let dol = fs::read(dol_path).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
@@ -135,11 +221,15 @@ fn run() -> Result<(), String> {
         fs::create_dir_all(&config_dir)
             .map_err(|e| format!("cannot create isolated Dolphin config directory: {e}"))?;
         let dolphin_ini = config_dir.join("Dolphin.ini");
-        fs::write(
-            &dolphin_ini,
-            dolphin_config(port, mute, prepared_allstars.is_some()),
-        )
-        .map_err(|e| format!("cannot write isolated Dolphin configuration: {e}"))?;
+        let config_text = dolphin_config(
+            if gdb_enabled { Some(port) } else { None },
+            mute,
+            prepared_allstars.is_some(),
+        );
+        if !config_text.is_empty() {
+            fs::write(&dolphin_ini, config_text)
+                .map_err(|e| format!("cannot write isolated Dolphin configuration: {e}"))?;
+        }
         if let Some(patch) = &prepared_allstars {
             let settings_dir = user_dir.join("GameSettings");
             fs::create_dir_all(&settings_dir)
@@ -151,19 +241,19 @@ fn run() -> Result<(), String> {
             .map_err(|e| format!("cannot write isolated AllStars GameSettings: {e}"))?;
         }
         let mut command = process::Command::new(&dolphin);
-        command
-            .arg("-u")
-            .arg(&user_dir)
-            .arg("-C")
-            .arg(format!("Main.General.GDBPort={port}"));
-        if mute {
-            command.args(["-C", "Main.DSP.Muted=True", "-C", "Main.DSP.Volume=0"]);
-        }
+        command.arg("-u").arg(&user_dir);
         let stdout_log = fs::File::create(user_dir.join("dolphin.stdout.log"))
             .map_err(|e| format!("cannot create isolated Dolphin stdout log: {e}"))?;
         let stderr_log = fs::File::create(user_dir.join("dolphin.stderr.log"))
             .map_err(|e| format!("cannot create isolated Dolphin stderr log: {e}"))?;
-        let child = command
+        let stdout_path = user_dir.join("dolphin.stdout.log");
+        let stderr_path = user_dir.join("dolphin.stderr.log");
+        let mut child = command
+            .current_dir(
+                dolphin
+                    .parent()
+                    .unwrap_or_else(|| std::path::Path::new(".")),
+            )
             .stdin(process::Stdio::null())
             .stdout(process::Stdio::from(stdout_log))
             .stderr(process::Stdio::from(stderr_log))
@@ -171,12 +261,23 @@ fn run() -> Result<(), String> {
             .arg(&game)
             .spawn()
             .map_err(|e| format!("cannot launch Dolphin: {e}"))?;
+        let window = wait_for_dolphin_window(&mut child, &stdout_path, &stderr_path)?;
         println!(
-            "Started Dolphin PID {} with isolated user data at {}",
+            "Started responsive Dolphin window {:?}, PID {}, with isolated user data at {}",
+            window.title,
             child.id(),
             user_dir.display()
         );
-        println!("GDB port {port} enabled.");
+        if gdb_enabled {
+            if port_is_available(port) {
+                println!("Warning: GDB listener was not detected on port {port} within startup timeout; game launch continues.");
+            } else {
+                println!("GDB listener detected on port {port} without opening a connection.");
+            }
+            println!("Dolphin's GDB mode starts the emulated CPU paused; use this only for debugging and resume it in Dolphin after attaching.");
+        } else {
+            println!("GDB is disabled; the game uses Dolphin's normal running startup state.");
+        }
         println!("Dolphin logs are isolated under {}", user_dir.display());
         if mute {
             println!("Dolphin test/debug audio mute enabled.");
@@ -431,7 +532,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy <original.dol> <modified.dol> | multigalaxy identify <disc-header.bin> <main.dol> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port> [--mute] [--allstars <patch-folder> <PAL-main.dol>] | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy <original.dol> <modified.dol> | multigalaxy identify <disc-header.bin> <main.dol> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> [--mute] [--gdb|--no-gdb] [--allstars <patch-folder> <PAL-main.dol>] | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
@@ -513,7 +614,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{dolphin_config, parse_dol, verification_offsets};
+    use super::{dolphin_config, parse_dol, port_is_available, verification_offsets, TcpListener};
 
     #[test]
     fn sampled_validation_reads_start_middle_and_end_without_scanning_section() {
@@ -524,13 +625,25 @@ mod tests {
 
     #[test]
     fn test_mute_is_opt_in_and_does_not_change_normal_audio_defaults() {
-        let normal = dolphin_config(55173, false, false);
+        let normal = dolphin_config(Some(55173), false, false);
         assert!(normal.contains("GDBPort = 55173"));
         assert!(!normal.contains("[DSP]"));
-        let muted = dolphin_config(55174, true, false);
+        let no_gdb = dolphin_config(None, false, false);
+        assert!(no_gdb.is_empty());
+        assert!(!no_gdb.contains("GDBPort"));
+        let muted = dolphin_config(None, true, false);
         assert!(muted.contains("Muted = True"));
         assert!(muted.contains("Volume = 0"));
-        assert!(dolphin_config(55175, false, true).contains("EnableCheats = True"));
+        assert!(dolphin_config(None, false, true).contains("EnableCheats = True"));
+    }
+
+    #[test]
+    fn gdb_port_probe_never_connects_or_consumes_the_stub_session() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        assert!(!port_is_available(port));
+        drop(listener);
+        assert!(port_is_available(port));
     }
 
     #[test]

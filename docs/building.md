@@ -9,12 +9,14 @@ Revision inspection uses `cargo run -p multigalaxy -- identify <disc-header.bin>
 The Rust launcher can start Dolphin using a fresh, empty user directory so debug configuration and saves remain separate from the user's ordinary Dolphin profile:
 
 ```powershell
-cargo run -p multigalaxy -- launch 'C:\path\Dolphin.exe' 'C:\temp\mg1-dolphin-test' 'C:\path\game.rvz' 55176 --mute
+cargo run -p multigalaxy -- launch 'C:\path\Dolphin.exe' 'C:\temp\mg1-dolphin-test' 'C:\path\game.rvz' 0 --mute
 ```
 
 `--mute` is an optional **test/debug-only** switch. It sets Dolphin's `Main.DSP.Muted=True` and volume to zero in the isolated test configuration. Omitting `--mute` leaves those settings alone and preserves normal Dolphin audio behavior; production launch must not add the flag by default.
 
-The launcher enables Dolphin's optional GDB stub for memory inspection. `verify-loaded` checks the `RMGP01` ID and samples 16 bytes at each DOL section's start, midpoint, and end. `verify-loaded-full` compares complete sections in 1 KiB chunks and reports progress; it is much slower. Each GDB response has a bounded total timeout. Dolphin 2609a was observed accepting one GDB client and then refusing reconnects after it disconnects, so use one read session per freshly launched Dolphin process. GDB is a reverse-engineering aid, not a supported game bridge. The Rust client connects only to localhost and exposes read operations only. Dolphin 2609a's listener was observed bound to `0.0.0.0`, so keep debug sessions brief and do not expose the debug port to untrusted networks.
+GDB is **disabled by default**. Dolphin's core explicitly calls `CPUSetInitialExecutionState(system, true)` when `GDBPort > 0`, which forces emulation to start paused. This was the black-screen cause in launcher sessions. The launcher adds GDB only when `--gdb` is passed; expect the game CPU to remain paused until resumed in Dolphin. `--gdb` is for reverse engineering, not normal play. The Rust client connects only to localhost and is read-only. Dolphin 2609a can accept only one GDB client for a process, so use one read session per launch.
+
+The launcher now sets its working directory to the Dolphin install folder, passes only `-u <isolated-user-dir>` and `-e <game>` plus config stored inside that profile, and waits up to 15 seconds for a responsive visible Dolphin window. It checks early process exit and prints isolated stdout/stderr tails on failure. It never probes GDB by connecting (which would consume the single GDB session); it checks the port using a non-connecting local bind. If startup times out, the Dolphin process is left running for inspection and its PID/log paths are reported.
 
 The launcher redirects Dolphin stdout/stderr to log files in its fresh isolated user directory, avoiding inherited terminal handles that can make launcher invocations appear to hang. Stop the exact test Dolphin PID when finished; the supplied RVZ and regular Dolphin profile are not changed.
 
@@ -28,10 +30,10 @@ The patch is off by default. Run the read-only validator with the local upstream
 .\target\debug\multigalaxy.exe inspect-allstars 'C:\path\SMG\PAL\Individual Patches' 'reference\original\main.dol'
 ```
 
-To opt in, use the same paths with `launch` and choose a new empty isolated profile:
+To opt in, use the same paths with `launch` and choose a new empty isolated profile. GDB remains off, so the game starts running normally:
 
 ```powershell
-.\target\debug\multigalaxy.exe launch 'C:\path\Dolphin.exe' 'C:\temp\mg1-allstars-test' 'C:\path\game.rvz' 55176 --mute --allstars 'C:\path\SMG\PAL\Individual Patches' 'reference\original\main.dol'
+.\target\debug\multigalaxy.exe launch 'C:\path\Dolphin.exe' 'C:\temp\mg1-allstars-test' 'C:\path\game.rvz' 0 --mute --allstars 'C:\path\SMG\PAL\Individual Patches' 'reference\original\main.dol'
 ```
 
 The launcher requires the pinned SMG PAL AllStars, Swap L/ZL, and Swap R/ZR files, validates the exact RMGP01 Rev 0 DOL fingerprint, merges the overlapping swap writes, and enables the resulting Dolphin `[OnFrame]` patch only in the isolated profile. It enables cheats there only. No upstream files are copied into the repository. Runtime behavior on Dolphin 2609a remains unverified.

@@ -33,7 +33,7 @@ No controlled in-game movement, two-instance exchange, or multiplayer result is 
 
 The current `reference/original/main.dol` is the user-supplied PAL build with SHA-1 `9bd1daa520bd1f573b6a4b82e03336e9c51b511f`. It matches Petari's `config/RMGP01/build.sha1` and the live Dolphin `RMGP01` identity. Sampled validation compares 16 bytes at each DOL section's start, midpoint, and end (deduplicated); use `verify-loaded-full` for a byte-by-byte comparison. The previous USA DOL is no longer retained.
 
-The Petari-backed static chain and `MarioActor::mPosition` offset are validated against this PAL DOL and symbol file. A persistent read-only `probe-mario` command reuses one GDB connection. On the last run, the read at the verified GameSystem singleton slot returned null, so this is only a waiting-state test: no coordinates or movement have been observed. To validate movement, start a visible isolated Dolphin session and sampler as below. Keep both terminals open; the sampler terminal retains the single GDB connection.
+The Petari-backed static chain and `MarioActor::mPosition` offset are validated against this PAL DOL and symbol file. A persistent read-only `probe-mario` command reuses one GDB connection. On the last run, the read at the verified GameSystem singleton slot returned null, so this is only a waiting-state test: no coordinates or movement have been observed. To validate movement, start an isolated Dolphin session with `--gdb` and sampler as below. GDB mode intentionally starts the emulated CPU paused; attach the sampler and resume from Dolphin. For normal gameplay checks, omit `--gdb`.
 
 ```powershell
 # Terminal 1: new empty user directory; test/debug is muted only.
