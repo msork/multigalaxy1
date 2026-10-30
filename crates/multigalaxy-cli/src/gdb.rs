@@ -5,6 +5,28 @@ use std::time::Duration;
 
 const MAX_READ: usize = 4096;
 
+/// Return half-open runs of differing bytes, including changes at either edge.
+pub fn diff_runs(expected: &[u8], observed: &[u8]) -> Vec<(usize, usize)> {
+    let mut runs = Vec::new();
+    let common_len = expected.len().min(observed.len());
+    let mut i = 0;
+    while i < common_len {
+        if expected[i] == observed[i] {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < common_len && expected[i] != observed[i] {
+            i += 1;
+        }
+        runs.push((start, i - start));
+    }
+    if expected.len() != observed.len() {
+        runs.push((common_len, expected.len().max(observed.len()) - common_len));
+    }
+    runs
+}
+
 pub struct DolphinGdb {
     stream: TcpStream,
 }
@@ -31,7 +53,12 @@ impl DolphinGdb {
             return Err("memory read crosses the 32-bit address-space boundary".into());
         }
         let response = self.request(&format!("m{address:x},{length:x}"))?;
-        if response.starts_with('E') {
+        // RSP error replies are the three-character form Ehh. A valid memory
+        // response is hexadecimal data and can itself begin with byte 0xE*.
+        if response.len() == 3
+            && response.starts_with('E')
+            && response.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+        {
             return Err(format!("Dolphin rejected guest memory read: {response}"));
         }
         let bytes = decode_hex(&response)?;
@@ -162,6 +189,34 @@ mod tests {
     }
 
     #[test]
+    fn accepts_memory_payload_whose_first_byte_is_e() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut packet = Vec::new();
+            loop {
+                let byte = read_byte(&mut stream).unwrap();
+                packet.push(byte);
+                if byte == b'#' {
+                    packet.push(read_byte(&mut stream).unwrap());
+                    packet.push(read_byte(&mut stream).unwrap());
+                    break;
+                }
+            }
+            stream.write_all(b"+").unwrap();
+            stream.write_all(&encode_packet("ec02002a")).unwrap();
+            assert_eq!(read_byte(&mut stream).unwrap(), b'+');
+        });
+        let mut client = DolphinGdb::connect(address, Duration::from_secs(2)).unwrap();
+        assert_eq!(
+            client.read_memory(0x8000_0000, 4).unwrap(),
+            [0xec, 0x02, 0, 0x2a]
+        );
+        server.join().unwrap();
+    }
+
+    #[test]
     fn rejects_invalid_or_unbounded_reads_before_network_io() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let mut client =
@@ -169,5 +224,15 @@ mod tests {
         assert!(client.read_memory(0, 0).is_err());
         assert!(client.read_memory(0, MAX_READ + 1).is_err());
         assert!(client.read_memory(u32::MAX, 2).is_err());
+    }
+
+    #[test]
+    fn diff_runs_reports_all_mismatch_spans_and_length_difference() {
+        assert_eq!(
+            diff_runs(&[1, 8, 3, 4, 9], &[1, 2, 3, 7, 8]),
+            vec![(1, 1), (3, 2)]
+        );
+        assert_eq!(diff_runs(&[1, 2], &[1, 2, 3]), vec![(2, 1)]);
+        assert!(diff_runs(&[1, 2], &[1, 2]).is_empty());
     }
 }

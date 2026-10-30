@@ -125,6 +125,9 @@ fn run() -> Result<(), String> {
             format!("127.0.0.1:{port}").parse().unwrap(),
             std::time::Duration::from_secs(5),
         )?;
+        let mut total_differences = 0usize;
+        let mut total_runs = 0usize;
+        let mut shown_differences = 0usize;
         for section in &info.sections {
             let file_start = section.file_offset as usize;
             let section_len = section.size as usize;
@@ -134,20 +137,23 @@ fn run() -> Result<(), String> {
                 let address = section.address + offset as u32;
                 let observed = client.read_memory(address, count)?;
                 let expected = &dol[file_start + offset..file_start + offset + count];
-                if observed != expected {
-                    let mismatch = observed
-                        .iter()
-                        .zip(expected)
-                        .position(|(a, b)| a != b)
-                        .unwrap_or(0);
-                    return Err(format!(
-                        "loaded DOL differs in {:?}[{}] at guest address 0x{:08x}: expected {:02x}, observed {:02x}",
-                        section.kind,
-                        section.index,
-                        address + mismatch as u32,
-                        expected[mismatch],
-                        observed[mismatch]
-                    ));
+                let runs = gdb::diff_runs(expected, &observed);
+                total_runs += runs.len();
+                total_differences += runs.iter().map(|(_, size)| size).sum::<usize>();
+                for (relative, size) in runs {
+                    if shown_differences < 32 {
+                        let at = relative.min(count.saturating_sub(1));
+                        println!(
+                            "difference {:?}[{}] guest 0x{:08x} length 0x{:x}: expected {:02x}, observed {:02x}",
+                            section.kind,
+                            section.index,
+                            address + at as u32,
+                            size,
+                            expected[at],
+                            observed[at]
+                        );
+                        shown_differences += 1;
+                    }
                 }
                 offset += count;
             }
@@ -158,6 +164,11 @@ fn run() -> Result<(), String> {
                 section.address,
                 section.address + section.size
             );
+        }
+        if total_differences > 0 {
+            return Err(format!(
+                "loaded DOL comparison found {total_differences} differing bytes across {total_runs} runs (showing at most 32); this does not identify whether they are revision differences or runtime modifications"
+            ));
         }
         println!(
             "Every loaded DOL section matches SHA-256 {}",
@@ -280,5 +291,21 @@ mod tests {
         let muted = dolphin_config(55174, true);
         assert!(muted.contains("Muted = True"));
         assert!(muted.contains("Volume = 0"));
+    }
+
+    #[test]
+    #[ignore = "requires a live Dolphin GDB stub and an already booted PAL SMG1 session"]
+    fn live_dolphin_exposes_the_pal_disc_id_read_only() {
+        let port = std::env::var("MG1_GDB_PORT")
+            .expect("set MG1_GDB_PORT to the live Dolphin GDB port")
+            .parse::<u16>()
+            .expect("MG1_GDB_PORT must be a valid TCP port");
+        let mut client = super::gdb::DolphinGdb::connect(
+            format!("127.0.0.1:{port}").parse().unwrap(),
+            std::time::Duration::from_secs(5),
+        )
+        .unwrap();
+        let disc_id = client.read_memory(0x8000_0000, 6).unwrap();
+        assert_eq!(&disc_id, b"RMGP01");
     }
 }
