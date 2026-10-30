@@ -31,7 +31,9 @@ Petari's current source semantics show a dynamic path rather than a fixed player
 
 Petari's current `configure.py` lists `RMGP01` as a first-class version. Its PAL `config.yml` and `build.sha1` specify SHA-1 `9BD1DAA520BD1F573B6A4B82E03336E9C51B511F`, exactly matching the user-supplied DOL. Petari's PAL `splits.txt` therefore provides an exact-hash-matched static map. It places `MarioActor.cpp` code in `0x802AE6C8..0x802B5228`, `MarioHolder.cpp` in `0x802E1490..0x802E156C`, `MarioAccess.cpp` in `0x80302384..0x803048F4`, and `SceneObjHolder.cpp` in `0x803449F4..0x80345840`. These are translation-unit ranges, not individual function entries or runtime object addresses.
 
-Petari source semantics provide a concrete investigation path: `MarioAccess::getPlayerActor()` calls `MR::getMarioHolder()->getMarioActor()`; `MR::getMarioHolder()` resolves `SceneObj_MarioHolder` from the scene-object holder; `MarioHolder` stores its `MarioActor*`; and the actor inherits `LiveActor::mPosition`. The `mPosition` member is a promising position source once an actor pointer and layout offset have been independently proven. We have not yet disassembled the PAL call sites or registered the scene-object singleton address, MarioHolder slot offset, actor pointer, or `mPosition` byte offset. Those are still unknown; do not derive a pointer by scanning plausible-looking floats.
+Petari source semantics provide a concrete investigation path: `MarioAccess::getPlayerActor()` calls `MR::getMarioHolder()->getMarioActor()`; `MR::getMarioHolder()` resolves `SceneObj_MarioHolder` from the scene-object holder; `MarioHolder` stores its `MarioActor*`; and the actor inherits `LiveActor::mPosition`. Static class layout sources expose `GameSystem::mSceneController` at `+0x24`, `GameSystemSceneController::mScene` at `+0xAC`, `Scene::mSceneObjHolder` at `+0x10`, `SceneObj_MarioHolder == 0x14` (slot at holder base `+0x50` for 32-bit pointers), and `LiveActor::mPosition` at `+0x0C`. `MarioHolder::mActor` follows its `NameObj` base; the expected `+0x0C` is an ABI-derived layout, not yet checked against a compiler map. Petari's `SingletonHolder<GameSystem>::sInstance` is the root of the source-level path, but its exact PAL address is not mapped here. The runtime chain is therefore incomplete and none of these offsets have yet been followed against live Mario memory.
+
+No PAL disassembly/xref validation has been completed: this Windows environment currently has no Ghidra or PowerPC objdump available, and the PAL `symbols.txt` is too large for the connected text-file fetch to return. Petari's `splits.txt` provides only translation-unit ranges, not individual function starts. In particular, do not treat those ranges or a float-looking RAM value as the singleton root, actor pointer, or position.
 
 The Rust revision catalog now recognizes this exact PAL Rev 0 DOL fingerprint as a verified build identity, with an empty hook list. That is identity evidence only; it does not make any player-state pointer or hook usable.
 
@@ -41,6 +43,10 @@ Sources:
 - [Petari Mario access code](https://github.com/SMGCommunity/Petari/blob/master/src/Game/Player/MarioAccess.cpp)
 - [Petari Mario holder implementation](https://github.com/SMGCommunity/Petari/blob/master/src/Game/Player/MarioHolder.cpp)
 - [Petari Mario actor implementation](https://github.com/SMGCommunity/Petari/blob/master/src/Game/Player/MarioActor.cpp)
+- [Petari Mario holder layout](https://github.com/SMGCommunity/Petari/blob/master/include/Game/Player/MarioHolder.hpp)
+- [Petari LiveActor position field](https://github.com/SMGCommunity/Petari/blob/master/include/Game/LiveActor/LiveActor.hpp)
+- [Petari scene-object holder layout](https://github.com/SMGCommunity/Petari/blob/master/include/Game/Scene/SceneObjHolder.hpp)
+- [Petari game and scene controller layouts](https://github.com/SMGCommunity/Petari/blob/master/include/Game/System/GameSystem.hpp)
 - [Petari PAL build SHA-1](https://github.com/SMGCommunity/Petari/blob/master/config/RMGP01/build.sha1)
 - [Petari PAL configuration](https://github.com/SMGCommunity/Petari/blob/master/config/RMGP01/config.yml)
 - [Petari PAL source split ranges](https://github.com/SMGCommunity/Petari/blob/master/config/RMGP01/splits.txt)
