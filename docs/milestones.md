@@ -10,7 +10,7 @@
 | M5 | Server authority, prediction/reconciliation, progression and recovery | Not started |
 | M6 | Character-specific movement and Wario/Waluigi abilities | Not started |
 | M7 | Russian/French/English client-local PAL localization validation | Research only; Russian archive audit pending |
-| M8 | Dolphin Classic Controller Gecko patch and conventional gamepad mapping | PAL AllStars selected; exact revision, Dolphin 2609a runtime, hook conflicts, and bindings unverified |
+| M8 | Dolphin Classic Controller per-frame patch and conventional gamepad mapping | AllStars + both shoulder swaps statically checked for exact PAL Rev 0 and isolated-profile configuration implemented; Dolphin 2609a runtime and bindings unverified |
 | M9 | Campaign compatibility, interactions, deaths, transitions, stability | Not started |
 | M10 | Performance, packaging, documentation, release | Not started |
 

@@ -8,7 +8,7 @@ BSMSO provides a concrete GameCube/Dolphin precedent: a PPC game module exports 
 
 The largest integration risk is a reliable game-side data path. A launcher alone cannot see structured gameplay state. First investigate Dolphin source/debugger/memory APIs, then prefer an injected bridge with versioned IPC. A small Dolphin fork is an option only if the needed lifecycle, memory, or process APIs are unavailable upstream. Do not use unverified address scanning.
 
-Classic Controller integration remains an independent input challenge. The patch may rewrite KPAD/game input and conflict with player-input hooks. Integrate at source level or generate conflict-aware patches; never concatenate blind binary patches.
+Classic Controller input uses the external Dolphin AllStars per-frame patch, with both requested shoulder swaps merged deterministically. The patch's sites are statically checked against the exact PAL Rev 0 DOL and future registered hooks; Dolphin 2609a runtime behavior and conventional pad mappings still need gameplay validation. The patch itself stays outside the repository.
 
 ## Rust-first go/no-go gates
 

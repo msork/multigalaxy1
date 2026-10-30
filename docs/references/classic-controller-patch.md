@@ -1,25 +1,35 @@
 # Dolphin Classic Controller patch
 
-Preferred patch: [SMG PAL AllStars](https://raw.githubusercontent.com/Starlightbotanist/SMG-SMG2ClassicControllerDolphinPatches/refs/heads/main/SMG/PAL/Individual%20Patches/SMG-AllStars-Pal.txt). **Use the AllStars variant only. Do not use Nvidia.** The upstream repository supplies separate SMG and SMG2 patches; this project requires the SMG1 PAL file. The collection says the patches were originally created as Riivolution files by **SuperHackio** and converted to Dolphin format by **Starlightbotanist**.
+## Selected PAL SMG1 variant
 
-## Format and installation
+Use the SMG PAL **AllStars** patch from [Starlightbotanist's Dolphin patch collection](https://github.com/Starlightbotanist/SMG-SMG2ClassicControllerDolphinPatches). Do not use Nvidia. Original patch attribution belongs to **SuperHackio**; Starlightbotanist converted the Riivolution patch to Dolphin's per-frame patch format.
 
-The selected PAL file is a Dolphin per-frame memory patch list, with entries formatted as `0xADDRESS:dword:0xVALUE` (the repository calls these patches/codes). The upstream README says to map a Classic Controller, add the code under the game-specific User Config `[OnFrame]` section with a `$` name, then enable it under the game's Patches list. The Dolphin GameINI convention uses an `[OnFrame_Enabled]` section containing the enabled patch name; official Dolphin's own `RMG.ini` has an `[OnFrame]` section for per-frame patches. This is an emulator patch; it does not require MultiGalaxy1 to rewrite the user's RVZ or bundle a patched DOL. Dolphin 2609a's exact runtime compatibility with this code has not yet been tested.
+The AllStars mapping diagram assigns movement and Star Ball/Ray Surfing to the left stick; Star Pointer, Star Bits, Pull Stars, and aiming to the right stick; ZL to crouch/dive; L to camera reset; D-pad to camera/options; Select to pause; Home to HOME; ZR to shoot Star Bits/cancel; the face controls cover jump and spin/context actions. Use the upstream [SMG AllStars diagram](https://github.com/Starlightbotanist/SMG-SMG2ClassicControllerDolphinPatches/blob/main/SMG/Mapping-SMG-AllStars.png) for the button artwork. The controller image labels indicate functions but do not provide machine-readable button names for every face-button/context action.
 
-The file has 419 lines of PPC guest-memory patches. Inspected sites include low-memory trampoline/code ranges around `0x800009B0–0x80000BC0`, `0x800014B0–0x800015D0`, `0x80002790–0x800029B0`, plus many hooks through `0x804A432C`. It overwrites game instructions and installs branches. The filename identifies PAL but does not state an RMGP01 revision or main.dol hash. Therefore the upstream label alone does not prove compatibility with RMGP01 Rev 0. Before enabling it alongside MultiGalaxy1, compare every patched address and branch target against the verified DOL, confirm expected original instructions, and reject any overlap with our hooks. The current MultiGalaxy1 revision has no game-side hook ranges registered, so future overlap compatibility is not yet testable.
+The user requested both shoulder swaps too. The PAL `SMG-SwapLZL-Pal.txt` replaces AllStars writes at `0x80000B1C` and `0x80000B2C`; `SMG-SwapRZR-Pal.txt` replaces writes at `0x80000AEC` and `0x80000B0C`. These addresses overlap the base AllStars program by design. Do not enable the three files as competing per-frame codes. MultiGalaxy1 merges the two exact swap fragments into the AllStars write set, so each address has one deterministic final value.
 
-## Mapping and conventional gamepads
+## Static inspection and revision compatibility
 
-The upstream README links a separate **SMG AllStars** mapping diagram. It offers variants Nvidia, AllStar, Swap L/ZL, and Swap R/ZL; only AllStar is selected here. The repository README does not give a textual button-by-button list, and this diagram has not been independently inspected in this work, so no exact mapping table is asserted yet. Link: [SMG AllStars mapping image](https://github.com/Starlightbotanist/SMG-SMG2ClassicControllerDolphinPatches/blob/main/SMG/Mapping-SMG-AllStars.png).
+The user's local files under `SMG/PAL/Individual Patches` were inspected as text only; nothing was executed or copied into the repository. SHA-256 fingerprints:
 
-Map Xbox and PlayStation controllers in Dolphin to the emulated Wii Remote/Classic Controller controls expected by this patch. Assign analog movement and any pointer/spin inputs explicitly; conventional pads do not provide Wii IR or accelerometer signals by themselves. This is local input for each user's separate Dolphin instance, not four local players in one game process.
+| File | SHA-256 |
+|---|---|
+| `SMG-AllStars-Pal.txt` | `c3b00b9e7471f980b887390d3b8bff11fd102be76260d60a42f218103617d5a9` |
+| `SMG-SwapLZL-Pal.txt` | `5003d243aebbac6308702586d333ada04038d9dbe0aaf5be55c6ad907a71427b` |
+| `SMG-SwapRZR-Pal.txt` | `f1444b6e45cd8349333155c750c160ad364888cdc204e0acd4b83cf0ecc362d5` |
 
-## Licensing, attribution, and localization
+The AllStars base has 419 unique writes. Comparing every address with the exact Petari-matched PAL RMGP01 Rev 0 `main.dol` shows 76 writes land in DOL text and 71 of those replace a different original word. The remaining 343 writes are in the patch's low-memory trampoline area (`0x80000000–0x80003fff`). All writes were checked to fall in one of these ranges. The code replaces instructions and branches across text sites up to `0x804a432c`; the patch filename itself does not declare a revision or DOL hash. Thus address compatibility with this exact DOL is statically established, but original call-site semantic correctness and runtime behavior are not yet proven.
 
-The inspected upstream tree exposes no license file or explicit redistribution grant. Treat its Gecko text and mapping image as third-party copyrighted material; do not copy or bundle them without permission. Preserve attribution to SuperHackio (original patch) and Starlightbotanist (Dolphin-format collection). MultiGalaxy1's WTFPL applies only to original project code.
+Current MultiGalaxy1 has no game-side hooks registered, so there are no current project hooks to collide with. The launcher rejects any overlap with future registered hook sites. The exact patch files are hash-pinned; different bytes fail closed.
 
-Localization remains client-side. A translated installation can use this patch only if its game ID/revision and patch-site bytes match the verified build. Any translation that changes main.dol or a patched location needs its own DOL fingerprint, original-byte checks, and conflict validation. Different client-side text/voice assets do not by themselves conflict with the controller patch, but this has not been tested with the Russian/French/English installations.
+## Dolphin installation and launcher behavior
 
-## Verification status
+The source file uses Dolphin `[OnFrame]` entries in `0xADDRESS:dword:0xVALUE` form. Dolphin's official SMG `RMG.ini` has an `[OnFrame]` section for these frame patches; enabled patch names are listed in `[OnFrame_Enabled]`, and cheats are gated by `Core.EnableCheats`. The launcher supports an explicit `--allstars <patch-folder> <PAL-main.dol>` option. It verifies the exact PAL Rev 0 DOL and the three patch hashes, merges the swaps, writes only `GameSettings/RMGP01.ini` plus the cheat enable setting inside the fresh isolated Dolphin user directory, and leaves the RVZ and normal Dolphin profile untouched. With no option, it does not install or enable controller patches.
 
-Static inspection confirms the AllStars PAL code file and Gecko format. Exact RMGP01 Rev 0 compatibility, Dolphin 2609a runtime, AllStars button diagram, hook coexistence, Xbox/PlayStation bindings, and multilingual interaction remain unverified. No upstream patch asset is committed.
+No patch assets are committed. The upstream repository has no license file or explicit redistribution grant in the inspected tree, so retain its third-party status and attribution. WTFPL applies only to original MultiGalaxy1 code.
+
+## Gamepad mapping and verification status
+
+Map Xbox/PlayStation devices in Dolphin's emulated Wii Remote configuration with the Classic Controller extension selected. Bind the sticks and buttons to the patch's expected Classic Controller inputs; Dolphin provides the conventional device mapping, while pointer and shake actions require explicit stick/button emulation. This code is for each online player's single local Dolphin instance, not local split-screen.
+
+The files have passed static hash, format, composition, DOL address-range, and Rev 0 fingerprint checks. Neither activation nor gameplay has yet been tested in Dolphin 2609a. Button behavior, conventional pad bindings, and multilingual interaction remain runtime test items.

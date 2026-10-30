@@ -19,3 +19,19 @@ The launcher enables Dolphin's optional GDB stub for memory inspection. `verify-
 The launcher redirects Dolphin stdout/stderr to log files in its fresh isolated user directory, avoiding inherited terminal handles that can make launcher invocations appear to hang. Stop the exact test Dolphin PID when finished; the supplied RVZ and regular Dolphin profile are not changed.
 
 The launcher refuses a non-empty user directory and never changes the supplied RVZ. Use a new temporary path for each run if Dolphin has populated the previous one. Injected Wii runtime builds are not yet defined; do not use unverified addresses.
+
+### Optional PAL AllStars controller patch
+
+The patch is off by default. Run the read-only validator with the local upstream patch folder and the user's PAL DOL:
+
+```powershell
+.\target\debug\multigalaxy.exe inspect-allstars 'C:\path\SMG\PAL\Individual Patches' 'reference\original\main.dol'
+```
+
+To opt in, use the same paths with `launch` and choose a new empty isolated profile:
+
+```powershell
+.\target\debug\multigalaxy.exe launch 'C:\path\Dolphin.exe' 'C:\temp\mg1-allstars-test' 'C:\path\game.rvz' 55176 --mute --allstars 'C:\path\SMG\PAL\Individual Patches' 'reference\original\main.dol'
+```
+
+The launcher requires the pinned SMG PAL AllStars, Swap L/ZL, and Swap R/ZR files, validates the exact RMGP01 Rev 0 DOL fingerprint, merges the overlapping swap writes, and enables the resulting Dolphin `[OnFrame]` patch only in the isolated profile. It enables cheats there only. No upstream files are copied into the repository. Runtime behavior on Dolphin 2609a remains unverified.

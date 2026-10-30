@@ -1,3 +1,4 @@
+mod controller_patch;
 mod gdb;
 mod player_probe;
 
@@ -24,8 +25,11 @@ fn timestamp_unix_ms() -> u128 {
         .as_millis()
 }
 
-fn dolphin_config(port: u16, mute: bool) -> String {
+fn dolphin_config(port: u16, mute: bool, enable_cheats: bool) -> String {
     let mut config = format!("[General]\nGDBPort = {port}\n");
+    if enable_cheats {
+        config.push_str("\n[Core]\nEnableCheats = True\n");
+    }
     if mute {
         config.push_str("\n[DSP]\nMuted = True\nVolume = 0\n");
     }
@@ -52,7 +56,21 @@ fn run() -> Result<(), String> {
         println!("PAL MarioAccess/MarioHolder/SceneObjHolder function bytes and branch targets verified.");
         return Ok(());
     }
-    if (args.len() == 5 || args.len() == 6) && args[0] == "launch" {
+    if args.len() == 3 && args[0] == "inspect-allstars" {
+        let dol = fs::read(&args[2]).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
+        let prepared = controller_patch::prepare_allstars(std::path::Path::new(&args[1]), &dol)?;
+        println!("PAL RMGP01 Rev 0 and the pinned AllStars + L/ZL + R/ZR source files passed static validation.");
+        println!(
+            "Writes: {}; target DOL text writes: {}; changed DOL words: {}.",
+            prepared.total_writes, prepared.dol_text_writes, prepared.dol_changed_words
+        );
+        for site in &prepared.changed_sites {
+            println!("{site}");
+        }
+        println!("No game image or Dolphin configuration was modified.");
+        return Ok(());
+    }
+    if args.len() >= 5 && args[0] == "launch" {
         let dolphin = std::path::PathBuf::from(&args[1]);
         let user_dir = std::path::PathBuf::from(&args[2]);
         let game = std::path::PathBuf::from(&args[3]);
@@ -64,9 +82,29 @@ fn run() -> Result<(), String> {
         if port == 0 {
             return Err("GDB port 0 is not valid".into());
         }
-        let mute = args.len() == 6 && args[5] == "--mute";
-        if args.len() == 6 && !mute {
-            return Err("the only optional launch flag is --mute (test/debug only)".into());
+        let mut mute = false;
+        let mut allstars = None;
+        let mut index = 5;
+        while index < args.len() {
+            match args[index].to_str() {
+                Some("--mute") if !mute => {
+                    mute = true;
+                    index += 1;
+                }
+                Some("--allstars") if allstars.is_none() && index + 2 < args.len() => {
+                    allstars = Some((
+                        std::path::PathBuf::from(&args[index + 1]),
+                        std::path::PathBuf::from(&args[index + 2]),
+                    ));
+                    index += 3;
+                }
+                _ => {
+                    return Err(
+                        "launch options: [--mute] [--allstars <patch-folder> <PAL-main.dol>]"
+                            .into(),
+                    )
+                }
+            }
         }
         if !dolphin.is_file() {
             return Err(format!(
@@ -77,6 +115,12 @@ fn run() -> Result<(), String> {
         if !game.is_file() {
             return Err(format!("game image does not exist: {}", game.display()));
         }
+        let prepared_allstars = if let Some((patch_dir, dol_path)) = &allstars {
+            let dol = fs::read(dol_path).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
+            Some(controller_patch::prepare_allstars(patch_dir, &dol)?)
+        } else {
+            None
+        };
         if user_dir.exists() {
             let mut entries = fs::read_dir(&user_dir)
                 .map_err(|e| format!("cannot inspect isolated Dolphin user directory: {e}"))?;
@@ -91,8 +135,21 @@ fn run() -> Result<(), String> {
         fs::create_dir_all(&config_dir)
             .map_err(|e| format!("cannot create isolated Dolphin config directory: {e}"))?;
         let dolphin_ini = config_dir.join("Dolphin.ini");
-        fs::write(&dolphin_ini, dolphin_config(port, mute))
-            .map_err(|e| format!("cannot write isolated Dolphin configuration: {e}"))?;
+        fs::write(
+            &dolphin_ini,
+            dolphin_config(port, mute, prepared_allstars.is_some()),
+        )
+        .map_err(|e| format!("cannot write isolated Dolphin configuration: {e}"))?;
+        if let Some(patch) = &prepared_allstars {
+            let settings_dir = user_dir.join("GameSettings");
+            fs::create_dir_all(&settings_dir)
+                .map_err(|e| format!("cannot create isolated GameSettings directory: {e}"))?;
+            fs::write(
+                settings_dir.join("RMGP01.ini"),
+                controller_patch::allstars_game_settings(patch),
+            )
+            .map_err(|e| format!("cannot write isolated AllStars GameSettings: {e}"))?;
+        }
         let mut command = process::Command::new(&dolphin);
         command
             .arg("-u")
@@ -125,6 +182,9 @@ fn run() -> Result<(), String> {
             println!("Dolphin test/debug audio mute enabled.");
         } else {
             println!("Dolphin audio retains its normal default setting.");
+        }
+        if let Some(patch) = &prepared_allstars {
+            println!("Enabled pinned PAL AllStars + L/ZL + R/ZR in this isolated profile only ({} writes; {} match PAL text).", patch.total_writes, patch.dol_text_writes);
         }
         return Ok(());
     }
@@ -371,7 +431,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy <original.dol> <modified.dol> | multigalaxy identify <disc-header.bin> <main.dol> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port> [--mute] | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy <original.dol> <modified.dol> | multigalaxy identify <disc-header.bin> <main.dol> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port> [--mute] [--allstars <patch-folder> <PAL-main.dol>] | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
@@ -464,12 +524,13 @@ mod tests {
 
     #[test]
     fn test_mute_is_opt_in_and_does_not_change_normal_audio_defaults() {
-        let normal = dolphin_config(55173, false);
+        let normal = dolphin_config(55173, false, false);
         assert!(normal.contains("GDBPort = 55173"));
         assert!(!normal.contains("[DSP]"));
-        let muted = dolphin_config(55174, true);
+        let muted = dolphin_config(55174, true, false);
         assert!(muted.contains("Muted = True"));
         assert!(muted.contains("Volume = 0"));
+        assert!(dolphin_config(55175, false, true).contains("EnableCheats = True"));
     }
 
     #[test]

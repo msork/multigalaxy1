@@ -1,8 +1,13 @@
 //! Safe, read-only DOL inspection and comparison primitives.
+mod dolphin_patch;
 mod revision;
 
 use std::fmt;
 
+pub use dolphin_patch::{
+    combine_allstars_swaps, parse_onframe_patch, validate_pal_patch_writes, DolphinPatchError,
+    PatchWrite,
+};
 pub use revision::{
     BuildFingerprint, DiscIdentity, HookSite, HookSiteStatus, RevisionCatalog, RevisionError,
     VersionMap,

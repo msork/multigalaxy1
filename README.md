@@ -8,6 +8,7 @@ Rust-first, online-only multiplayer modification research for PAL Super Mario Ga
 - The Rust CLI parses and compares DOLs; multiplayer runtime behavior is not implemented.
 - Exact PAL revision maps and a Dolphin game-side bridge remain unverified.
 - Russian, French, and English client-local localization is a required acceptance case, not a tested feature.
+- The PAL AllStars controller patch with both shoulder swaps has a pinned, optional isolated-profile launcher path; static checks pass, but Dolphin gameplay testing remains pending.
 - See [milestones](docs/milestones.md), [testing evidence](docs/testing.md), and [online architecture](docs/networking.md).
 
 ## Development
