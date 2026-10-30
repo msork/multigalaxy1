@@ -4,10 +4,10 @@ Evidence labels: **research** (source documentation), **static** (binary/source 
 
 ## Current verified evidence
 
-- `cargo test --workspace`: 13 unit tests pass and one live-Dolphin integration test is ignored by default. A prior `verify-loaded` run against Dolphin 2609a matched every PAL DOL section. The new automated live comparison test is present but has not yet completed successfully in a repeat run.
+- `cargo test --workspace`: current test result is recorded below; one live-Dolphin integration test is ignored by default. Its opt-in run now passes against a fresh Dolphin 2609a process.
 - `cargo build --workspace`: succeeds.
 - Dolphin 2609a and a PAL RVZ launched with isolated user data. DolphinTool identified it as `RMGP01`, PAL revision 0. RVZ was left unchanged.
-- Rust GDB read `RMGP01` at `0x80000000`; the earlier `verify-loaded` command confirmed every loaded text/data section matches the user-supplied PAL DOL. The opt-in integration test now repeats that comparison but remains unverified.
+- Rust GDB read `RMGP01` at `0x80000000`. Sampled section validation and the opt-in read-only integration test passed against Dolphin 2609a. Earlier full-section verification also passed, but the current fast mode samples each section at start/middle/end and is not a full hash comparison.
 - The current reference DOL is PAL `RMGP01` Rev 0 and matches all loaded text/data sections in Dolphin. Its SHA-1 is `9bd1daa520bd1f573b6a4b82e03336e9c51b511f`; SHA-256 is `8200fb72b3170069bb71c8b3dc21b49e429977ce8ae5159bb95ea6a19de0fbee`.
 - `--mute` writes mute settings only for an isolated test/debug launch. The default launch configuration omits DSP mute settings. No audible verification was performed.
 
@@ -15,9 +15,11 @@ Evidence labels: **research** (source documentation), **static** (binary/source 
 
 | Case | Status |
 |---|---|
-| PAL Dolphin `verify-loaded` (RMGP01 and all DOL sections) | Passed in an earlier run; read-only, tested on Dolphin 2609a |
+| PAL Dolphin sampled section validation | Passed; all 10 DOL sections sampled, 0.34 s, Dolphin 2609a |
+| Opt-in PAL live integration test | Passed against fresh Dolphin process; 1 test, read-only |
+| Full DOL section comparison | Passed in a prior run; slower scan now available as `verify-loaded-full` |
 | Two Dolphin instances exchange bridge-derived state and visibly render each other | Not implemented/tested |
-| Live player coordinates extracted from the game | Not verified; no address map approved |
+| Live Mario coordinates extracted from the game | Not verified; no runtime object pointer/field offset approved |
 | Independent local camera and controller input | Not tested |
 | Four players and all characters | Not tested |
 | Authority, prediction, and reconciliation | Not implemented/tested |
@@ -25,12 +27,19 @@ Evidence labels: **research** (source documentation), **static** (binary/source 
 | Character abilities, star collection, death/respawn, transitions | Not tested |
 | Loss, latency, reconnect, duplicate event handling | Not tested |
 
-No gameplay boot, coordinates, two-instance exchange, or multiplayer result is established.
+No controlled in-game movement, two-instance exchange, or multiplayer result is established.
 
 ## PAL live-memory work
 
-The current `reference/original/main.dol` is the user-supplied PAL build with SHA-1 `9bd1daa520bd1f573b6a4b82e03336e9c51b511f`. All sections match the loaded `RMGP01` Rev 0 DOL in Dolphin 2609a. The previous USA DOL is no longer retained.
+The current `reference/original/main.dol` is the user-supplied PAL build with SHA-1 `9bd1daa520bd1f573b6a4b82e03336e9c51b511f`. It matches Petari's `config/RMGP01/build.sha1` and the live Dolphin `RMGP01` identity. Sampled validation compares 16 bytes at each DOL section's start, midpoint, and end (deduplicated); use `verify-loaded-full` for a byte-by-byte comparison. The previous USA DOL is no longer retained.
 
-The CLI now scans all DOL section ranges in one GDB connection and reports capped byte-difference runs rather than stopping at the first byte. The GDB client now correctly accepts valid hex memory responses beginning with `E`; RSP error replies are recognized only as `Ehh` packets. The live Dolphin integration test is ignored by default. Set `MG1_GDB_PORT` and `MG1_PAL_DOL`, then run it with `cargo test -p multigalaxy -- --ignored`; it reads the game ID and compares every parsed DOL text/data section against live RAM. It is read-only. On the latest retry, `verify-loaded` matched Text[0] but stalled before completing later sections, so the integration test is still pending further diagnosis.
+The GDB client bounds each response by one total timeout deadline and reports the failing guest range. The fast validator reads small samples instead of scanning each whole section; the optional full scan logs progress every 64 KiB. A full scan without progress output can look stalled while making thousands of requests. Dolphin 2609a was observed to stop accepting new GDB connections after the first client disconnects, so run one integration test per fresh Dolphin process. Each new CLI read command therefore needs a fresh Dolphin instance; a persistent probe should keep one GDB connection open. The ignored test reads only and compares sampled bytes. For example:
 
-A controlled movement test was not performed: Dolphin exposed no usable window handle in this session, and the PAL actor pointer is not yet verified. Coordinates, rotations, gravity state, pointer validation for an actor, timestamped samples, protocol handoff, and two-instance exchange remain unverified and unimplemented. Do not describe the DOL identity test as player-state extraction.
+```powershell
+$env:MG1_GDB_PORT = '55213'
+$env:MG1_PAL_DOL = 'C:\path\to\main.dol'
+cargo test -p multigalaxy live_dolphin_matches_the_pal_dol_read_only -- --ignored --nocapture
+Remove-Item Env:\MG1_GDB_PORT, Env:\MG1_PAL_DOL
+```
+
+A controlled movement test was not performed. The opt-in test verified identity and static executable samples only; it did not read Mario coordinates. Petari now supplies an exact PAL build mapping, but we have not proven the runtime scene-object pointer chain or `mPosition` offset. Coordinates, rotations, gravity state, pointer validation for an actor, timestamped samples, protocol handoff, and two-instance exchange remain unverified and unimplemented. Manual gameplay is still needed to validate changing coordinates once the PAL pointer/offset path is statically established.

@@ -29,7 +29,11 @@ The earlier complete comparison also exposed a bug in our GDB client: an `m` pac
 
 Petari's current source semantics show a dynamic path rather than a fixed player singleton: `MR::getMarioHolder()` resolves a `MarioHolder` from the scene-object holder registry; `MarioHolder` owns a `MarioActor*`; `MarioActor` creates its `Mario` movement object and uses the inherited `LiveActor::mPosition`. The actor's position is therefore the first state field to target once the PAL instance address is resolved. Actor and holder pointers are allocated at runtime, so source names alone do not provide a stable memory address.
 
-The checked Petari README lists `RMGK01` Rev 0 as its supported build. Although Petari source provides semantic actor names, no `RMGP01` symbol file has yet been verified against the exact PAL DOL hash above. No address or structure offset has been imported into the runtime reader. Rotation and state-field offsets are not registered.
+Petari's current `configure.py` lists `RMGP01` as a first-class version. Its PAL `config.yml` and `build.sha1` specify SHA-1 `9BD1DAA520BD1F573B6A4B82E03336E9C51B511F`, exactly matching the user-supplied DOL. Petari's PAL `splits.txt` therefore provides an exact-hash-matched static map. It places `MarioActor.cpp` code in `0x802AE6C8..0x802B5228`, `MarioHolder.cpp` in `0x802E1490..0x802E156C`, `MarioAccess.cpp` in `0x80302384..0x803048F4`, and `SceneObjHolder.cpp` in `0x803449F4..0x80345840`. These are translation-unit ranges, not individual function entries or runtime object addresses.
+
+Petari source semantics provide a concrete investigation path: `MarioAccess::getPlayerActor()` calls `MR::getMarioHolder()->getMarioActor()`; `MR::getMarioHolder()` resolves `SceneObj_MarioHolder` from the scene-object holder; `MarioHolder` stores its `MarioActor*`; and the actor inherits `LiveActor::mPosition`. The `mPosition` member is a promising position source once an actor pointer and layout offset have been independently proven. We have not yet disassembled the PAL call sites or registered the scene-object singleton address, MarioHolder slot offset, actor pointer, or `mPosition` byte offset. Those are still unknown; do not derive a pointer by scanning plausible-looking floats.
+
+The Rust revision catalog now recognizes this exact PAL Rev 0 DOL fingerprint as a verified build identity, with an empty hook list. That is identity evidence only; it does not make any player-state pointer or hook usable.
 
 Sources:
 
@@ -37,4 +41,8 @@ Sources:
 - [Petari Mario access code](https://github.com/SMGCommunity/Petari/blob/master/src/Game/Player/MarioAccess.cpp)
 - [Petari Mario holder implementation](https://github.com/SMGCommunity/Petari/blob/master/src/Game/Player/MarioHolder.cpp)
 - [Petari Mario actor implementation](https://github.com/SMGCommunity/Petari/blob/master/src/Game/Player/MarioActor.cpp)
+- [Petari PAL build SHA-1](https://github.com/SMGCommunity/Petari/blob/master/config/RMGP01/build.sha1)
+- [Petari PAL configuration](https://github.com/SMGCommunity/Petari/blob/master/config/RMGP01/config.yml)
+- [Petari PAL source split ranges](https://github.com/SMGCommunity/Petari/blob/master/config/RMGP01/splits.txt)
+- [Petari PAL version selection and build configuration](https://github.com/SMGCommunity/Petari/blob/master/configure.py)
 - [Dolphin GDB memory-read implementation](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/Core/PowerPC/GDBStub.cpp)

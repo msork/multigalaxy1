@@ -1,7 +1,7 @@
 //! Read-only GDB Remote Serial Protocol access for Dolphin's optional PowerPC stub.
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const MAX_READ: usize = 4096;
 
@@ -29,6 +29,7 @@ pub fn diff_runs(expected: &[u8], observed: &[u8]) -> Vec<(usize, usize)> {
 
 pub struct DolphinGdb {
     stream: TcpStream,
+    request_timeout: Duration,
 }
 
 impl DolphinGdb {
@@ -39,7 +40,10 @@ impl DolphinGdb {
             .set_read_timeout(Some(timeout))
             .and_then(|_| stream.set_write_timeout(Some(timeout)))
             .map_err(|e| format!("cannot configure GDB socket timeouts: {e}"))?;
-        Ok(Self { stream })
+        Ok(Self {
+            stream,
+            request_timeout: timeout,
+        })
     }
 
     /// Read emulated guest RAM. This client intentionally exposes no write operation.
@@ -52,7 +56,9 @@ impl DolphinGdb {
         if u64::from(address) + length as u64 > (u64::from(u32::MAX) + 1) {
             return Err("memory read crosses the 32-bit address-space boundary".into());
         }
-        let response = self.request(&format!("m{address:x},{length:x}"))?;
+        let response = self
+            .request(&format!("m{address:x},{length:x}"))
+            .map_err(|e| format!("guest read 0x{address:08x}+0x{length:x} failed: {e}"))?;
         // RSP error replies are the three-character form Ehh. A valid memory
         // response is hexadecimal data and can itself begin with byte 0xE*.
         if response.len() == 3
@@ -72,23 +78,25 @@ impl DolphinGdb {
     }
 
     fn request(&mut self, command: &str) -> Result<String, String> {
+        let started = Instant::now();
+        let deadline = started + self.request_timeout;
         let packet = encode_packet(command);
         self.stream
             .write_all(&packet)
             .map_err(|e| format!("cannot send GDB request: {e}"))?;
-        let ack = read_byte(&mut self.stream)?;
+        let ack = read_byte_until(&mut self.stream, deadline)?;
         if ack != b'+' {
             return Err(format!(
                 "expected GDB packet acknowledgement, received 0x{ack:02x}"
             ));
         }
-        let mut start = read_byte(&mut self.stream)?;
+        let mut start = read_byte_until(&mut self.stream, deadline)?;
         while start != b'$' {
-            start = read_byte(&mut self.stream)?;
+            start = read_byte_until(&mut self.stream, deadline)?;
         }
         let mut payload = Vec::new();
         loop {
-            let byte = read_byte(&mut self.stream)?;
+            let byte = read_byte_until(&mut self.stream, deadline)?;
             if byte == b'#' {
                 break;
             }
@@ -97,8 +105,8 @@ impl DolphinGdb {
             }
             payload.push(byte);
         }
-        let high = read_byte(&mut self.stream)?;
-        let low = read_byte(&mut self.stream)?;
+        let high = read_byte_until(&mut self.stream, deadline)?;
+        let low = read_byte_until(&mut self.stream, deadline)?;
         let expected = (hex_nibble(high)? << 4) | hex_nibble(low)?;
         let actual = payload
             .iter()
@@ -116,11 +124,37 @@ impl DolphinGdb {
     }
 }
 
+#[cfg(test)]
 fn read_byte(stream: &mut TcpStream) -> Result<u8, String> {
     let mut byte = [0];
     stream
         .read_exact(&mut byte)
         .map_err(|e| format!("cannot read GDB packet: {e}"))?;
+    Ok(byte[0])
+}
+
+fn read_byte_until(stream: &mut TcpStream, deadline: Instant) -> Result<u8, String> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        return Err("GDB request exceeded its total response timeout".into());
+    }
+    stream
+        .set_read_timeout(Some(remaining))
+        .map_err(|e| format!("cannot set GDB response timeout: {e}"))?;
+    let mut byte = [0];
+    stream.read_exact(&mut byte).map_err(|e| {
+        if matches!(
+            e.kind(),
+            std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+        ) {
+            format!(
+                "GDB response timed out ({} ms remained): {e}",
+                remaining.as_millis()
+            )
+        } else {
+            format!("cannot read GDB response: {e}")
+        }
+    })?;
     Ok(byte[0])
 }
 
@@ -224,6 +258,30 @@ mod tests {
         assert!(client.read_memory(0, 0).is_err());
         assert!(client.read_memory(0, MAX_READ + 1).is_err());
         assert!(client.read_memory(u32::MAX, 2).is_err());
+    }
+
+    #[test]
+    fn bounds_total_gdb_response_time() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut byte = [0];
+            while stream.read_exact(&mut byte).is_ok() {
+                if byte[0] == b'#' {
+                    let _ = stream.read_exact(&mut byte);
+                    let _ = stream.read_exact(&mut byte);
+                    break;
+                }
+            }
+            stream.write_all(b"+").unwrap();
+            thread::sleep(Duration::from_millis(150));
+            let _ = stream.write_all(&encode_packet("01020304"));
+        });
+        let mut client = DolphinGdb::connect(address, Duration::from_millis(40)).unwrap();
+        let error = client.read_memory(0x8000_0000, 4).unwrap_err();
+        assert!(error.contains("timed out"), "{error}");
+        server.join().unwrap();
     }
 
     #[test]

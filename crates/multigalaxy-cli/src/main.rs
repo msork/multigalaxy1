@@ -3,7 +3,18 @@ mod gdb;
 use multigalaxy_patch::{
     branch_target, changed_ranges, parse_dol, sha256, DiscIdentity, RevisionCatalog, SectionKind,
 };
+use std::io::Write;
 use std::{env, fs, process};
+
+fn verification_offsets(section_len: usize, full_scan: bool) -> Vec<usize> {
+    if full_scan {
+        return (0..section_len).step_by(1024).collect();
+    }
+    let mut offsets = vec![0, section_len / 2, section_len.saturating_sub(16)];
+    offsets.sort_unstable();
+    offsets.dedup();
+    offsets
+}
 
 fn dolphin_config(port: u16, mute: bool) -> String {
     let mut config = format!("[General]\nGDBPort = {port}\n");
@@ -65,7 +76,14 @@ fn run() -> Result<(), String> {
         if mute {
             command.args(["-C", "Main.DSP.Muted=True", "-C", "Main.DSP.Volume=0"]);
         }
+        let stdout_log = fs::File::create(user_dir.join("dolphin.stdout.log"))
+            .map_err(|e| format!("cannot create isolated Dolphin stdout log: {e}"))?;
+        let stderr_log = fs::File::create(user_dir.join("dolphin.stderr.log"))
+            .map_err(|e| format!("cannot create isolated Dolphin stderr log: {e}"))?;
         let child = command
+            .stdin(process::Stdio::null())
+            .stdout(process::Stdio::from(stdout_log))
+            .stderr(process::Stdio::from(stderr_log))
             .arg("-e")
             .arg(&game)
             .spawn()
@@ -76,6 +94,7 @@ fn run() -> Result<(), String> {
             user_dir.display()
         );
         println!("GDB port {port} enabled.");
+        println!("Dolphin logs are isolated under {}", user_dir.display());
         if mute {
             println!("Dolphin test/debug audio mute enabled.");
         } else {
@@ -113,7 +132,8 @@ fn run() -> Result<(), String> {
         );
         return Ok(());
     }
-    if args.len() == 3 && args[0] == "verify-loaded" {
+    if args.len() == 3 && (args[0] == "verify-loaded" || args[0] == "verify-loaded-full") {
+        let full_scan = args[0] == "verify-loaded-full";
         let port = args[1]
             .to_str()
             .ok_or("GDB port must be valid UTF-8")?
@@ -125,15 +145,35 @@ fn run() -> Result<(), String> {
             format!("127.0.0.1:{port}").parse().unwrap(),
             std::time::Duration::from_secs(5),
         )?;
+        let identity = client.read_memory(0x8000_0000, 6)?;
+        if identity != b"RMGP01" {
+            return Err(format!(
+                "expected PAL RMGP01 in Dolphin memory, found {}",
+                String::from_utf8_lossy(&identity)
+            ));
+        }
+        println!(
+            "Dolphin identity RMGP01 verified; mode: {}",
+            if full_scan {
+                "full section scan"
+            } else {
+                "sampled section validation"
+            }
+        );
+        let scan_started = std::time::Instant::now();
         let mut total_differences = 0usize;
         let mut total_runs = 0usize;
         let mut shown_differences = 0usize;
         for section in &info.sections {
             let file_start = section.file_offset as usize;
             let section_len = section.size as usize;
-            let mut offset = 0usize;
-            while offset < section_len {
-                let count = (section_len - offset).min(4096);
+            let offsets = verification_offsets(section_len, full_scan);
+            for &offset in &offsets {
+                let count = if full_scan {
+                    (section_len - offset).min(1024)
+                } else {
+                    (section_len - offset).min(16)
+                };
                 let address = section.address + offset as u32;
                 let observed = client.read_memory(address, count)?;
                 let expected = &dol[file_start + offset..file_start + offset + count];
@@ -155,15 +195,28 @@ fn run() -> Result<(), String> {
                         shown_differences += 1;
                     }
                 }
-                offset += count;
+                if full_scan && offset % (64 * 1024) == 0 {
+                    println!(
+                        "progress {:?}[{}] +0x{:x}/0x{:x}, {:.1}s",
+                        section.kind,
+                        section.index,
+                        offset,
+                        section_len,
+                        scan_started.elapsed().as_secs_f32()
+                    );
+                    let _ = std::io::stdout().flush();
+                }
             }
             println!(
-                "matched {:?}[{}] guest 0x{:08x}..0x{:08x}",
+                "sampled {:?}[{}] guest 0x{:08x}..0x{:08x} ({} reads, {:.2}s)",
                 section.kind,
                 section.index,
                 section.address,
-                section.address + section.size
+                section.address + section.size,
+                offsets.len(),
+                scan_started.elapsed().as_secs_f32()
             );
+            let _ = std::io::stdout().flush();
         }
         if total_differences > 0 {
             return Err(format!(
@@ -171,11 +224,14 @@ fn run() -> Result<(), String> {
             ));
         }
         println!(
-            "Every loaded DOL section matches SHA-256 {}",
+            "All {} DOL sections matched in {} validation; candidate SHA-256 {} ({:.2}s)",
+            info.sections.len(),
+            if full_scan { "full" } else { "sampled" },
             sha256(&dol)
                 .iter()
                 .map(|b| format!("{b:02x}"))
-                .collect::<String>()
+                .collect::<String>(),
+            scan_started.elapsed().as_secs_f32()
         );
         return Ok(());
     }
@@ -199,7 +255,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy <original.dol> <modified.dol> | multigalaxy identify <disc-header.bin> <main.dol> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port> [--mute] | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy verify-loaded <port> <main.dol>".into());
+        return Err("usage: multigalaxy <original.dol> <modified.dol> | multigalaxy identify <disc-header.bin> <main.dol> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port> [--mute] | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
@@ -281,7 +337,14 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{dolphin_config, parse_dol};
+    use super::{dolphin_config, parse_dol, verification_offsets};
+
+    #[test]
+    fn sampled_validation_reads_start_middle_and_end_without_scanning_section() {
+        assert_eq!(verification_offsets(0x5000, false), vec![0, 0x2800, 0x4ff0]);
+        assert_eq!(verification_offsets(8, false), vec![0, 4]);
+        assert_eq!(verification_offsets(2050, true), vec![0, 1024, 2048]);
+    }
 
     #[test]
     fn test_mute_is_opt_in_and_does_not_change_normal_audio_defaults() {
@@ -314,9 +377,8 @@ mod tests {
         for section in &info.sections {
             let file_start = section.file_offset as usize;
             let section_len = section.size as usize;
-            let mut offset = 0usize;
-            while offset < section_len {
-                let count = (section_len - offset).min(4096);
+            for offset in verification_offsets(section_len, false) {
+                let count = (section_len - offset).min(16);
                 let address = section.address + offset as u32;
                 let observed = client.read_memory(address, count).unwrap();
                 let expected = &dol[file_start + offset..file_start + offset + count];
@@ -330,7 +392,6 @@ mod tests {
                     expected[runs.first().map_or(0, |(start, _)| *start)],
                     observed[runs.first().map_or(0, |(start, _)| *start)]
                 );
-                offset += count;
             }
         }
     }

@@ -123,7 +123,29 @@ impl std::error::Error for RevisionError {}
 
 impl RevisionCatalog {
     pub fn new() -> Self {
-        Self::default()
+        // Petari's PAL config/RMGP01/build.sha1 records SHA-1
+        // 9BD1DAA520BD1F573B6A4B82E03336E9C51B511F. That exact DOL was
+        // independently SHA-256 fingerprinted and matched against Dolphin RAM.
+        // This registers build identity only; no hook sites are implied.
+        Self {
+            maps: vec![VersionMap {
+                fingerprint: BuildFingerprint {
+                    disc: DiscIdentity {
+                        game_id: "RMGP01".into(),
+                        revision: 0,
+                    },
+                    dol_sha256: [
+                        0x82, 0x00, 0xfb, 0x72, 0xb3, 0x17, 0x00, 0x69, 0xbb, 0x71, 0xc8, 0xb3,
+                        0xdc, 0x21, 0xb4, 0x9e, 0x42, 0x99, 0x77, 0xce, 0x8a, 0xe5, 0x15, 0x9b,
+                        0xb9, 0x5e, 0xa6, 0xa1, 0x9d, 0xe0, 0xfb, 0xee,
+                    ],
+                },
+                provenance:
+                    "Petari config/RMGP01 exact main.dol SHA-1; PAL Rev 0; no hooks registered"
+                        .into(),
+                hooks: Vec::new(),
+            }],
+        }
     }
 
     /// Add a reviewed PAL build mapping. Unverified hook sites may be catalogued for research,
@@ -303,7 +325,7 @@ mod tests {
             revision: 0,
         };
         let map = version_map(&dol, vec![]);
-        let mut catalog = RevisionCatalog::new();
+        let mut catalog = RevisionCatalog::default();
         catalog.register(map).unwrap();
         assert!(catalog.identify(&disc, &dol).is_ok());
         assert!(matches!(
@@ -319,6 +341,23 @@ mod tests {
                 &dol
             ),
             Err(RevisionError::UnsupportedRevision { .. })
+        ));
+    }
+
+    #[test]
+    fn bundled_pal_entry_has_verified_identity_but_no_unverified_hooks() {
+        let catalog = RevisionCatalog::new();
+        let disc = DiscIdentity {
+            game_id: "RMGP01".into(),
+            revision: 0,
+        };
+        let map = catalog.maps.first().unwrap();
+        assert_eq!(map.fingerprint.disc, disc);
+        assert!(map.hooks.is_empty());
+        assert!(map.provenance.contains("no hooks registered"));
+        assert!(matches!(
+            catalog.identify(&disc, &fixture()),
+            Err(RevisionError::UnknownExecutableHash { .. })
         ));
     }
 
