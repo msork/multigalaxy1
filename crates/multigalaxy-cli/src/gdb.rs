@@ -1,0 +1,173 @@
+//! Read-only GDB Remote Serial Protocol access for Dolphin's optional PowerPC stub.
+use std::io::{Read, Write};
+use std::net::{SocketAddr, TcpStream};
+use std::time::Duration;
+
+const MAX_READ: usize = 4096;
+
+pub struct DolphinGdb {
+    stream: TcpStream,
+}
+
+impl DolphinGdb {
+    pub fn connect(address: SocketAddr, timeout: Duration) -> Result<Self, String> {
+        let stream = TcpStream::connect_timeout(&address, timeout)
+            .map_err(|e| format!("cannot connect to Dolphin GDB stub at {address}: {e}"))?;
+        stream
+            .set_read_timeout(Some(timeout))
+            .and_then(|_| stream.set_write_timeout(Some(timeout)))
+            .map_err(|e| format!("cannot configure GDB socket timeouts: {e}"))?;
+        Ok(Self { stream })
+    }
+
+    /// Read emulated guest RAM. This client intentionally exposes no write operation.
+    pub fn read_memory(&mut self, address: u32, length: usize) -> Result<Vec<u8>, String> {
+        if length == 0 || length > MAX_READ {
+            return Err(format!(
+                "read length must be between 1 and {MAX_READ} bytes"
+            ));
+        }
+        if u64::from(address) + length as u64 > (u64::from(u32::MAX) + 1) {
+            return Err("memory read crosses the 32-bit address-space boundary".into());
+        }
+        let response = self.request(&format!("m{address:x},{length:x}"))?;
+        if response.starts_with('E') {
+            return Err(format!("Dolphin rejected guest memory read: {response}"));
+        }
+        let bytes = decode_hex(&response)?;
+        if bytes.len() != length {
+            return Err(format!(
+                "Dolphin returned {} bytes for a {length}-byte memory read",
+                bytes.len()
+            ));
+        }
+        Ok(bytes)
+    }
+
+    fn request(&mut self, command: &str) -> Result<String, String> {
+        let packet = encode_packet(command);
+        self.stream
+            .write_all(&packet)
+            .map_err(|e| format!("cannot send GDB request: {e}"))?;
+        let ack = read_byte(&mut self.stream)?;
+        if ack != b'+' {
+            return Err(format!(
+                "expected GDB packet acknowledgement, received 0x{ack:02x}"
+            ));
+        }
+        let mut start = read_byte(&mut self.stream)?;
+        while start != b'$' {
+            start = read_byte(&mut self.stream)?;
+        }
+        let mut payload = Vec::new();
+        loop {
+            let byte = read_byte(&mut self.stream)?;
+            if byte == b'#' {
+                break;
+            }
+            if payload.len() >= 16 * MAX_READ {
+                return Err("GDB response exceeds the bounded packet size".into());
+            }
+            payload.push(byte);
+        }
+        let high = read_byte(&mut self.stream)?;
+        let low = read_byte(&mut self.stream)?;
+        let expected = (hex_nibble(high)? << 4) | hex_nibble(low)?;
+        let actual = payload
+            .iter()
+            .fold(0u8, |sum, byte| sum.wrapping_add(*byte));
+        if expected != actual {
+            self.stream
+                .write_all(b"-")
+                .map_err(|e| format!("cannot reject invalid GDB packet: {e}"))?;
+            return Err("Dolphin GDB response checksum mismatch".into());
+        }
+        self.stream
+            .write_all(b"+")
+            .map_err(|e| format!("cannot acknowledge GDB response: {e}"))?;
+        String::from_utf8(payload).map_err(|e| format!("GDB response is not ASCII: {e}"))
+    }
+}
+
+fn read_byte(stream: &mut TcpStream) -> Result<u8, String> {
+    let mut byte = [0];
+    stream
+        .read_exact(&mut byte)
+        .map_err(|e| format!("cannot read GDB packet: {e}"))?;
+    Ok(byte[0])
+}
+
+fn encode_packet(payload: &str) -> Vec<u8> {
+    let checksum = payload
+        .as_bytes()
+        .iter()
+        .fold(0u8, |sum, byte| sum.wrapping_add(*byte));
+    format!("${payload}#{checksum:02x}").into_bytes()
+}
+
+fn decode_hex(text: &str) -> Result<Vec<u8>, String> {
+    if text.len() % 2 != 0 {
+        return Err("Dolphin returned an odd-length hexadecimal memory response".into());
+    }
+    text.as_bytes()
+        .chunks_exact(2)
+        .map(|pair| Ok((hex_nibble(pair[0])? << 4) | hex_nibble(pair[1])?))
+        .collect()
+}
+
+fn hex_nibble(byte: u8) -> Result<u8, String> {
+    match byte {
+        b'0'..=b'9' => Ok(byte - b'0'),
+        b'a'..=b'f' => Ok(byte - b'a' + 10),
+        b'A'..=b'F' => Ok(byte - b'A' + 10),
+        _ => Err(format!(
+            "invalid hexadecimal digit 0x{byte:02x} in GDB response"
+        )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::TcpListener;
+    use std::thread;
+
+    #[test]
+    fn reads_memory_using_gdb_rsp_without_write_commands() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut packet = Vec::new();
+            loop {
+                let byte = read_byte(&mut stream).unwrap();
+                packet.push(byte);
+                if byte == b'#' {
+                    packet.push(read_byte(&mut stream).unwrap());
+                    packet.push(read_byte(&mut stream).unwrap());
+                    break;
+                }
+            }
+            assert_eq!(packet, encode_packet("m80004000,4"));
+            stream.write_all(b"+").unwrap();
+            stream.write_all(&encode_packet("3f800000")).unwrap();
+            assert_eq!(read_byte(&mut stream).unwrap(), b'+');
+        });
+        let mut client = DolphinGdb::connect(address, Duration::from_secs(2)).unwrap();
+        assert_eq!(
+            client.read_memory(0x8000_4000, 4).unwrap(),
+            [0x3f, 0x80, 0, 0]
+        );
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_or_unbounded_reads_before_network_io() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut client =
+            DolphinGdb::connect(listener.local_addr().unwrap(), Duration::from_secs(1)).unwrap();
+        assert!(client.read_memory(0, 0).is_err());
+        assert!(client.read_memory(0, MAX_READ + 1).is_err());
+        assert!(client.read_memory(u32::MAX, 2).is_err());
+    }
+}

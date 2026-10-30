@@ -44,3 +44,7 @@ A separate launcher cannot expose game actors by itself. The minimal runtime pro
 ## PAL and localization identity
 
 Support only PAL SMG1 builds with exact verified ID/revision/DOL maps. Reject unknown versions. Gameplay payloads must match across peers. Russian, French, and English presentation assets remain local and can differ only after audit proves they cannot affect simulation. See `docs/localization.md` and `docs/references/russian-patch.md`.
+
+## Runtime investigation status
+
+The launcher has an opt-in `--mute` argument strictly for test/debug sessions. It writes audio mute options into only the isolated Dolphin test profile; normal launch omits these options. Dolphin 2609a GDB memory reads have been verified against a live PAL session, but the available candidate `main.dol` mismatches loaded memory at `0x800041a3`. Until an exact hash-linked PAL DOL and symbol map are available, coordinate access and injection remain unimplemented. The GDB stub bound to all interfaces during the observed test, so use it only briefly and stop Dolphin after inspection. See [runtime research](research.md) and [testing evidence](testing.md).
