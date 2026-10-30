@@ -281,7 +281,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::dolphin_config;
+    use super::{dolphin_config, parse_dol};
 
     #[test]
     fn test_mute_is_opt_in_and_does_not_change_normal_audio_defaults() {
@@ -295,11 +295,15 @@ mod tests {
 
     #[test]
     #[ignore = "requires a live Dolphin GDB stub and an already booted PAL SMG1 session"]
-    fn live_dolphin_exposes_the_pal_disc_id_read_only() {
+    fn live_dolphin_matches_the_pal_dol_read_only() {
         let port = std::env::var("MG1_GDB_PORT")
             .expect("set MG1_GDB_PORT to the live Dolphin GDB port")
             .parse::<u16>()
             .expect("MG1_GDB_PORT must be a valid TCP port");
+        let dol_path = std::env::var("MG1_PAL_DOL")
+            .expect("set MG1_PAL_DOL to the verified PAL main.dol path");
+        let dol = std::fs::read(&dol_path).expect("read the user-supplied PAL main.dol");
+        let info = parse_dol(&dol).expect("parse the user-supplied PAL main.dol");
         let mut client = super::gdb::DolphinGdb::connect(
             format!("127.0.0.1:{port}").parse().unwrap(),
             std::time::Duration::from_secs(5),
@@ -307,5 +311,27 @@ mod tests {
         .unwrap();
         let disc_id = client.read_memory(0x8000_0000, 6).unwrap();
         assert_eq!(&disc_id, b"RMGP01");
+        for section in &info.sections {
+            let file_start = section.file_offset as usize;
+            let section_len = section.size as usize;
+            let mut offset = 0usize;
+            while offset < section_len {
+                let count = (section_len - offset).min(4096);
+                let address = section.address + offset as u32;
+                let observed = client.read_memory(address, count).unwrap();
+                let expected = &dol[file_start + offset..file_start + offset + count];
+                let runs = super::gdb::diff_runs(expected, &observed);
+                assert!(
+                    runs.is_empty(),
+                    "PAL {:?}[{}] differs at guest 0x{:08x}: expected {:02x}, observed {:02x}",
+                    section.kind,
+                    section.index,
+                    address + runs.first().map_or(0, |(start, _)| *start as u32),
+                    expected[runs.first().map_or(0, |(start, _)| *start)],
+                    observed[runs.first().map_or(0, |(start, _)| *start)]
+                );
+                offset += count;
+            }
+        }
     }
 }

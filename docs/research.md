@@ -1,10 +1,10 @@
-﻿# Dolphin runtime evidence
+# Dolphin runtime evidence
 
 The Windows development environment has Dolphin `2609a` at the user-supplied installation path and a user-supplied PAL RVZ. DolphinTool reports disc ID `RMGP01`, PAL region, revision 0, country Europe, internal name `SUPER MARIO GALAXY`; RVZ verification reported no problems and raw-image SHA-1 `4ad985eb39b6f60be00a44c3a41bc3ed31b083c2` (the tool also printed `Error creating key`, so this verification output is recorded with that caveat). The RVZ was not modified.
 
 A Rust GDB Remote Serial Protocol client successfully read 16 bytes at guest address `0x80000000` from the running Dolphin instance. The bytes decode to `RMGP01` followed by zeroes. This proves the local GDB memory-read path, not player-coordinate extraction or gameplay.
 
-The previously available `reference/original/main.dol` is not confirmed to be the DOL extracted from this RVZ. Comparing its section bytes to loaded guest memory found the first mismatch in Text section 0 at guest address `0x800041a3`. Therefore its hash and any offsets derived from it must not be treated as the RVZ's verified executable mapping. No player global, coordinate structure, function address, or hook is approved from this evidence. The next reverse-engineering step is to acquire a hash-identified main.dol from this exact user-owned PAL revision and map it against Petari's verified symbols/build data.
+The current user-supplied `reference/original/main.dol` is 6,283,264 bytes (SHA-1 `9bd1daa520bd1f573b6a4b82e03336e9c51b511f`, SHA-256 `8200fb72b3170069bb71c8b3dc21b49e429977ce8ae5159bb95ea6a19de0fbee`). DolphinTool identifies the loaded disc as `RMGP01`, PAL revision 0. A read-only full section comparison against Dolphin 2609a matched every Text and Data section. This verifies the supplied DOL against the running PAL session at comparison time. No player global, coordinate structure, function address, or hook has yet been mapped.
 
 Dolphin's GDB stub is configured through `Main.General.GDBPort`; its implementation supports memory reads and writes at the protocol level. The MultiGalaxy Rust client intentionally implements reads only. On this Dolphin 2609a test, the listener appeared on `0.0.0.0`, not just loopback, even though the client connects to `127.0.0.1`. Dolphin must be stopped after debugging. Dolphin's MemoryWatcher implementation was not validated for this Windows build; it is not used by the bridge.
 
@@ -17,9 +17,9 @@ Research references:
 
 ## Why the reference DOL differed from live PAL memory
 
-The reference file `reference/original/main.dol` has SHA-1 `9a71008ae1ee9010e267fa67d1f0b0d4f0e895dd` and SHA-256 `2c680585a8f58e1cc9c5521b579057f12b124ff0ef409e470a57606c50a93c09`. The archived SMG USA decompilation identifies that exact SHA-1 as its rebuilt retail `main.dol`, establishing this reference as the USA `RMGE01` Rev 0 executable. DolphinTool identifies the live RVZ independently as `RMGP01`, PAL revision 0. The prior comparison therefore compared two regions; it was not evidence of RVZ corruption.
+Before the user replaced it, the file at `reference/original/main.dol` had SHA-1 `9a71008ae1ee9010e267fa67d1f0b0d4f0e895dd`, which the archived USA decompilation identifies as the USA `RMGE01` Rev 0 executable. That USA file is no longer retained. Its prior comparison to the PAL session differed at `0x800041a3`; that was a cross-region comparison, not evidence of RVZ corruption. The replacement PAL DOL now matches every loaded section (see the current fingerprint above).
 
-A full section scan compared the USA candidate against live PAL RAM. Text sections differ substantially, while all listed DOL data sections matched in this run. This scan cannot distinguish normal region code differences from runtime code changes because the candidate is the wrong region and Dolphin reports current RAM. It should not be used as a PAL DOL fingerprint.
+A full section scan compared the replacement PAL candidate against live PAL RAM. Every Text and Data section matched; no code or data differences were observed at that sample. This is the exact PAL DOL fingerprint now used for further symbol and actor analysis.
 
 The isolated launcher profile has GDB enabled and test audio mute only; it contains no game-specific cheats or Action Replay entries. Dolphin's generic `RMG.ini` only defines video hacks/enhancements, not code patches. GDB's `ReadMemory` implementation first checks that the guest address is RAM, then obtains the address with `GetPointerForRange` and hex-encodes those bytes. Thus it reads the current emulated RAM contents without applying a separate address translation at the client. It does not promise those bytes are still identical to the original DOL after the game has executed.
 
@@ -29,7 +29,7 @@ The earlier complete comparison also exposed a bug in our GDB client: an `m` pac
 
 Petari's current source semantics show a dynamic path rather than a fixed player singleton: `MR::getMarioHolder()` resolves a `MarioHolder` from the scene-object holder registry; `MarioHolder` owns a `MarioActor*`; `MarioActor` creates its `Mario` movement object and uses the inherited `LiveActor::mPosition`. The actor's position is therefore the first state field to target once the PAL instance address is resolved. Actor and holder pointers are allocated at runtime, so source names alone do not provide a stable memory address.
 
-The public Petari master config directory currently exposes an `RMGK01` map, not a verified PAL (`RMGP01`) address map. Semantic source findings are useful for analysis, but no Petari address or structure offset has been imported into the runtime reader. A PAL-specific mapping still needs the exact `RMGP01` DOL identity and matching symbols/structure layout. Rotation and state-field offsets are also not registered.
+The checked Petari README lists `RMGK01` Rev 0 as its supported build. Although Petari source provides semantic actor names, no `RMGP01` symbol file has yet been verified against the exact PAL DOL hash above. No address or structure offset has been imported into the runtime reader. Rotation and state-field offsets are not registered.
 
 Sources:
 

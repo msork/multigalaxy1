@@ -4,12 +4,14 @@
 
 | Input | Size | SHA-256 | Result |
 |---|---:|---|---|
-| Local original `reference/original/main.dol` | 6,283,264 | `2c680585a8f58e1cc9c5521b579057f12b124ff0ef409e470a57606c50a93c09` | Matches expected |
-| Local AllReds `reference/allreds/main.dol` | 6,294,444 | `2db4fe4a7eed6af7e69746be7acbc211ff81340d03b2554a2b7ce282c25478f2` | Matches expected |
+| User-supplied PAL `reference/original/main.dol` | 6,283,264 | `8200fb72b3170069bb71c8b3dc21b49e429977ce8ae5159bb95ea6a19de0fbee` | Matches every loaded section in Dolphin 2609a (`RMGP01`, Rev 0) |
+| Historical AllReds `reference/allreds/main.dol` | 6,294,444 | `2db4fe4a7eed6af7e69746be7acbc211ff81340d03b2554a2b7ce282c25478f2` | Historical USA comparison input; not compared to current PAL |
 
-Hashes were independently checked with Windows `certutil`.
+Hashes were independently checked with Windows `certutil`. SHA-1 for the current PAL DOL is `9bd1daa520bd1f573b6a4b82e03336e9c51b511f`. The earlier USA DOL (`9a71008ae1ee9010e267fa67d1f0b0d4f0e895dd`) was replaced and is no longer retained.
 
-## Reproduced structural comparison
+## Historical structural comparison (USA)
+
+The comparison below was performed against the former USA `RMGE01` Rev 0 DOL, not the current PAL file. The USA input has been replaced and is no longer available at the old path. Therefore these figures are historical AllReds analysis and cannot be reproduced from the current PAL file without obtaining the matching USA input again.
 
 Using a separate read-only PowerShell/.NET byte parser against both local files:
 

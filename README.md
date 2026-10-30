@@ -14,7 +14,7 @@ Rust-first, online-only multiplayer modification research for PAL Super Mario Ga
 
 ```powershell
 cargo test --workspace
-cargo run -p multigalaxy -- reference/original/main.dol reference/allreds/main.dol
+cargo run -p multigalaxy -- <original.dol> <modified.dol>
 cargo run -p multigalaxy -- identify disc-header.bin main.dol
 ```
 
@@ -22,4 +22,4 @@ Use only game files you are legally entitled to use. The launcher must not downl
 
 ## Dolphin debug bridge status
 
-The CLI can launch Dolphin in a fresh isolated user directory and read guest memory through Dolphin 2609a's GDB stub. The test/debug-only `--mute` option silences that isolated run; without it, normal audio settings remain in effect. This is not a production mute setting. The supplied PAL RVZ identifies as `RMGP01` revision 0, but the currently available reference DOL differs from Dolphin's loaded executable at `0x800041a3`. No player coordinate address or game hook is verified yet. See [runtime research](docs/research.md), [testing evidence](docs/testing.md), and [debug launch instructions](docs/building.md).
+The CLI can launch Dolphin in a fresh isolated user directory and read guest memory through Dolphin 2609a's GDB stub. The test/debug-only `--mute` option silences that isolated run; without it, normal audio settings remain in effect. This is not a production mute setting. The supplied PAL RVZ identifies as `RMGP01` revision 0, and the current PAL `main.dol` matches every loaded Dolphin section. No player coordinate address or game hook is verified yet. See [runtime research](docs/research.md), [testing evidence](docs/testing.md), and [debug launch instructions](docs/building.md).
