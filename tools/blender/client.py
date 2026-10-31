@@ -1,6 +1,7 @@
 """Command-line client for bridge.py; uses only the Python standard library."""
 import argparse
 import json
+from pathlib import Path
 import socket
 import uuid
 
@@ -53,7 +54,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=["inspect.objects", "inspect.armature", "inspect.weights",
                                                  "inspect.actions", "inspect.pose", "mutate.duplicate_rig",
-                                                 "mutate.restore", "analyze.waluigi_arm"])
+                                                 "mutate.restore", "analyze.waluigi_arm",
+                                                 "mutate.prototype_waluigi_arm"])
     parser.add_argument("--args", default="{}", help="operation arguments as JSON")
     parser.add_argument("--confirm", action="store_true", help="required for mutate.* operations")
     parser.add_argument("--port", type=int, default=47831)
@@ -64,6 +66,11 @@ def main():
     parser.add_argument("--sample-count", type=int, help="uniform analysis samples")
     parser.add_argument("--frames", type=float, nargs="+", help="explicit analysis sample frames")
     parser.add_argument("--mesh", action="append", dest="meshes", help="weight mesh; may be repeated")
+    parser.add_argument("--source-object", help="source armature for the Waluigi arm prototype")
+    parser.add_argument("--source-action", help="source action for the Waluigi arm prototype")
+    parser.add_argument("--target-object", help="disposable Waluigi test armature")
+    parser.add_argument("--target-mesh", action="append", dest="target_meshes", help="disposable target mesh; may be repeated")
+    parser.add_argument("--report", help="write prototype diagnostics JSON to this local path")
     opts = parser.parse_args()
     arguments = json.loads(opts.args)
     if opts.operation == "analyze.waluigi_arm" and (opts.object_name or opts.action_name or opts.sample_count or opts.frames or opts.meshes):
@@ -78,7 +85,26 @@ def main():
             arguments["frames"] = opts.frames
         if opts.meshes:
             arguments["meshes"] = opts.meshes
+    if opts.operation == "mutate.prototype_waluigi_arm":
+        if opts.source_object:
+            arguments["source_object"] = opts.source_object
+        if opts.source_action:
+            arguments["source_action"] = opts.source_action
+        if opts.target_object:
+            arguments["target_object"] = opts.target_object
+        if opts.target_meshes:
+            arguments["meshes"] = opts.target_meshes
     response = request(opts.operation, arguments, opts.confirm, port=opts.port)
+    if opts.report:
+        report_path = Path(opts.report)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_value = response.get("result", response)
+        report_path.write_text(json.dumps(report_value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+        print(json.dumps({"report": str(report_path), "prototype_object": report_value.get("after", {}).get("prototype_object"),
+                          "prototype_action": report_value.get("after", {}).get("prototype_action"),
+                          "validation": report_value.get("validation"),
+                          "branch_relative_orientation": report_value.get("after", {}).get("branch_relative_orientation")}, indent=2))
+        return
     output = summarize_arm_analysis(response["result"]) if opts.summary and opts.operation == "analyze.waluigi_arm" else response
     print(json.dumps(output, indent=2))
 

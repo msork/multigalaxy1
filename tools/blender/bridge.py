@@ -13,7 +13,7 @@ import threading
 import uuid
 
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 try:
     from .rotation_math import angular_distance, pearson, relative
@@ -406,6 +406,376 @@ def _analyze_waluigi_arm(args):
                 bpy.data.armatures.remove(data)
 
 
+_PROTOTYPE_MAP = [
+    ("bone_23", "ShoulderL", "local"),
+    ("bone_24", "ArmL1", "local"),
+    ("bone_25", "ArmL1", "armature"),
+    ("bone_26", "ArmL2", "local"),
+    ("bone_27", "HandL", "local"),
+    ("bone_29", "HandL", "armature"),
+]
+_PROTOTYPE_BONES = ["bone_22", "bone_23", "bone_24", "bone_25", "bone_26", "bone_27", "bone_29", "bone_30"]
+
+
+def _unique_id_name(collection, base):
+    candidate, index = base, 1
+    while collection.get(candidate):
+        candidate = base + "_" + str(index)
+        index += 1
+    return candidate
+
+
+def _link_like(source, duplicate, fallback):
+    collections = list(source.users_collection) or [fallback]
+    for collection in collections:
+        collection.objects.link(duplicate)
+
+
+def _remove_owned_object(obj):
+    if not obj:
+        return
+    data = obj.data
+    bpy.data.objects.remove(obj, do_unlink=True)
+    if data and data.users == 0:
+        if data.__class__.__name__ == "Armature":
+            bpy.data.armatures.remove(data)
+        elif data.__class__.__name__ == "Mesh":
+            bpy.data.meshes.remove(data)
+
+
+def _action_slot_for(action, obj):
+    current = obj.animation_data.action_slot if obj.animation_data and obj.animation_data.action == action else None
+    if current:
+        return current
+    slots = list(getattr(action, "slots", []))
+    slot = next((s for s in slots if s.target_id_type == "OBJECT" and
+                 (obj.name in s.name or obj.name in s.identifier)), None)
+    return slot or next((s for s in slots if s.target_id_type == "OBJECT"), None)
+
+
+def _source_local_rest_rotation(obj, name):
+    bone = obj.data.bones[name]
+    rest = bone.matrix_local.copy()
+    if bone.parent:
+        rest = bone.parent.matrix_local.inverted_safe() @ rest
+    return rest.to_quaternion().normalized()
+
+
+def _target_local_rest_rotation(obj, name):
+    bone = obj.data.bones[name]
+    rest = bone.matrix_local.copy()
+    if bone.parent:
+        rest = bone.parent.matrix_local.inverted_safe() @ rest
+    return rest.to_quaternion().normalized()
+
+
+def _copy_rotation_mode(source_obj, target_obj, target_name, source_name):
+    source_basis = source_obj.pose.bones[source_name].matrix_basis.to_quaternion().normalized()
+    source_rest = _source_local_rest_rotation(source_obj, source_name)
+    target_rest = _target_local_rest_rotation(target_obj, target_name)
+    calibration = target_rest.inverted() @ source_rest
+    return (calibration @ source_basis @ calibration.inverted()).normalized()
+
+
+def _copy_world_delta(source_obj, target_obj, target_name, source_name):
+    source_pose = source_obj.pose.bones[source_name].matrix.to_quaternion().normalized()
+    source_rest = source_obj.data.bones[source_name].matrix_local.to_quaternion().normalized()
+    target_rest = target_obj.data.bones[target_name].matrix_local.to_quaternion().normalized()
+    delta = source_pose @ source_rest.inverted()
+    return (delta @ target_rest).normalized()
+
+
+def _set_pose_armature_rotation(pose_bone, rotation):
+    current = pose_bone.matrix.copy()
+    matrix = Matrix.LocRotScale(current.translation, rotation, current.to_scale())
+    pose_bone.matrix = matrix
+
+
+def _finite_tree(value):
+    if isinstance(value, dict):
+        return all(_finite_tree(v) for v in value.values())
+    if isinstance(value, (tuple, list)):
+        return all(_finite_tree(v) for v in value)
+    if isinstance(value, (int, float)):
+        return math.isfinite(value)
+    return True
+
+
+def _mesh_weight_centroids(mesh_sources, mesh_copies, bone_names, armature):
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    result = {}
+    for source, duplicate in zip(mesh_sources, mesh_copies):
+        evaluated = duplicate.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+        try:
+            groups = {g.index: g.name for g in source.vertex_groups if g.name in bone_names}
+            sums = {name: Vector((0,0,0)) for name in bone_names}
+            weights = {name: 0.0 for name in bone_names}
+            counts = {name: 0 for name in bone_names}
+            world = evaluated.matrix_world
+            for index, vertex in enumerate(mesh.vertices):
+                if index >= len(source.data.vertices):
+                    break
+                point = world @ vertex.co
+                for assignment in source.data.vertices[index].groups:
+                    name = groups.get(assignment.group)
+                    weight = float(assignment.weight)
+                    if name and weight > 0.0:
+                        sums[name] += point * weight
+                        weights[name] += weight
+                        counts[name] += 1
+            result[source.name] = {name: {"weighted_vertex_count": counts[name],
+                                           "centroid_world": list(sums[name] / weights[name]) if weights[name] else None}
+                                   for name in bone_names}
+        finally:
+            evaluated.to_mesh_clear()
+    return result
+
+
+def _prototype_waluigi_arm(args):
+    source = _object(args.get("source_object", "luigi.001_armature"))
+    source_action = bpy.data.actions.get(args.get("source_action", "luigi.001_armature_walk"))
+    target = _object(args.get("target_object", "Waluigi_Arm_Test"))
+    if source.type != "ARMATURE" or target.type != "ARMATURE":
+        raise ValueError("source and target must be armature objects")
+    if source_action is None:
+        raise ValueError("source action not found")
+    if not source.animation_data or source.animation_data.action != source_action:
+        raise ValueError("source action must already be assigned to the source armature for verified slot selection")
+    missing_source = sorted({s for _, s, _ in _PROTOTYPE_MAP if source.data.bones.get(s) is None})
+    missing_target = [n for n in _PROTOTYPE_BONES if target.data.bones.get(n) is None]
+    if missing_source or missing_target:
+        raise ValueError("required mapped bones missing; source=" + str(missing_source) + " target=" + str(missing_target))
+    source_slot = _action_slot_for(source_action, source)
+    if hasattr(source_action, "slots") and len(source_action.slots) and source_slot is None:
+        raise ValueError("source action has no compatible object slot")
+    frame_start, frame_end = source_action.frame_range
+    if frame_start > 0 or frame_end < 60:
+        raise ValueError("source action does not cover prototype frames 0 through 60")
+
+    mesh_names = args.get("meshes", [])
+    if not mesh_names:
+        raise ValueError("provide the disposable weighted meshes explicitly")
+    mesh_sources = [_object(n) for n in mesh_names]
+    for mesh in mesh_sources:
+        if mesh.type != "MESH":
+            raise ValueError("target mesh is not a mesh object: " + mesh.name)
+        mods = [m for m in mesh.modifiers if m.type == "ARMATURE" and m.object == target]
+        if not mods:
+            raise ValueError("mesh is not currently bound to the requested disposable target: " + mesh.name)
+
+    scene = bpy.context.scene
+    original_frame, original_subframe = scene.frame_current, scene.frame_subframe
+    source_temp = None
+    target_copy = None
+    mesh_copies = []
+    action = None
+    try:
+        target_name = _unique_id_name(bpy.data.objects, args.get("name", "Waluigi_Arm_Retarget_Prototype"))
+        target_copy = target.copy()
+        target_copy.data = target.data.copy()
+        target_copy.name = target_name
+        target_copy.data.name = target_name + "_Data"
+        target_copy[TAG] = True
+        target_copy["_mg1_prototype_role"] = "waluigi_left_arm_target"
+        _link_like(target, target_copy, scene.collection)
+        if target_copy.animation_data:
+            target_copy.animation_data.action = None
+            if hasattr(target_copy.animation_data, "action_slot"):
+                target_copy.animation_data.action_slot = None
+        for constraint in list(target_copy.constraints):
+            target_copy.constraints.remove(constraint)
+        for pose_bone in target_copy.pose.bones:
+            for constraint in list(pose_bone.constraints):
+                pose_bone.constraints.remove(constraint)
+            pose_bone.matrix_basis = Matrix.Identity(4)
+        for mesh_source in mesh_sources:
+            dup = mesh_source.copy()
+            dup.data = mesh_source.data.copy()
+            dup.name = _unique_id_name(bpy.data.objects, mesh_source.name + "_ArmRetargetPreview")
+            dup.data.name = dup.name + "_Data"
+            dup[TAG] = True
+            dup["_mg1_prototype_role"] = "waluigi_left_arm_weight_mesh"
+            _link_like(mesh_source, dup, scene.collection)
+            for modifier in dup.modifiers:
+                if modifier.type == "ARMATURE" and modifier.object == target:
+                    modifier.object = target_copy
+            mesh_copies.append(dup)
+
+        source_temp = source.copy()
+        source_temp.data = source.data.copy()
+        source_temp.name = _unique_id_name(bpy.data.objects, "_MG1_ArmRetarget_SourceEval")
+        source_temp.data.name = source_temp.name + "_Data"
+        source_temp[TAG] = True
+        _link_like(source, source_temp, scene.collection)
+        for source_pose in source.pose.bones:
+            source_temp.pose.bones[source_pose.name].rotation_mode = source_pose.rotation_mode
+        source_temp.animation_data_create()
+        source_temp.animation_data.action = source_action
+        if hasattr(source_temp.animation_data, "action_slot"):
+            source_temp.animation_data.action_slot = source_slot
+
+        action_name = _unique_id_name(bpy.data.actions, "Waluigi_LeftArm_Retarget_Prototype")
+        action = bpy.data.actions.new(action_name)
+        action[TAG] = True
+        action["_mg1_prototype_source_action"] = source_action.name
+        slot = action.slots.new("OBJECT", target_copy.name)
+        layer = action.layers.new("Baked Left Arm FK")
+        strip = layer.strips.new(type="KEYFRAME")
+        channelbag = strip.channelbag(slot, ensure=True)
+        target_copy.animation_data_create()
+        target_copy.animation_data.action = action
+        target_copy.animation_data.action_slot = slot
+
+        frames = list(range(0, 61))
+        baked = {name: {"location": [], "rotation_quaternion": [], "scale": []} for name in _PROTOTYPE_BONES}
+        source_motion = []
+        before = {"target_object": target.name, "target_scale": list(target.scale),
+                  "source_object": source.name, "source_action": source_action.name,
+                  "source_scale": list(source.scale),
+                  "source_constraints": sum(len(p.constraints) for p in source.pose.bones),
+                  "target_constraints": sum(len(p.constraints) for p in target.pose.bones),
+                  "target_action": target.animation_data.action.name if target.animation_data and target.animation_data.action else None}
+        before_samples = []
+        for frame in (0, 15, 30, 45, 60):
+            scene.frame_set(frame)
+            bpy.context.view_layer.update()
+            source_motion.append({"frame": frame,
+                                  "bones": {name: {"rotation_mode": source_temp.pose.bones[name].rotation_mode,
+                                                   "euler": [float(v) for v in source_temp.pose.bones[name].rotation_euler],
+                                                   "basis_q": _quat(source_temp.pose.bones[name].matrix_basis.to_quaternion().normalized())}
+                                              for name in sorted({s for _, s, _ in _PROTOTYPE_MAP})}})
+            original_pose = target.pose.bones
+            gaps = {"shoulder": float((target.matrix_world @ original_pose["bone_21"].tail - target.matrix_world @ original_pose["bone_22"].head).length),
+                    "elbow_main": float((target.matrix_world @ original_pose["bone_24"].tail - target.matrix_world @ original_pose["bone_26"].head).length),
+                    "elbow_overlap": float((target.matrix_world @ original_pose["bone_25"].tail - target.matrix_world @ original_pose["bone_29"].head).length),
+                    "wrist_glove": float((target.matrix_world @ original_pose["bone_27"].tail - target.matrix_world @ original_pose["bone_30"].head).length)}
+            before_samples.append({"frame": frame, "pose_matrices": {n: _mat(original_pose[n].matrix) for n in _PROTOTYPE_BONES},
+                                  "joint_gaps_world": gaps,
+                                  "weighted_mesh_centroids": _mesh_weight_centroids(mesh_sources, mesh_sources, _PROTOTYPE_BONES, target)})
+        before["sample_frames"] = before_samples
+        before["mesh_object_scales"] = {m.name: list(m.scale) for m in mesh_sources}
+
+        for frame in frames:
+            scene.frame_set(frame)
+            bpy.context.view_layer.update()
+            for name in _PROTOTYPE_BONES:
+                target_copy.pose.bones[name].matrix_basis = Matrix.Identity(4)
+            bpy.context.view_layer.update()
+            for target_name_bone, source_name, mode in _PROTOTYPE_MAP:
+                if mode == "local":
+                    target_pose = target_copy.pose.bones[target_name_bone]
+                    target_pose.rotation_mode = "QUATERNION"
+                    target_pose.rotation_quaternion = _copy_rotation_mode(source_temp, target_copy, target_name_bone, source_name)
+            bpy.context.view_layer.update()
+            for target_name_bone, source_name, mode in _PROTOTYPE_MAP:
+                if mode == "armature":
+                    target_pose = target_copy.pose.bones[target_name_bone]
+                    _set_pose_armature_rotation(target_pose, _copy_world_delta(source_temp, target_copy, target_name_bone, source_name))
+                    bpy.context.view_layer.update()
+            for name in _PROTOTYPE_BONES:
+                pose = target_copy.pose.bones[name]
+                rotation = pose.matrix_basis.to_quaternion().normalized()
+                qlist = _quat(rotation)
+                prior = baked[name]["rotation_quaternion"][-1] if baked[name]["rotation_quaternion"] else None
+                if prior and sum(a*b for a,b in zip(prior, qlist)) < 0:
+                    qlist = [-v for v in qlist]
+                baked[name]["location"].append([float(v) for v in pose.location])
+                baked[name]["rotation_quaternion"].append(qlist)
+                baked[name]["scale"].append([float(v) for v in pose.scale])
+
+        for name in _PROTOTYPE_BONES:
+            for path in ("location", "rotation_quaternion", "scale"):
+                data_path = target_copy.pose.bones[name].path_from_id(path)
+                width = len(baked[name][path][0])
+                for index in range(width):
+                    curve = channelbag.fcurves.new(data_path, index=index, group_name=name)
+                    curve.keyframe_points.add(len(frames))
+                    for point, frame, values in zip(curve.keyframe_points, frames, baked[name][path]):
+                        point.co = (frame, values[index])
+                        point.interpolation = "LINEAR"
+                    curve.update()
+
+        sample_frames = [0, 15, 30, 45, 60]
+        after_samples = []
+        branch_quats = {"bone_23_bone_25": [], "bone_26_bone_29": []}
+        for frame in sample_frames:
+            scene.frame_set(frame)
+            bpy.context.view_layer.update()
+            p = target_copy.pose.bones
+            edges = [("shoulder", "bone_21", "bone_22"), ("elbow_main", "bone_24", "bone_26"),
+                     ("elbow_overlap", "bone_25", "bone_29"), ("wrist_glove", "bone_27", "bone_30")]
+            joint_gaps = {}
+            for label, parent_name, child_name in edges:
+                parent, child = p[parent_name], p[child_name]
+                joint_gaps[label] = float((target_copy.matrix_world @ parent.tail - target_copy.matrix_world @ child.head).length)
+            mesh_centroids = _mesh_weight_centroids(mesh_sources, mesh_copies, _PROTOTYPE_BONES, target_copy)
+            for pair, (a_name, b_name) in {"bone_23_bone_25": ("bone_23", "bone_25"),
+                                           "bone_26_bone_29": ("bone_26", "bone_29")}.items():
+                branch_quats[pair].append(relative(_quat(p[a_name].matrix.to_quaternion()),
+                                                   _quat(p[b_name].matrix.to_quaternion())))
+            after_samples.append({"frame": frame,
+                                  "pose_matrices": {name: _mat(p[name].matrix) for name in _PROTOTYPE_BONES},
+                                  "pose_scales": {name: [float(v) for v in p[name].scale] for name in _PROTOTYPE_BONES},
+                                  "joint_gaps_world": joint_gaps, "weighted_mesh_centroids": mesh_centroids})
+        branch_relative = {}
+        for pair, quaternions in branch_quats.items():
+            changes = [math.degrees(angular_distance(quaternions[0], q)) for q in quaternions]
+            branch_relative[pair] = {"sampled_change_degrees": changes,
+                                     "maximum_change_degrees": max(changes),
+                                     "changes_over_time": max(changes) > 0.05}
+        after = {"prototype_object": target_copy.name, "prototype_action": action.name,
+                 "target_scale": list(target_copy.scale),
+                 "mesh_object_scales": {m.name: list(m.scale) for m in mesh_copies},
+                 "mesh_objects": [m.name for m in mesh_copies],
+                 "runtime_constraint_count": len(target_copy.constraints) + sum(len(p.constraints) for p in target_copy.pose.bones),
+                 "action_frame_range": list(action.frame_range), "sample_frames": after_samples,
+                 "branch_relative_orientation": branch_relative,
+                 "finite_numbers": _finite_tree(after_samples),
+                 "object_scale_unchanged": all(abs(a-b) < 1e-8 for a,b in zip(target.scale, target_copy.scale)),
+                 "max_joint_gap_world": {label: max(s["joint_gaps_world"][label] for s in after_samples)
+                                          for label in after_samples[0]["joint_gaps_world"]}}
+        after["max_bone_scale_deviation"] = max(abs(v-1.0) for sample in after_samples
+                                                for values in sample["pose_scales"].values() for v in values)
+        after["all_joint_gaps_within_0_05_world_units"] = all(
+            gap < 0.05 for sample in after_samples for gap in sample["joint_gaps_world"].values())
+        mesh_scale_unchanged = all(
+            all(abs(a-b) < 1e-8 for a,b in zip(src.scale, dup.scale))
+            for src, dup in zip(mesh_sources, mesh_copies))
+        result = {"schema": "mg1.waluigi-arm-prototype.v1", "mapping": [
+                      {"target": t, "source": s, "mode": m} for t,s,m in _PROTOTYPE_MAP],
+                  "source_frames": frames, "source_pose_samples": source_motion,
+                  "source_temp_action": source_temp.animation_data.action.name if source_temp and source_temp.animation_data and source_temp.animation_data.action else None,
+                  "source_temp_slot": source_temp.animation_data.action_slot.identifier if source_temp and source_temp.animation_data and getattr(source_temp.animation_data, "action_slot", None) else None,
+                  "before": before, "after": after,
+                  "validation": {"finite_numbers": after["finite_numbers"],
+                                 "scale_unchanged": after["object_scale_unchanged"],
+                                 "mesh_scales_unchanged": mesh_scale_unchanged,
+                                 "no_runtime_constraints": after["runtime_constraint_count"] == 0,
+                                 "bone_scales_unchanged": after["max_bone_scale_deviation"] < 1e-5,
+                                 "overlap_relative_motion_present": all(v["changes_over_time"] for v in branch_relative.values()),
+                                 "joint_continuity_within_tolerance": after["all_joint_gaps_within_0_05_world_units"],
+                                 "shoulder_continuity_max_gap_world": after["max_joint_gap_world"]["shoulder"],
+                                 "elbow_main_max_gap_world": after["max_joint_gap_world"]["elbow_main"],
+                                 "elbow_overlap_max_gap_world": after["max_joint_gap_world"]["elbow_overlap"],
+                                 "wrist_glove_max_gap_world": after["max_joint_gap_world"]["wrist_glove"]}}
+        if (not result["validation"]["finite_numbers"] or not result["validation"]["scale_unchanged"] or
+                not result["validation"]["mesh_scales_unchanged"] or
+                not result["validation"]["no_runtime_constraints"] or not result["validation"]["bone_scales_unchanged"]):
+            raise RuntimeError("prototype failed finite/scale/constraint validation: " + json.dumps(result["validation"]))
+        return result
+    except Exception:
+        if action and bpy.data.actions.get(action.name):
+            bpy.data.actions.remove(action)
+        for obj in [source_temp, *mesh_copies, target_copy]:
+            _remove_owned_object(obj)
+        raise
+    finally:
+        scene.frame_set(original_frame, subframe=original_subframe)
+        if source_temp and bpy.data.objects.get(source_temp.name):
+            _remove_owned_object(source_temp)
+
+
 def _duplicate_rig(args):
     source = _object(args["object"])
     if source.type != "ARMATURE":
@@ -448,7 +818,8 @@ def _restore(args):
 _READ = {"inspect.objects": _inspect_objects, "inspect.armature": _inspect_armature,
          "inspect.weights": _inspect_weights, "inspect.actions": _inspect_actions,
          "inspect.pose": _inspect_pose, "analyze.waluigi_arm": _analyze_waluigi_arm}
-_MUTATE = {"mutate.duplicate_rig": _duplicate_rig, "mutate.restore": _restore}
+_MUTATE = {"mutate.duplicate_rig": _duplicate_rig, "mutate.restore": _restore,
+           "mutate.prototype_waluigi_arm": _prototype_waluigi_arm}
 
 
 def _dispatch(req):

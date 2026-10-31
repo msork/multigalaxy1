@@ -36,6 +36,14 @@ python tools/blender/client.py mutate.duplicate_rig --confirm --args '{"object":
 python tools/blender/client.py mutate.restore --confirm
 ```
 
+The first left-arm FK prototype uses source action frames 0–60, duplicates the disposable target armature and explicitly supplied meshes, bakes a new action, and saves a numerical report on the client machine:
+
+```powershell
+python tools/blender/client.py mutate.prototype_waluigi_arm --confirm --source-object luigi.001_armature --source-action luigi.001_armature_walk --target-object Waluigi_Arm_Test --target-mesh ARMTEST_29_0x75c1640_submesh0 --target-mesh ARMTEST_29_0x75c1640_submesh1 --report tools/blender/reports/waluigi_left_arm_prototype.json
+```
+
+The report records before/after armature matrices, shoulder/elbow/wrist continuity gaps, weighted mesh centroids, scale checks, and constraint counts. The duplicated preview objects and action are bridge-tagged and can be removed with the confirm-gated `mutate.restore` call after review.
+
 Cleanup only removes objects tagged by this bridge and actions tagged by this bridge. It does not remove arbitrary test objects or `sequence_*` actions. The duplicate is an armature-only copy; it is not bound to source meshes.
 
 ## Background smoke test
