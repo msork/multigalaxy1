@@ -235,6 +235,7 @@ fn wait_for_dolphin_window(
             .is_none()
         {
             return Ok(startup::WindowState {
+                hwnd: 0,
                 title: "process alive (window check unsupported on this platform)".into(),
                 hung: false,
             });
@@ -252,7 +253,19 @@ fn wait_for_dolphin_window(
             ));
         }
         let last_windows = startup::visible_windows(child.id());
-        if let Some(window) = last_windows.iter().find(|window| !window.hung) {
+        if let Some(window) = last_windows.iter().find(|window| {
+            !window.hung && startup::is_valid_visible_for_pid(window.hwnd, child.id())
+        }) {
+            if !startup::activate(window.hwnd) {
+                eprintln!(
+                    "Dolphin created visible window HWND=0x{:x}, but Windows did not allow foreground activation; title={:?}",
+                    window.hwnd, window.title
+                );
+            }
+            println!(
+                "Dolphin visible window verified: HWND=0x{:x}, title={:?}",
+                window.hwnd, window.title
+            );
             return Ok(window.clone());
         }
         if Instant::now() >= deadline {
@@ -262,7 +275,7 @@ fn wait_for_dolphin_window(
                 format!("Dolphin windows are not responding: {last_windows:?}")
             };
             return Err(format!(
-                "Dolphin stayed alive but startup did not become responsive within 15 seconds ({window_state}). The test process was left open as PID {}. stdout: {}; stderr: {}",
+                "Dolphin stayed alive but no valid visible window handle was available within 15 seconds ({window_state}). The test process was left open as PID {}. stdout: {}; stderr: {}",
                 child.id(), log_tail(stdout_path), log_tail(stderr_path)
             ));
         }
