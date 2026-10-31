@@ -102,6 +102,9 @@ target_specs = [("bone_21", None), ("bone_22", "bone_21"), ("bone_23", "bone_22"
                 ("bone_24", "bone_23"), ("bone_26", "bone_24"), ("bone_27", "bone_26"),
                 ("bone_30", "bone_27"), ("bone_25", "bone_22"), ("bone_29", "bone_25")]
 target_test = make_armature("BridgePrototypeTarget", target_specs)
+target_test.animation_data_create()
+target_test.animation_data.action = source_action
+target_test.animation_data.action_slot = source_slot
 mesh_data = bpy.data.meshes.new("BridgePrototypeMeshData")
 mesh_data.from_pydata([(0,0,0),(0,1,0),(1,0,0)], [], [(0,1,2)])
 mesh_data.update()
@@ -124,6 +127,7 @@ assert prototype_result["validation"]["overlap_relative_motion_present"]
 assert prototype_result["validation"]["bone_scales_unchanged"]
 assert prototype_result["validation"]["mesh_scales_unchanged"]
 assert prototype_result["validation"]["joint_continuity_within_tolerance"]
+assert prototype_result["after"]["max_joint_gap_change_world"]["shoulder"] < 0.05
 bridge._restore({})
 bridge.stop()
 print("Blender bridge smoke test passed")

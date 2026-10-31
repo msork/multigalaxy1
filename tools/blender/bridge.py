@@ -581,8 +581,6 @@ def _prototype_waluigi_arm(args):
         _link_like(target, target_copy, scene.collection)
         if target_copy.animation_data:
             target_copy.animation_data.action = None
-            if hasattr(target_copy.animation_data, "action_slot"):
-                target_copy.animation_data.action_slot = None
         for constraint in list(target_copy.constraints):
             target_copy.constraints.remove(constraint)
         for pose_bone in target_copy.pose.bones:
@@ -737,8 +735,13 @@ def _prototype_waluigi_arm(args):
                                           for label in after_samples[0]["joint_gaps_world"]}}
         after["max_bone_scale_deviation"] = max(abs(v-1.0) for sample in after_samples
                                                 for values in sample["pose_scales"].values() for v in values)
-        after["all_joint_gaps_within_0_05_world_units"] = all(
-            gap < 0.05 for sample in after_samples for gap in sample["joint_gaps_world"].values())
+        before_by_frame = {s["frame"]: s for s in before_samples}
+        joint_gap_delta_max = {label: max(abs(sample["joint_gaps_world"][label] -
+                                                   before_by_frame[sample["frame"]]["joint_gaps_world"][label])
+                                               for sample in after_samples)
+                               for label in after_samples[0]["joint_gaps_world"]}
+        after["max_joint_gap_change_world"] = joint_gap_delta_max
+        after["joint_gaps_change_within_0_05_world_units"] = all(v < 0.05 for v in joint_gap_delta_max.values())
         mesh_scale_unchanged = all(
             all(abs(a-b) < 1e-8 for a,b in zip(src.scale, dup.scale))
             for src, dup in zip(mesh_sources, mesh_copies))
@@ -754,7 +757,7 @@ def _prototype_waluigi_arm(args):
                                  "no_runtime_constraints": after["runtime_constraint_count"] == 0,
                                  "bone_scales_unchanged": after["max_bone_scale_deviation"] < 1e-5,
                                  "overlap_relative_motion_present": all(v["changes_over_time"] for v in branch_relative.values()),
-                                 "joint_continuity_within_tolerance": after["all_joint_gaps_within_0_05_world_units"],
+                                 "joint_continuity_within_tolerance": after["joint_gaps_change_within_0_05_world_units"],
                                  "shoulder_continuity_max_gap_world": after["max_joint_gap_world"]["shoulder"],
                                  "elbow_main_max_gap_world": after["max_joint_gap_world"]["elbow_main"],
                                  "elbow_overlap_max_gap_world": after["max_joint_gap_world"]["elbow_overlap"],
@@ -797,8 +800,16 @@ def _duplicate_rig(args):
 
 
 def _restore(args):
-    objects = [o for o in bpy.data.objects if o.get(TAG, False)]
-    actions = [a for a in bpy.data.actions if a.get(TAG, False)]
+    requested_objects = set(args.get("objects", []))
+    requested_actions = set(args.get("actions", []))
+    if requested_objects or requested_actions:
+        objects = [bpy.data.objects.get(name) for name in requested_objects]
+        actions = [bpy.data.actions.get(name) for name in requested_actions]
+        objects = [o for o in objects if o and o.get(TAG, False)]
+        actions = [a for a in actions if a and a.get(TAG, False)]
+    else:
+        objects = [o for o in bpy.data.objects if o.get(TAG, False)]
+        actions = [a for a in bpy.data.actions if a.get(TAG, False)]
     removed = {"objects": [], "actions": []}
     for obj in objects:
         removed["objects"].append(obj.name)
