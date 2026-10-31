@@ -50,6 +50,34 @@ def summarize_arm_analysis(result):
         "track_metadata_available": result["track_metadata_available"]}
 
 
+def validate_prototype_report(result, tolerance=0.05):
+    """Compare saved joint gaps to the original rig at matching frames."""
+    before = result.get("before", {}).get("sample_frames", [])
+    after = result.get("after", {}).get("sample_frames", [])
+    if not before or not after:
+        raise ValueError("prototype report lacks before/after joint samples")
+    baseline = {sample["frame"]: sample["joint_gaps_world"] for sample in before}
+    labels = after[0]["joint_gaps_world"].keys()
+    deltas = {}
+    for label in labels:
+        changes = []
+        for sample in after:
+            if sample["frame"] not in baseline:
+                raise ValueError("prototype report lacks baseline frame " + str(sample["frame"]))
+            changes.append(abs(sample["joint_gaps_world"][label] - baseline[sample["frame"]][label]))
+        deltas[label] = max(changes)
+    after_result = result.setdefault("after", {})
+    after_result["max_joint_gap_change_world"] = deltas
+    after_result["joint_gaps_change_within_0_05_world_units"] = all(v < tolerance for v in deltas.values())
+    validation = result.setdefault("validation", {})
+    validation["joint_continuity_within_tolerance"] = after_result["joint_gaps_change_within_0_05_world_units"]
+    validation["joint_gap_tolerance_world_units"] = tolerance
+    validation["max_joint_gap_change_world"] = deltas
+    validation["shoulder_continuity_baseline_gap_world"] = max(
+        sample["joint_gaps_world"]["shoulder"] for sample in before)
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=["inspect.objects", "inspect.armature", "inspect.weights",
@@ -99,6 +127,8 @@ def main():
         report_path = Path(opts.report)
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_value = response.get("result", response)
+        if report_value.get("schema") == "mg1.waluigi-arm-prototype.v1":
+            validate_prototype_report(report_value)
         report_path.write_text(json.dumps(report_value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
         print(json.dumps({"report": str(report_path), "prototype_object": report_value.get("after", {}).get("prototype_object"),
                           "prototype_action": report_value.get("after", {}).get("prototype_action"),

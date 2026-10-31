@@ -44,6 +44,12 @@ python tools/blender/client.py mutate.prototype_waluigi_arm --confirm --source-o
 
 The report records before/after armature matrices, shoulder/elbow/wrist continuity gaps, weighted mesh centroids, scale checks, and constraint counts. The duplicated preview objects and action are bridge-tagged and can be removed with the confirm-gated `mutate.restore` call after review.
 
+Re-evaluate continuity in a saved report against its recorded baseline with:
+
+```powershell
+python tools/blender/validate_prototype_report.py tools/blender/reports/waluigi_left_arm_prototype.json
+```
+
 Cleanup only removes objects tagged by this bridge and actions tagged by this bridge. It does not remove arbitrary test objects or `sequence_*` actions. The duplicate is an armature-only copy; it is not bound to source meshes.
 
 ## Background smoke test
@@ -54,7 +60,7 @@ With Blender 5.x installed and available as `blender`:
 blender -b --python tools/blender/smoke_test.py -- tools/blender/bridge.py
 ```
 
-`python -m py_compile tools/blender/bridge.py tools/blender/client.py tools/blender/rotation_math.py tools/blender/test_rotation_math.py` and `python tools/blender/test_rotation_math.py` check syntax and quaternion math without Blender, but do not replace the Blender smoke test.
+`python -m py_compile tools/blender/bridge.py tools/blender/client.py tools/blender/rotation_math.py tools/blender/test_rotation_math.py tools/blender/test_prototype_report.py` and `python tools/blender/test_rotation_math.py` plus `python tools/blender/test_prototype_report.py` check syntax and calculations without Blender, but do not replace the Blender smoke test.
 
 To reload a newer bridge in a session that already runs an older copy, run `stop()` in Blender's Python Console, then run the startup command above again. The running bridge does not expose arbitrary code execution or self-reload.
 
