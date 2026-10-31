@@ -220,6 +220,87 @@ fn log_tail(path: &std::path::Path) -> String {
         .unwrap_or_default()
 }
 
+fn absolute_path(path: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    if path.is_absolute() {
+        Ok(path.to_path_buf())
+    } else {
+        env::current_dir()
+            .map(|cwd| cwd.join(path))
+            .map_err(|e| format!("cannot resolve current directory: {e}"))
+    }
+}
+
+fn powershell_literal(value: &std::path::Path) -> String {
+    let value = value.to_string_lossy();
+    let value = value.strip_prefix("\\\\?\\").unwrap_or(&value);
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+fn dev_gui_handoff(
+    config_arg: &std::ffi::OsStr,
+    profile: &std::path::Path,
+    command: &str,
+    arguments: &[String],
+) -> Result<(), String> {
+    let Some(context) = startup::desktop_context() else {
+        return Ok(());
+    };
+    if context.is_interactive_default() {
+        return Ok(());
+    }
+    let config_path = absolute_path(std::path::Path::new(config_arg))?;
+    let profile_path = absolute_path(profile)?;
+    let executable = env::current_exe()
+        .map_err(|e| format!("cannot resolve launcher executable for desktop handoff: {e}"))?;
+    let mut command_line = format!(
+        "& {} {} {} {}",
+        powershell_literal(&executable),
+        command,
+        powershell_literal(&config_path),
+        powershell_literal(&profile_path)
+    );
+    for argument in arguments {
+        command_line.push(' ');
+        command_line.push_str(&powershell_literal(std::path::Path::new(argument)));
+    }
+    Err(format!(
+        "GUI launch refused: the launcher is not on the interactive WinSta0\\Default desktop, so a child Dolphin would not appear in your Alt+Tab/Task View. No Dolphin process was started. launcher_pid={} session={} active_console_session={} user={} station={} desktop={} input_desktop={}. Run this exact command from a PowerShell window on the interactive Windows desktop:\n{}",
+        context.pid,
+        context.session_id,
+        context.active_console_session_id,
+        context.user_name,
+        context.station,
+        context.desktop,
+        context.input_desktop,
+        command_line
+    ))
+}
+
+fn log_process_windows(pid: u32) {
+    let session_id = startup::process_session_id(pid)
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| "unknown".into());
+    let station = startup::desktop_context()
+        .map(|context| context.station)
+        .unwrap_or_else(|| "unsupported".into());
+    println!("window diagnostics for pid={pid} session={session_id} station={station:?}:");
+    for window in startup::process_windows(pid) {
+        println!(
+            "window hwnd=0x{:x} thread={} desktop={:?} visible={} hung={} style=0x{:x} exstyle=0x{:x} parent=0x{:x} owner=0x{:x} title={:?}",
+            window.hwnd,
+            window.thread_id,
+            window.desktop,
+            window.visible,
+            window.hung,
+            window.style,
+            window.extended_style,
+            window.parent,
+            window.owner,
+            window.title
+        );
+    }
+}
+
 fn wait_for_dolphin_window(
     child: &mut process::Child,
     stdout_path: &std::path::Path,
@@ -236,8 +317,15 @@ fn wait_for_dolphin_window(
         {
             return Ok(startup::WindowState {
                 hwnd: 0,
+                thread_id: 0,
                 title: "process alive (window check unsupported on this platform)".into(),
+                visible: false,
                 hung: false,
+                style: 0,
+                extended_style: 0,
+                parent: 0,
+                owner: 0,
+                desktop: "unsupported".into(),
             });
         }
     }
@@ -292,6 +380,28 @@ fn spawn_game(
     mute: bool,
     patch: &controller_patch::PreparedPatch,
 ) -> Result<process::Child, String> {
+    if let Some(context) = startup::desktop_context() {
+        println!(
+            "launcher desktop: pid={} session={} active_console_session={} user={} station={:?} desktop={:?} input_desktop={:?}",
+            context.pid,
+            context.session_id,
+            context.active_console_session_id,
+            context.user_name,
+            context.station,
+            context.desktop,
+            context.input_desktop
+        );
+        if !context.is_interactive_default() {
+            return Err(format!(
+                "refusing to start GUI Dolphin from non-interactive desktop: session={} active_console_session={} station={:?} desktop={:?} input_desktop={:?}",
+                context.session_id,
+                context.active_console_session_id,
+                context.station,
+                context.desktop,
+                context.input_desktop
+            ));
+        }
+    }
     let dolphin = dolphin
         .canonicalize()
         .map_err(|e| format!("cannot resolve Dolphin executable path: {e}"))?;
@@ -326,11 +436,16 @@ fn spawn_game(
         .map_err(|e| format!("cannot launch Dolphin: {e}"))?;
     let window = wait_for_dolphin_window(&mut child, &stdout_path, &stderr_path)?;
     println!(
-        "Started Dolphin window {:?}, PID {}, with isolated user data at {}",
+        "Started Dolphin window HWND=0x{:x} {:?}, PID {} session {}, with isolated user data at {}",
+        window.hwnd,
         window.title,
         child.id(),
+        startup::process_session_id(child.id())
+            .map(|id| id.to_string())
+            .unwrap_or_else(|| "unknown".into()),
         user_dir.display()
     );
+    log_process_windows(child.id());
     println!("Mandatory pinned PAL AllStars + both shoulder swaps are enabled in this isolated profile ({} writes).", patch.total_writes);
     if gdb_enabled {
         println!("debug stage=window-ready; GDB enabled on port {port}; emulation is expected to be paused until the launcher attaches.");
@@ -452,6 +567,7 @@ fn run_interactive_sampler(
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
     if args.len() == 3 && args[0] == "dev-setup" {
+        dev_gui_handoff(&args[1], std::path::Path::new(&args[2]), "dev-setup", &[])?;
         let config_text = fs::read_to_string(&args[1])
             .map_err(|e| format!("cannot read local development config: {e}"))?;
         let config = dev_config::parse(&config_text)?;
@@ -520,6 +636,7 @@ fn run() -> Result<(), String> {
             .spawn()
             .map_err(|e| format!("cannot launch Dolphin setup window: {e}"))?;
         let window = wait_for_dolphin_window(&mut child, &stdout_path, &stderr_path)?;
+        log_process_windows(child.id());
         println!("Started Dolphin setup window {:?}, PID {}. Import the Wii save using Tools > Import Wii Save, select {}, then close Dolphin before running dev-launch.", window.title, child.id(), config.wii_save.display());
         println!("This uses Dolphin's own importer; the source save and regular Dolphin profile are untouched. D3D12, the copied controller profile, and AllStars are isolated under {}.", user_dir.display());
         return Ok(());
@@ -556,6 +673,13 @@ fn run() -> Result<(), String> {
                 "debug GDB port {port} is invalid or already in use"
             ));
         }
+        let mut handoff_arguments = vec![port.to_string()];
+        handoff_arguments.extend(
+            args[4..]
+                .iter()
+                .map(|argument| argument.to_string_lossy().into_owned()),
+        );
+        dev_gui_handoff(&args[1], &user_dir, "dev-launch", &handoff_arguments)?;
         let dol =
             fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
         let patch = controller_patch::prepare_allstars(&config.patch_folder, &dol)?;
@@ -617,6 +741,7 @@ fn run() -> Result<(), String> {
                 return Err(format!("debug launch could not resume Dolphin through GDB; stopped its process: {error}"));
             }
             println!("debug stage=continued; rendering/gameplay starts without an external probe attachment");
+            log_process_windows(child.id());
             run_interactive_sampler(
                 client,
                 probe_map
@@ -1039,6 +1164,12 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn powershell_handoff_quotes_paths_and_removes_extended_prefix() {
+        let path = std::path::Path::new("\\\\?\\C:\\Games\\Max's SMG");
+        assert_eq!(powershell_literal(path), "'C:\\Games\\Max''s SMG'");
+    }
 
     #[test]
     fn sampled_validation_reads_start_middle_and_end_without_scanning_section() {
