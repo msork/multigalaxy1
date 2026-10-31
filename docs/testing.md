@@ -2,7 +2,7 @@
 
 ## Automated checks
 
-Run `cargo fmt --all`, `cargo test --workspace`, and `cargo build --workspace`. Unit tests cover DOL parsing/revision checks, mandatory patch composition, bounded GDB requests, persistent continue-then-read RSP traffic, PAL pointer-chain decoding, and local development config parsing.
+Run `cargo fmt --all`, `cargo test --workspace`, and `cargo build --workspace`. Unit tests cover DOL parsing/revision checks, mandatory patch composition, bounded GDB requests, persistent continue-then-read RSP traffic, PAL pointer-chain decoding, local development config parsing, and benchmark CPU-percent math.
 
 The live Dolphin integration test is opt-in. It validates the live disc identity and DOL memory samples; it does not establish player coordinates or gameplay.
 
@@ -49,3 +49,7 @@ Dolphin 2609a accepts one GDB client per process. If a read times out or the con
 - Game boot and save import: require visual confirmation in the isolated Dolphin profile.
 - Coordinate extraction: requires real standing, walking, and jumping samples. Not yet verified.
 - Multiplayer: not started; basic local gameplay and player-state extraction remain prerequisites.
+
+## Runtime performance benchmark
+
+The four-condition benchmark procedure and source-level GDB overhead investigation are in [performance.md](performance.md). The Rust `bench-dolphin` command measures CPU utilization for an existing Dolphin PID and records operator-read Speed/FPS/VPS OSD averages. No valid gameplay performance numbers have been captured yet: this automation uses a sandbox desktop, and Dolphin must be launched by the user's interactive PowerShell. The GDB-unattached condition is paused on Dolphin 2609a and must not be reported as a running-game FPS comparison.

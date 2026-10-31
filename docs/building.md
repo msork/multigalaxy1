@@ -30,7 +30,9 @@ Start a debug game session after the setup window is closed:
 cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-dev-profile' 55221 --debug
 ```
 
-This starts Dolphin with GDB enabled, D3D12, muted test audio, the selected controller profile, and mandatory AllStars. The same command automatically attaches, resumes the emulated CPU, and begins sampling on its persistent GDB connection. Type `STOP`/`START` to pause/resume sampling and `Q` to close the sampler. Do not start `probe-mario` separately for this Dolphin: its single GDB connection is owned by `dev-launch`. Use `--unmute` only if needed for a local test.
+This starts Dolphin with GDB enabled, D3D12, muted test audio, the selected controller profile, mandatory AllStars, and isolated Speed/FPS/VPS metrics. The same command automatically attaches, resumes the emulated CPU, and begins sampling on its persistent GDB connection. Type `STOP`/`START` to pause/resume sampling and `Q` to close the sampler. Do not start `probe-mario` separately for this Dolphin: its single GDB connection is owned by `dev-launch`. Use `--unmute` only if needed for a local test. `--debug-unattached` is a benchmark-only control: Dolphin waits for a GDB client with the CPU paused, so it cannot produce running gameplay FPS on 2609a.
+
+Run `bench-dolphin <PID> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling>` from a second PowerShell to collect process CPU and then enter the OSD Speed/FPS/VPS averages. See [performance.md](performance.md) for the controlled comparison and `bridge-prototype` synthetic shared-memory transport commands.
 
 To test normal unpaused gameplay without GDB, omit `--debug`. Runtime verification remains split into separate claims: patch activation is statically checked in the isolated GameSettings file; Dolphin window/game boot requires visual confirmation; live X/Y/Z requires sampling during controlled movement and has not yet been confirmed.
 

@@ -22,7 +22,7 @@ Implement online-only co-op for up to four PAL SMG1 players. Every player runs t
 
 ## Technical design
 
-Rust workspace owns launcher, protocol, networking, lobby, state validation, prediction/reconciliation, patching, and tests. A verified injected game-side bridge reads local state, accepts remote state/events, and communicates over versioned local IPC. Minimal C/C++/PPC code may be needed at engine ABI boundaries. Never use guessed memory offsets.
+Rust workspace owns launcher, protocol, networking, lobby, state validation, prediction/reconciliation, patching, and tests. The intended bridge is a small Dolphin fork using verified guarded MMU reads and versioned shared-memory snapshots; GDB is development-only because its active core-timing poll is a suspected runtime cost. Rust's shared snapshot ABI is prototyped with synthetic data but not connected to Dolphin. Minimal C/C++/PPC code may be needed at engine ABI boundaries. Never use guessed memory offsets.
 
 ## Dependencies
 

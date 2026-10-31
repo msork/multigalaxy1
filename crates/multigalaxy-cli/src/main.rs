@@ -1,7 +1,10 @@
 mod controller_patch;
 mod dev_config;
 mod gdb;
+mod perf_bench;
 mod player_probe;
+#[cfg(any(windows, test))]
+mod shared_snapshot;
 mod startup;
 
 use multigalaxy_patch::{
@@ -179,6 +182,13 @@ fn configure_isolated_profile(
         dolphin_config(gdb_port, mute, true, development),
     )
     .map_err(|e| format!("cannot write isolated Dolphin configuration: {e}"))?;
+    if development {
+        fs::write(
+            config_dir.join("GFX.ini"),
+            "[Settings]\nShowFPS = True\nShowVPS = True\nShowSpeed = True\n",
+        )
+        .map_err(|e| format!("cannot enable isolated performance metrics: {e}"))?;
+    }
     let settings_dir = user_dir.join("GameSettings");
     fs::create_dir_all(&settings_dir)
         .map_err(|e| format!("cannot create isolated GameSettings directory: {e}"))?;
@@ -566,6 +576,120 @@ fn run_interactive_sampler(
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 4 && args[0] == "bridge-prototype" {
+        #[cfg(windows)]
+        {
+            use shared_snapshot::windows_mapping::Mapping;
+            let mode = args[1].to_str().ok_or("bridge mode must be valid UTF-8")?;
+            if mode != "write" && mode != "read" {
+                return Err("bridge mode must be write or read".into());
+            }
+            let name = args[2].to_str().ok_or("mapping name must be valid UTF-8")?;
+            let seconds = args[3]
+                .to_str()
+                .ok_or("duration must be valid UTF-8")?
+                .parse::<u64>()
+                .map_err(|_| "duration must be an integer number of seconds")?;
+            if !(1..=600).contains(&seconds) {
+                return Err("duration must be 1..=600 seconds".into());
+            }
+            if mode == "write" {
+                let (mapping, _created) = Mapping::create_or_open(name)?;
+                let deadline = Instant::now() + Duration::from_secs(seconds);
+                let mut frame = 0u64;
+                while Instant::now() < deadline {
+                    mapping.snapshot().publish(&frame.to_le_bytes())?;
+                    frame = frame.wrapping_add(1);
+                    std::thread::sleep(Duration::from_millis(16));
+                }
+                println!("bridge_prototype role=writer mapping={name} frames={frame} elapsed_s={seconds} rate_hz={:.2}", frame as f64 / seconds as f64);
+            } else {
+                let mapping = Mapping::open_existing(name)?;
+                mapping.snapshot().validate()?;
+                let deadline = Instant::now() + Duration::from_secs(seconds);
+                let mut reads = 0u64;
+                let mut new_frames = 0u64;
+                let mut last_sequence = u64::MAX;
+                while Instant::now() < deadline {
+                    if let Some(snapshot) = mapping.snapshot().read()? {
+                        reads += 1;
+                        if snapshot.sequence != last_sequence {
+                            new_frames += 1;
+                            last_sequence = snapshot.sequence;
+                        }
+                    }
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                println!("bridge_prototype role=reader mapping={name} reads={reads} new_frames={new_frames} elapsed_s={seconds} read_rate_hz={:.0}", reads as f64 / seconds as f64);
+            }
+            return Ok(());
+        }
+        #[cfg(not(windows))]
+        return Err("bridge-prototype currently requires Windows shared mappings".into());
+    }
+    if args.len() == 4 && args[0] == "bench-dolphin" {
+        let pid = args[1]
+            .to_str()
+            .ok_or("Dolphin PID must be valid UTF-8")?
+            .parse::<u32>()
+            .map_err(|_| "Dolphin PID must be a positive integer")?;
+        let seconds = args[2]
+            .to_str()
+            .ok_or("duration must be valid UTF-8")?
+            .parse::<u64>()
+            .map_err(|_| "duration must be an integer number of seconds")?;
+        let condition = args[3].to_str().ok_or("condition must be valid UTF-8")?;
+        if !["normal", "gdb-unattached", "gdb-idle", "gdb-sampling"].contains(&condition) {
+            return Err(
+                "condition must be normal, gdb-unattached, gdb-idle, or gdb-sampling".into(),
+            );
+        }
+        println!("benchmark condition={condition} pid={pid} duration_s={seconds}; read-only process CPU sampling starts now");
+        let samples = perf_bench::sample(pid, seconds)?;
+        let average_cpu = samples
+            .iter()
+            .map(|sample| sample.total_cpu_percent)
+            .sum::<f64>()
+            / samples.len() as f64;
+        println!("Enter OSD averages as: SpeedPercent FPS VPS (or press Enter if unavailable)");
+        let mut metrics = String::new();
+        std::io::stdin()
+            .read_line(&mut metrics)
+            .map_err(|e| format!("cannot read OSD metrics: {e}"))?;
+        let values: Vec<_> = metrics.split_whitespace().collect();
+        if !values.is_empty() && values.len() != 3 {
+            return Err("enter exactly three values: SpeedPercent FPS VPS".into());
+        }
+        let (speed, fps, vps) = if values.is_empty() {
+            (String::new(), String::new(), String::new())
+        } else {
+            for value in &values {
+                value
+                    .parse::<f64>()
+                    .map_err(|_| format!("invalid numeric OSD value {value:?}"))?;
+            }
+            (
+                values[0].to_owned(),
+                values[1].to_owned(),
+                values[2].to_owned(),
+            )
+        };
+        println!(
+            "timestamp_unix_ms,condition,pid,duration_seconds,avg_cpu_percent,speed_percent,fps,vps"
+        );
+        println!(
+            "{},{},{},{},{:.3},{},{},{}",
+            timestamp_unix_ms(),
+            condition,
+            pid,
+            seconds,
+            average_cpu,
+            speed,
+            fps,
+            vps
+        );
+        return Ok(());
+    }
     if args.len() == 3 && args[0] == "dev-setup" {
         dev_gui_handoff(&args[1], std::path::Path::new(&args[2]), "dev-setup", &[])?;
         let config_text = fs::read_to_string(&args[1])
@@ -660,15 +784,22 @@ fn run() -> Result<(), String> {
             .parse::<u16>()
             .map_err(|_| "GDB port must be between 1 and 65535")?;
         let mut debug = false;
+        let mut gdb_unattached = false;
         let mut mute = true;
         for option in &args[4..] {
             match option.to_str() {
-                Some("--debug") if !debug => debug = true,
+                Some("--debug") if !debug && !gdb_unattached => debug = true,
+                Some("--debug-unattached") if !debug && !gdb_unattached => gdb_unattached = true,
                 Some("--unmute") if mute => mute = false,
-                _ => return Err("dev-launch options: [--debug] [--unmute]".into()),
+                _ => {
+                    return Err(
+                        "dev-launch options: [--debug | --debug-unattached] [--unmute]".into(),
+                    )
+                }
             }
         }
-        if debug && (port == 0 || !port_is_available(port)) {
+        let gdb_enabled = debug || gdb_unattached;
+        if gdb_enabled && (port == 0 || !port_is_available(port)) {
             return Err(format!(
                 "debug GDB port {port} is invalid or already in use"
             ));
@@ -695,14 +826,14 @@ fn run() -> Result<(), String> {
             &patch,
             Some(&config.controller_profile),
             true,
-            if debug { Some(port) } else { None },
+            if gdb_enabled { Some(port) } else { None },
             mute,
         )?;
         let mut child = spawn_game(
             &config.dolphin,
             &user_dir,
             &config.game,
-            debug,
+            gdb_enabled,
             port,
             mute,
             &patch,
@@ -752,6 +883,9 @@ fn run() -> Result<(), String> {
                 true,
             )?;
         } else {
+            if gdb_unattached {
+                println!("debug stage=unattached; GDB is listening on port {port}, but Dolphin is paused waiting for its single GDB client. This condition cannot produce comparable running-game FPS.");
+            }
             drop(child);
         }
         return Ok(());
@@ -1081,7 +1215,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port> [--debug] [--unmute] | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port> [--debug | --debug-unattached] [--unmute] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling> | multigalaxy bridge-prototype <write|read> <mapping-name> <seconds> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
@@ -1225,11 +1359,15 @@ mod tests {
         )
         .unwrap();
         let dolphin_ini = fs::read_to_string(user.join("Config/Dolphin.ini")).unwrap();
+        let gfx_ini = fs::read_to_string(user.join("Config/GFX.ini")).unwrap();
         let game_ini = fs::read_to_string(user.join("GameSettings/RMGP01.ini")).unwrap();
         let copied_profile =
             fs::read(user.join("Config/Profiles/Wiimote/Pro Con to Classic Con.ini")).unwrap();
         assert!(dolphin_ini.contains("GFXBackend = D3D12"));
         assert!(dolphin_ini.contains("GDBPort = 55221"));
+        assert!(gfx_ini.contains("ShowFPS = True"));
+        assert!(gfx_ini.contains("ShowVPS = True"));
+        assert!(gfx_ini.contains("ShowSpeed = True"));
         assert!(game_ini.contains("[OnFrame_Enabled]"));
         assert!(game_ini.contains("WiimoteSource0 = 1"));
         assert!(game_ini.contains("WiimoteProfile1 = Pro Con to Classic Con"));
