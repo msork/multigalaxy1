@@ -65,3 +65,11 @@ blender -b --python tools/blender/smoke_test.py -- tools/blender/bridge.py
 To reload a newer bridge in a session that already runs an older copy, run `stop()` in Blender's Python Console, then run the startup command above again. The running bridge does not expose arbitrary code execution or self-reload.
 
 The arm analyzer evaluates a requested action on a temporary armature/data duplicate, samples local, armature-space, and world-space rotations, and restores the scene frame. It never assigns the action to the production object. Quaternion comparisons normalize inputs and use `abs(dot(q1, q2))`, so opposite quaternion signs produce zero angular difference. Pairwise correlation uses angular displacement sequences; relative orientation changes use evaluated armature-space rotations. Weight centroids and bounds are transformed into the analyzed armature's local space.
+
+Run the read-only multi-action native arm study with:
+
+```powershell
+python tools/blender/study_native_arm.py --object Waluigi_Arm_Test --sample-count 41 --output tools/blender/reports/native_arm_multi_action_study.json
+```
+
+It samples five named `sequence_*` actions, reports branch-relative rotation statistics and armature-space endpoint divergence, and does not mutate Blender objects or actions.

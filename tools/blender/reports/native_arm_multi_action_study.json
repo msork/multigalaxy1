@@ -1,0 +1,253 @@
+{
+  "schema": "mg1.native-waluigi-arm-study.v1",
+  "object": "Waluigi_Arm_Test",
+  "read_only": true,
+  "sample_count_per_action": 41,
+  "actions": [
+    {
+      "action": "sequence_10.003",
+      "action_slot": "OBArmature.004",
+      "frame_range": [
+        0.0,
+        13.666666984558105
+      ],
+      "sample_count": 41,
+      "track_ids": {
+        "bone_22": 16,
+        "bone_23": 115,
+        "bone_24": 116,
+        "bone_25": 17,
+        "bone_26": 111,
+        "bone_27": 112,
+        "bone_29": 18,
+        "bone_30": 19
+      },
+      "weighted_vertex_counts": {
+        "bone_22": 58,
+        "bone_23": 49,
+        "bone_24": 0,
+        "bone_25": 29,
+        "bone_26": 0,
+        "bone_27": 54,
+        "bone_29": 59,
+        "bone_30": 104
+      },
+      "max_local_angular_displacement_degrees": {
+        "bone_22": 100.96502243613692,
+        "bone_23": 103.2585715159382,
+        "bone_24": 16.652166165381665,
+        "bone_25": 102.78769011187596,
+        "bone_26": 131.97477753644023,
+        "bone_27": 23.618678627840236,
+        "bone_29": 130.6915031451273,
+        "bone_30": 84.65597063251745
+      },
+      "pair_23_25": {
+        "local_displacement_correlation": 0.9705982613325209,
+        "max_relative_orientation_change_degrees": 34.01690600464232
+      },
+      "pair_26_29": {
+        "local_displacement_correlation": 0.9753848596382976,
+        "max_relative_orientation_change_degrees": 35.4487604640957
+      },
+      "max_main_overlap_elbow_head_separation_world": 12.244906816504724,
+      "max_glove_to_overlap_tail_distance_world": 27.295793436702485
+    },
+    {
+      "action": "sequence_12.001",
+      "action_slot": "OBArmature",
+      "frame_range": [
+        0.0,
+        55.0
+      ],
+      "sample_count": 41,
+      "track_ids": {
+        "bone_22": 16,
+        "bone_23": 115,
+        "bone_24": 116,
+        "bone_25": 17,
+        "bone_26": 111,
+        "bone_27": 112,
+        "bone_29": 18,
+        "bone_30": 19
+      },
+      "weighted_vertex_counts": {
+        "bone_22": 58,
+        "bone_23": 49,
+        "bone_24": 0,
+        "bone_25": 29,
+        "bone_26": 0,
+        "bone_27": 54,
+        "bone_29": 59,
+        "bone_30": 104
+      },
+      "max_local_angular_displacement_degrees": {
+        "bone_22": 41.041765130896835,
+        "bone_23": 69.30501346237104,
+        "bone_24": 15.866876686290162,
+        "bone_25": 78.03526326046004,
+        "bone_26": 29.409502685120835,
+        "bone_27": 10.00770347921881,
+        "bone_29": 28.075592756015872,
+        "bone_30": 43.01054792290142
+      },
+      "pair_23_25": {
+        "local_displacement_correlation": 0.9495898930310163,
+        "max_relative_orientation_change_degrees": 29.749165649617556
+      },
+      "pair_26_29": {
+        "local_displacement_correlation": 0.9479419002505907,
+        "max_relative_orientation_change_degrees": 19.415426957699644
+      },
+      "max_main_overlap_elbow_head_separation_world": 7.759245982911747,
+      "max_glove_to_overlap_tail_distance_world": 18.96996243216262
+    },
+    {
+      "action": "sequence_15.001",
+      "action_slot": "OBArmature",
+      "frame_range": [
+        0.0,
+        22.5
+      ],
+      "sample_count": 41,
+      "track_ids": {
+        "bone_22": 16,
+        "bone_23": 115,
+        "bone_24": 116,
+        "bone_25": 17,
+        "bone_26": 111,
+        "bone_27": 112,
+        "bone_29": 18,
+        "bone_30": 19
+      },
+      "weighted_vertex_counts": {
+        "bone_22": 58,
+        "bone_23": 49,
+        "bone_24": 0,
+        "bone_25": 29,
+        "bone_26": 0,
+        "bone_27": 54,
+        "bone_29": 59,
+        "bone_30": 104
+      },
+      "max_local_angular_displacement_degrees": {
+        "bone_22": 28.567359728886096,
+        "bone_23": 132.59314531039743,
+        "bone_24": 42.613601833817185,
+        "bone_25": 98.79047874249906,
+        "bone_26": 87.75284078577488,
+        "bone_27": 12.021845645418134,
+        "bone_29": 78.56083294418394,
+        "bone_30": 62.32278755894214
+      },
+      "pair_23_25": {
+        "local_displacement_correlation": 0.9234621093137149,
+        "max_relative_orientation_change_degrees": 83.60377563966745
+      },
+      "pair_26_29": {
+        "local_displacement_correlation": 0.8985707170385578,
+        "max_relative_orientation_change_degrees": 25.94678638266759
+      },
+      "max_main_overlap_elbow_head_separation_world": 19.97500187697253,
+      "max_glove_to_overlap_tail_distance_world": 20.412389137484315
+    },
+    {
+      "action": "sequence_4.001",
+      "action_slot": "OBArmature",
+      "frame_range": [
+        0.0,
+        15.0
+      ],
+      "sample_count": 41,
+      "track_ids": {
+        "bone_22": 16,
+        "bone_23": 115,
+        "bone_24": 116,
+        "bone_25": 17,
+        "bone_26": 111,
+        "bone_27": 112,
+        "bone_29": 18,
+        "bone_30": 19
+      },
+      "weighted_vertex_counts": {
+        "bone_22": 58,
+        "bone_23": 49,
+        "bone_24": 0,
+        "bone_25": 29,
+        "bone_26": 0,
+        "bone_27": 54,
+        "bone_29": 59,
+        "bone_30": 104
+      },
+      "max_local_angular_displacement_degrees": {
+        "bone_22": 11.677587430683081,
+        "bone_23": 45.619889368439495,
+        "bone_24": 4.301684228587828,
+        "bone_25": 37.106141579918706,
+        "bone_26": 51.275779013252425,
+        "bone_27": 5.893102419332236,
+        "bone_29": 51.11998927398157,
+        "bone_30": 20.81427217130323
+      },
+      "pair_23_25": {
+        "local_displacement_correlation": 0.912646210693695,
+        "max_relative_orientation_change_degrees": 9.172791101449729
+      },
+      "pair_26_29": {
+        "local_displacement_correlation": 0.9986073135528272,
+        "max_relative_orientation_change_degrees": 11.387300743765117
+      },
+      "max_main_overlap_elbow_head_separation_world": 5.166863512879635,
+      "max_glove_to_overlap_tail_distance_world": 17.702588726990697
+    },
+    {
+      "action": "sequence_8.001",
+      "action_slot": "OBArmature",
+      "frame_range": [
+        0.0,
+        9.5
+      ],
+      "sample_count": 41,
+      "track_ids": {
+        "bone_22": 16,
+        "bone_23": 115,
+        "bone_24": 116,
+        "bone_25": 17,
+        "bone_26": 111,
+        "bone_27": 112,
+        "bone_29": 18,
+        "bone_30": 19
+      },
+      "weighted_vertex_counts": {
+        "bone_22": 58,
+        "bone_23": 49,
+        "bone_24": 0,
+        "bone_25": 29,
+        "bone_26": 0,
+        "bone_27": 54,
+        "bone_29": 59,
+        "bone_30": 104
+      },
+      "max_local_angular_displacement_degrees": {
+        "bone_22": 0.0,
+        "bone_23": 66.69734883032862,
+        "bone_24": 6.481381858742206,
+        "bone_25": 73.79641653748254,
+        "bone_26": 41.54188760279437,
+        "bone_27": 10.146255680502794,
+        "bone_29": 40.00617157888872,
+        "bone_30": 11.924430298857061
+      },
+      "pair_23_25": {
+        "local_displacement_correlation": 0.9943888545759494,
+        "max_relative_orientation_change_degrees": 12.544997165248269
+      },
+      "pair_26_29": {
+        "local_displacement_correlation": 0.999045231118141,
+        "max_relative_orientation_change_degrees": 15.760891630354143
+      },
+      "max_main_overlap_elbow_head_separation_world": 16.50969093531287,
+      "max_glove_to_overlap_tail_distance_world": 25.388295037328255
+    }
+  ]
+}
