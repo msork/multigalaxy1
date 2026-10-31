@@ -1,0 +1,1065 @@
+{
+  "schema": "mg1.native-arm-candidate-labels.v1",
+  "method": "threshold labels and displacement clusters; no raw quaternion-component correlation",
+  "candidates": [
+    {
+      "action": "sequence_0.004",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "low_or_mixed_motion",
+      "heuristic_labels": [],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 35,
+      "sample_time_count": 35,
+      "duration_frames": 6.6666669845581055,
+      "maximum_displacement_degrees": {
+        "bone_22": 12.068548244298071,
+        "bone_23": 13.679039158699041,
+        "bone_24": 14.111284665253166,
+        "bone_25": 14.860865443191251,
+        "bone_26": 15.325562364059875,
+        "bone_27": 15.320892941132998,
+        "bone_29": 15.736168066985183,
+        "bone_30": 16.058322627795317
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 1.8975920639409876,
+        "26_29": 1.8717490145114724
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 14.860865443191251,
+        "elbow_forearm": 15.736168066985183,
+        "wrist_hand": 16.058322627795317
+      },
+      "endpoint_return_degrees": 0.2146783393781004
+    },
+    {
+      "action": "sequence_1.004",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 6,
+      "sample_time_count": 6,
+      "duration_frames": 0.8333333730697632,
+      "maximum_displacement_degrees": {
+        "bone_22": 156.93305429116174,
+        "bone_23": 176.3559937506556,
+        "bone_24": 170.0367359087214,
+        "bone_25": 160.59896809611885,
+        "bone_26": 111.70700487508599,
+        "bone_27": 98.15915897572576,
+        "bone_29": 130.02286929486766,
+        "bone_30": 84.03511745463881
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 66.49772561452296,
+        "26_29": 36.67405522233905
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 176.3559937506556,
+        "elbow_forearm": 170.0367359087214,
+        "wrist_hand": 98.15915897572576
+      },
+      "endpoint_return_degrees": 176.3559937506556
+    },
+    {
+      "action": "sequence_10.003",
+      "split": "train",
+      "provenance_confidence": "tested_anchor",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 83,
+      "sample_time_count": 83,
+      "duration_frames": 13.666666984558105,
+      "maximum_displacement_degrees": {
+        "bone_22": 141.68194069999151,
+        "bone_23": 178.73766180799032,
+        "bone_24": 179.76696667996492,
+        "bone_25": 179.91067590181876,
+        "bone_26": 164.23120512075332,
+        "bone_27": 175.73140462672325,
+        "bone_29": 143.85563457490352,
+        "bone_30": 176.79849179315238
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 34.5724850576256,
+        "26_29": 35.76545101594391
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 179.91067590181876,
+        "elbow_forearm": 179.76696667996492,
+        "wrist_hand": 176.79849179315238
+      },
+      "endpoint_return_degrees": 141.0680448106705
+    },
+    {
+      "action": "sequence_11.003",
+      "split": "holdout",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": false,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 41,
+      "sample_time_count": 41,
+      "duration_frames": 6.6666669845581055,
+      "maximum_displacement_degrees": {
+        "bone_22": 96.86229977740834,
+        "bone_23": 148.60821760598768,
+        "bone_24": 140.32682376766977,
+        "bone_25": 139.1964398190726,
+        "bone_26": 106.67149345971455,
+        "bone_27": 90.05535301025942,
+        "bone_29": 138.41863541201207,
+        "bone_30": 117.76775039662128
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 37.48850055694261,
+        "26_29": 58.26490038293596
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 148.60821760598768,
+        "elbow_forearm": 140.32682376766977,
+        "wrist_hand": 117.76775039662128
+      },
+      "endpoint_return_degrees": 1.7075472925031877e-06
+    },
+    {
+      "action": "sequence_12.003",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 6,
+      "sample_time_count": 6,
+      "duration_frames": 0.8333333730697632,
+      "maximum_displacement_degrees": {
+        "bone_22": 93.24637191232124,
+        "bone_23": 114.47247347518321,
+        "bone_24": 106.46791830122044,
+        "bone_25": 98.82950049660325,
+        "bone_26": 76.87426432194367,
+        "bone_27": 78.0338117389303,
+        "bone_29": 72.67699088214499,
+        "bone_30": 77.94104366535863
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 24.606534032705028,
+        "26_29": 14.681616542835366
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 114.47247347518321,
+        "elbow_forearm": 106.46791830122044,
+        "wrist_hand": 78.0338117389303
+      },
+      "endpoint_return_degrees": 114.47247347518321
+    },
+    {
+      "action": "sequence_13.003",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "elbow_or_forearm_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 39,
+      "sample_time_count": 39,
+      "duration_frames": 6.6666669845581055,
+      "maximum_displacement_degrees": {
+        "bone_22": 9.950006369291323,
+        "bone_23": 17.140533023757378,
+        "bone_24": 15.814217507680512,
+        "bone_25": 15.273425210820813,
+        "bone_26": 23.513043848403736,
+        "bone_27": 23.461544371052565,
+        "bone_29": 27.044646982088803,
+        "bone_30": 39.707223135631054
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 9.101847126552506,
+        "26_29": 8.065522615652188
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 17.140533023757378,
+        "elbow_forearm": 27.044646982088803,
+        "wrist_hand": 39.707223135631054
+      },
+      "endpoint_return_degrees": 2.4148365394514667e-06
+    },
+    {
+      "action": "sequence_14.003",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 14,
+      "sample_time_count": 14,
+      "duration_frames": 2.1666667461395264,
+      "maximum_displacement_degrees": {
+        "bone_22": 93.24637191232124,
+        "bone_23": 114.48733257572403,
+        "bone_24": 106.47832742142542,
+        "bone_25": 98.83509473406113,
+        "bone_26": 76.8609770054872,
+        "bone_27": 78.01958503005946,
+        "bone_29": 72.66400139727284,
+        "bone_30": 68.93357636704303
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 21.009166329571155,
+        "26_29": 17.424261541861725
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 114.48733257572403,
+        "elbow_forearm": 106.47832742142542,
+        "wrist_hand": 78.01958503005946
+      },
+      "endpoint_return_degrees": 114.48733257572403
+    },
+    {
+      "action": "sequence_15.003",
+      "split": "holdout",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": false,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 31,
+      "sample_time_count": 31,
+      "duration_frames": 5.0,
+      "maximum_displacement_degrees": {
+        "bone_22": 152.32017608130468,
+        "bone_23": 119.51627049572718,
+        "bone_24": 124.71111336825305,
+        "bone_25": 157.96956226020677,
+        "bone_26": 154.19393589890933,
+        "bone_27": 157.99643802847757,
+        "bone_29": 155.8122321352515,
+        "bone_30": 161.80326590780064
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 80.98660179022926,
+        "26_29": 41.78088955424283
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 157.96956226020677,
+        "elbow_forearm": 155.8122321352515,
+        "wrist_hand": 161.80326590780064
+      },
+      "endpoint_return_degrees": 157.96956226020677
+    },
+    {
+      "action": "sequence_16.003",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 54,
+      "sample_time_count": 54,
+      "duration_frames": 8.833333015441895,
+      "maximum_displacement_degrees": {
+        "bone_22": 177.95212785640376,
+        "bone_23": 168.35307001719593,
+        "bone_24": 170.88718535756448,
+        "bone_25": 179.23150741223606,
+        "bone_26": 172.87259133355425,
+        "bone_27": 171.8312522734813,
+        "bone_29": 174.5445315582819,
+        "bone_30": 177.9357219406968
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 71.0472112546977,
+        "26_29": 23.94849940138087
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 179.23150741223606,
+        "elbow_forearm": 174.5445315582819,
+        "wrist_hand": 177.9357219406968
+      },
+      "endpoint_return_degrees": 152.93540782422096
+    },
+    {
+      "action": "sequence_17.001",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 70,
+      "sample_time_count": 70,
+      "duration_frames": 11.666666030883789,
+      "maximum_displacement_degrees": {
+        "bone_22": 119.09479482377094,
+        "bone_23": 124.34198968296074,
+        "bone_24": 120.90810989665337,
+        "bone_25": 124.01799817426581,
+        "bone_26": 118.65111505043956,
+        "bone_27": 107.27231725260467,
+        "bone_29": 136.90093341028253,
+        "bone_30": 100.70705505341226
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 60.710144130149914,
+        "26_29": 32.605173636985725
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 124.34198968296074,
+        "elbow_forearm": 136.90093341028253,
+        "wrist_hand": 107.27231725260467
+      },
+      "endpoint_return_degrees": 92.25478091545429
+    },
+    {
+      "action": "sequence_18.001",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 72,
+      "sample_time_count": 72,
+      "duration_frames": 11.833333015441895,
+      "maximum_displacement_degrees": {
+        "bone_22": 141.65618828999257,
+        "bone_23": 173.08252912691833,
+        "bone_24": 165.45369200596778,
+        "bone_25": 154.6684811965994,
+        "bone_26": 163.43241266611196,
+        "bone_27": 173.30020938057734,
+        "bone_29": 152.02307857508228,
+        "bone_30": 161.66798202106824
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 55.890853784051615,
+        "26_29": 24.61809744894775
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 173.08252912691833,
+        "elbow_forearm": 165.45369200596778,
+        "wrist_hand": 173.30020938057734
+      },
+      "endpoint_return_degrees": 105.72103309549928
+    },
+    {
+      "action": "sequence_19.001",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 70,
+      "sample_time_count": 70,
+      "duration_frames": 11.666666030883789,
+      "maximum_displacement_degrees": {
+        "bone_22": 116.81255322704877,
+        "bone_23": 170.64766017679793,
+        "bone_24": 155.75116865037816,
+        "bone_25": 149.4642775635993,
+        "bone_26": 144.3543073915712,
+        "bone_27": 141.7920459753841,
+        "bone_29": 151.1540244427932,
+        "bone_30": 146.05802285476514
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 62.81008163896096,
+        "26_29": 33.55932603986884
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 170.64766017679793,
+        "elbow_forearm": 155.75116865037816,
+        "wrist_hand": 146.05802285476514
+      },
+      "endpoint_return_degrees": 170.64766017679793
+    },
+    {
+      "action": "sequence_2.004",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 16,
+      "sample_time_count": 16,
+      "duration_frames": 2.5,
+      "maximum_displacement_degrees": {
+        "bone_22": 87.03711222783194,
+        "bone_23": 152.68095458236112,
+        "bone_24": 156.90979484818584,
+        "bone_25": 153.1524580295357,
+        "bone_26": 164.85075741502723,
+        "bone_27": 167.9734857867086,
+        "bone_29": 154.1905870717434,
+        "bone_30": 179.6298424664297
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 28.793896900574232,
+        "26_29": 19.76036047421724
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 153.1524580295357,
+        "elbow_forearm": 164.85075741502723,
+        "wrist_hand": 179.6298424664297
+      },
+      "endpoint_return_degrees": 147.20684704050154
+    },
+    {
+      "action": "sequence_20.001",
+      "split": "holdout",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": false,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 61,
+      "sample_time_count": 61,
+      "duration_frames": 10.0,
+      "maximum_displacement_degrees": {
+        "bone_22": 179.99130537383837,
+        "bone_23": 179.87798859787614,
+        "bone_24": 179.2102819915175,
+        "bone_25": 179.90756989270488,
+        "bone_26": 179.56416071854446,
+        "bone_27": 171.74009396240572,
+        "bone_29": 177.90309335151164,
+        "bone_30": 178.44847742988
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 70.98944632426857,
+        "26_29": 43.79816764143007
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 179.99130537383837,
+        "elbow_forearm": 179.56416071854446,
+        "wrist_hand": 178.44847742988
+      },
+      "endpoint_return_degrees": 179.0720141161328
+    },
+    {
+      "action": "sequence_21.001",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 34,
+      "sample_time_count": 34,
+      "duration_frames": 5.5,
+      "maximum_displacement_degrees": {
+        "bone_22": 105.96106721428461,
+        "bone_23": 179.5505887075496,
+        "bone_24": 177.74250249816598,
+        "bone_25": 179.12351720748222,
+        "bone_26": 177.01040365060283,
+        "bone_27": 178.7450743594785,
+        "bone_29": 179.20526746940837,
+        "bone_30": 176.93603300086272
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 26.363385724857828,
+        "26_29": 22.22286665838383
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 179.5505887075496,
+        "elbow_forearm": 179.20526746940837,
+        "wrist_hand": 178.7450743594785
+      },
+      "endpoint_return_degrees": 70.69078857258357
+    },
+    {
+      "action": "sequence_22.001",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 16,
+      "sample_time_count": 16,
+      "duration_frames": 2.5,
+      "maximum_displacement_degrees": {
+        "bone_22": 37.71652816050082,
+        "bone_23": 47.60763728661299,
+        "bone_24": 48.347297468399844,
+        "bone_25": 42.708531272337964,
+        "bone_26": 102.52579019116133,
+        "bone_27": 117.40789607343189,
+        "bone_29": 85.79007021011302,
+        "bone_30": 125.4496823701783
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 16.854670057849464,
+        "26_29": 43.275398053325006
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 47.60763728661299,
+        "elbow_forearm": 102.52579019116133,
+        "wrist_hand": 125.4496823701783
+      },
+      "endpoint_return_degrees": 125.4496823701783
+    },
+    {
+      "action": "sequence_23.001",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "low_or_mixed_motion",
+      "heuristic_labels": [],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 36,
+      "sample_time_count": 36,
+      "duration_frames": 6.6666669845581055,
+      "maximum_displacement_degrees": {
+        "bone_22": 11.859139019099777,
+        "bone_23": 23.63525971022912,
+        "bone_24": 23.441998106536012,
+        "bone_25": 23.255212152099226,
+        "bone_26": 17.882200213146007,
+        "bone_27": 17.88220020694751,
+        "bone_29": 15.850668689913833,
+        "bone_30": 17.882194089836386
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 2.2710994482445113,
+        "26_29": 2.9735031612692064
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 23.63525971022912,
+        "elbow_forearm": 23.441998106536012,
+        "wrist_hand": 17.88220020694751
+      },
+      "endpoint_return_degrees": 2.4148365394514667e-06
+    },
+    {
+      "action": "sequence_24",
+      "split": "holdout",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": false,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate",
+        "cyclic_pose_return_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 63,
+      "sample_time_count": 63,
+      "duration_frames": 10.333333015441895,
+      "maximum_displacement_degrees": {
+        "bone_22": 106.25786470847238,
+        "bone_23": 164.1530006568108,
+        "bone_24": 160.22300274407658,
+        "bone_25": 168.30547199448205,
+        "bone_26": 149.8544772112753,
+        "bone_27": 151.06853209031328,
+        "bone_29": 162.4227090110997,
+        "bone_30": 163.66654894614217
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 31.584166004298805,
+        "26_29": 52.411786907695195
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 168.30547199448205,
+        "elbow_forearm": 162.4227090110997,
+        "wrist_hand": 163.66654894614217
+      },
+      "endpoint_return_degrees": 0.0
+    },
+    {
+      "action": "sequence_25",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 61,
+      "sample_time_count": 61,
+      "duration_frames": 10.0,
+      "maximum_displacement_degrees": {
+        "bone_22": 97.01916755588485,
+        "bone_23": 110.61821328381771,
+        "bone_24": 108.66956292792818,
+        "bone_25": 111.24405400460518,
+        "bone_26": 105.12624535708719,
+        "bone_27": 104.95537280461244,
+        "bone_29": 111.17666234665691,
+        "bone_30": 104.67711777761828
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 28.748868034948877,
+        "26_29": 17.39055800044245
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 111.24405400460518,
+        "elbow_forearm": 111.17666234665691,
+        "wrist_hand": 104.95537280461244
+      },
+      "endpoint_return_degrees": 110.61821328381771
+    },
+    {
+      "action": "sequence_26",
+      "split": "holdout",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": false,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 66,
+      "sample_time_count": 66,
+      "duration_frames": 10.833333969116211,
+      "maximum_displacement_degrees": {
+        "bone_22": 74.01334437710725,
+        "bone_23": 178.24410645790365,
+        "bone_24": 178.26157904767098,
+        "bone_25": 179.3811482507171,
+        "bone_26": 179.5638078248887,
+        "bone_27": 175.41313822379155,
+        "bone_29": 176.22256678356962,
+        "bone_30": 178.10122790171187
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 40.03392436497373,
+        "26_29": 26.101735460984766
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 179.3811482507171,
+        "elbow_forearm": 179.5638078248887,
+        "wrist_hand": 178.10122790171187
+      },
+      "endpoint_return_degrees": 174.32551726100309
+    },
+    {
+      "action": "sequence_27",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 61,
+      "sample_time_count": 61,
+      "duration_frames": 10.0,
+      "maximum_displacement_degrees": {
+        "bone_22": 125.14868803657855,
+        "bone_23": 179.23439859681625,
+        "bone_24": 178.90676528593465,
+        "bone_25": 178.3035877867129,
+        "bone_26": 172.07599122053622,
+        "bone_27": 161.58657063737624,
+        "bone_29": 179.57926126940907,
+        "bone_30": 177.80770950833147
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 61.8747789215484,
+        "26_29": 23.721680692989825
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 179.23439859681625,
+        "elbow_forearm": 179.57926126940907,
+        "wrist_hand": 177.80770950833147
+      },
+      "endpoint_return_degrees": 112.51592721912769
+    },
+    {
+      "action": "sequence_3.004",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 21,
+      "sample_time_count": 21,
+      "duration_frames": 3.3333334922790527,
+      "maximum_displacement_degrees": {
+        "bone_22": 111.2884028167064,
+        "bone_23": 88.85037928856309,
+        "bone_24": 81.62636007814932,
+        "bone_25": 75.65972880271681,
+        "bone_26": 73.29265557383732,
+        "bone_27": 97.07105312788346,
+        "bone_29": 58.12899102143975,
+        "bone_30": 160.68044546939683
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 37.09257462444962,
+        "26_29": 32.10058289514281
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 111.2884028167064,
+        "elbow_forearm": 81.62636007814932,
+        "wrist_hand": 160.68044546939683
+      },
+      "endpoint_return_degrees": 160.68044546939683
+    },
+    {
+      "action": "sequence_4.004",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 31,
+      "sample_time_count": 31,
+      "duration_frames": 5.0,
+      "maximum_displacement_degrees": {
+        "bone_22": 53.21498557748078,
+        "bone_23": 105.97682595637968,
+        "bone_24": 103.77121825433306,
+        "bone_25": 101.28353355885571,
+        "bone_26": 100.2569615094846,
+        "bone_27": 99.87711950795236,
+        "bone_29": 97.93395420521124,
+        "bone_30": 93.28580198543197
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 47.37138487924892,
+        "26_29": 12.821697171497151
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 105.97682595637968,
+        "elbow_forearm": 103.77121825433306,
+        "wrist_hand": 99.87711950795236
+      },
+      "endpoint_return_degrees": 95.89961576811335
+    },
+    {
+      "action": "sequence_5.004",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 30,
+      "sample_time_count": 30,
+      "duration_frames": 5.0,
+      "maximum_displacement_degrees": {
+        "bone_22": 18.713382800654315,
+        "bone_23": 26.555477276747226,
+        "bone_24": 25.924937511521765,
+        "bone_25": 25.111075096578165,
+        "bone_26": 26.44521716526246,
+        "bone_27": 27.372498763130313,
+        "bone_29": 25.207167186432972,
+        "bone_30": 35.221990334884396
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 12.525417038649842,
+        "26_29": 3.4570853413903198
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 26.555477276747226,
+        "elbow_forearm": 26.44521716526246,
+        "wrist_hand": 35.221990334884396
+      },
+      "endpoint_return_degrees": 2.4148365394514667e-06
+    },
+    {
+      "action": "sequence_6.004",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 21,
+      "sample_time_count": 21,
+      "duration_frames": 3.3333334922790527,
+      "maximum_displacement_degrees": {
+        "bone_22": 53.21498557748078,
+        "bone_23": 95.89961576811335,
+        "bone_24": 73.89873014256916,
+        "bone_25": 55.01161833217563,
+        "bone_26": 52.541426696232094,
+        "bone_27": 58.824827194340386,
+        "bone_29": 51.95341599404511,
+        "bone_30": 72.28410681778205
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 48.5432112546825,
+        "26_29": 12.86223573492169
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 95.89961576811335,
+        "elbow_forearm": 73.89873014256916,
+        "wrist_hand": 72.28410681778205
+      },
+      "endpoint_return_degrees": 95.89961576811335
+    },
+    {
+      "action": "sequence_7.004",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 6,
+      "sample_time_count": 6,
+      "duration_frames": 0.8333333730697632,
+      "maximum_displacement_degrees": {
+        "bone_22": 170.58915996050442,
+        "bone_23": 90.14434430100603,
+        "bone_24": 105.2280134563053,
+        "bone_25": 130.31948491719953,
+        "bone_26": 105.0621657462262,
+        "bone_27": 103.3699808851386,
+        "bone_29": 105.14838522313433,
+        "bone_30": 105.4047147239229
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 101.82891317239299,
+        "26_29": 15.407383374556506
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 170.58915996050442,
+        "elbow_forearm": 105.2280134563053,
+        "wrist_hand": 105.4047147239229
+      },
+      "endpoint_return_degrees": 164.1351494982521
+    },
+    {
+      "action": "sequence_8.004",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 35,
+      "sample_time_count": 35,
+      "duration_frames": 5.666666507720947,
+      "maximum_displacement_degrees": {
+        "bone_22": 120.52911706181004,
+        "bone_23": 130.7990062390469,
+        "bone_24": 128.9024009592006,
+        "bone_25": 129.6619899911407,
+        "bone_26": 122.23311599862471,
+        "bone_27": 133.0714227817431,
+        "bone_29": 115.06171844010599,
+        "bone_30": 172.78940236262127
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 27.7759112590526,
+        "26_29": 29.807806874059693
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 130.7990062390469,
+        "elbow_forearm": 128.9024009592006,
+        "wrist_hand": 172.78940236262127
+      },
+      "endpoint_return_degrees": 130.602901786861
+    },
+    {
+      "action": "sequence_9.003",
+      "split": "train",
+      "provenance_confidence": "high_family_inference",
+      "training_eligible": true,
+      "cluster": "combined",
+      "heuristic_labels": [
+        "shoulder_raise_or_swing_candidate",
+        "elbow_or_forearm_candidate",
+        "overlapping_branch_roll_or_coupling_candidate",
+        "wrist_or_hand_candidate",
+        "combined_pose_candidate"
+      ],
+      "label_confidence": "candidate_only; sequence names are not semantic labels",
+      "exact_keyed_time_count": 21,
+      "sample_time_count": 21,
+      "duration_frames": 3.3333334922790527,
+      "maximum_displacement_degrees": {
+        "bone_22": 115.8356907464655,
+        "bone_23": 114.1792053299308,
+        "bone_24": 105.76493500345595,
+        "bone_25": 98.58879074714052,
+        "bone_26": 88.57515796075268,
+        "bone_27": 81.70554362840574,
+        "bone_29": 99.1200689245312,
+        "bone_30": 101.74528353263253
+      },
+      "branch_relative_change_degrees": {
+        "23_25": 16.286859793114715,
+        "26_29": 23.8969507319209
+      },
+      "semantic_motion_scores_degrees": {
+        "shoulder": 115.8356907464655,
+        "elbow_forearm": 105.76493500345595,
+        "wrist_hand": 101.74528353263253
+      },
+      "endpoint_return_degrees": 115.8356907464655
+    }
+  ],
+  "coverage": {
+    "shoulder_raise_or_swing_candidate": 25,
+    "elbow_or_forearm_candidate": 26,
+    "overlapping_branch_roll_or_coupling_candidate": 25,
+    "wrist_or_hand_candidate": 26,
+    "combined_pose_candidate": 26,
+    "cyclic_pose_return_candidate": 1
+  }
+}

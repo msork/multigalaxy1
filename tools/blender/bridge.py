@@ -4,6 +4,7 @@ Run in Blender's Python Console: exec(compile(open(r'.../bridge.py').read(), 'br
 All bpy access is dispatched onto Blender's main thread.
 """
 import json
+import hashlib
 import queue
 import math
 import os
@@ -65,6 +66,14 @@ def _object(name):
     if obj is None:
         raise ValueError("object not found: " + name)
     return obj
+
+
+def _armature_rest_signature(data):
+    signature = [{"name": bone.name, "parent": bone.parent.name if bone.parent else None,
+                  "matrix": _mat(bone.matrix_local), "length": float(bone.length)}
+                 for bone in data.bones]
+    payload = json.dumps(signature, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _inspect_objects(_args):
@@ -137,6 +146,246 @@ def _inspect_pose(args):
                            "matrix_basis": _mat(p.matrix_basis)} for p in obj.pose.bones]}
     finally:
         scene.frame_set(old_frame, subframe=old_subframe)
+
+
+def _slot_data(action):
+    result = []
+    for slot in getattr(action, "slots", []):
+        curves = []
+        for fc, layer, curve_slot in _action_curves(action):
+            if curve_slot == slot:
+                curves.append(fc)
+        paths = sorted({fc.data_path for fc in curves})
+        result.append({"name": slot.identifier, "identifier": slot.identifier,
+                       "target_id_type": slot.target_id_type,
+                       "fcurve_count": len(curves), "data_path_count": len(paths),
+                       "bone_names": sorted({m.group(1) for path in paths
+                                             if (m := re.match(r'^pose\.bones\[\"([^\"]+)\"\]', path))})})
+    return result
+
+
+def _inspect_action_provenance(_args):
+    armatures = []
+    owners = {}
+    for obj in bpy.data.objects:
+        if obj.type != "ARMATURE":
+            continue
+        action = obj.animation_data.action if obj.animation_data else None
+        slot = obj.animation_data.action_slot if obj.animation_data and hasattr(obj.animation_data, "action_slot") else None
+        if action:
+            owners.setdefault(action.name, []).append({"object": obj.name, "data": obj.data.name,
+                                                        "slot_identifier": slot.identifier if slot else None})
+        armatures.append({"object": obj.name, "data": obj.data.name,
+                          "bone_count": len(obj.data.bones),
+                          "rest_signature_sha256": _armature_rest_signature(obj.data),
+                          "action": action.name if action else None,
+                          "slot_identifier": slot.identifier if slot else None,
+                          "scale": [float(x) for x in obj.scale]})
+    actions = []
+    for action in bpy.data.actions:
+        if not action.name.startswith("sequence_"):
+            continue
+        actions.append({"name": action.name, "frame_range": [float(x) for x in action.frame_range],
+                        "slots": _slot_data(action), "assigned_armatures": owners.get(action.name, []),
+                        "metadata": _custom_props(action),
+                        "library": action.library.filepath if action.library else None})
+    return {"schema": "mg1.action-provenance-inventory.v1", "armatures": armatures,
+            "sequence_action_count": len(actions), "actions": sorted(actions, key=lambda x: x["name"])}
+
+
+def _extract_native_arm_dataset(args):
+    """Read-only keyed-time native arm sampling; temporary copies are always removed."""
+    obj = _object(args.get("object", "Waluigi_Arm_Test"))
+    if obj.type != "ARMATURE":
+        raise ValueError("object is not an armature")
+    names = list(args.get("bones", _ARM_BONES["left"]))
+    if any(obj.data.bones.get(name) is None for name in names):
+        raise ValueError("requested arm bones are missing from the rig")
+    mesh_sources = [_object(name) for name in args.get("meshes", [])]
+    for mesh in mesh_sources:
+        if mesh.type != "MESH":
+            raise ValueError("weight source is not a mesh: " + mesh.name)
+    requested = args.get("actions")
+    actions = [bpy.data.actions.get(name) for name in requested] if requested else [
+        a for a in bpy.data.actions if a.name.startswith("sequence_")]
+    if any(a is None for a in actions):
+        raise ValueError("one or more requested actions were not found")
+    include_slots = set(args.get("include_slots", []))
+    max_samples = int(args.get("max_samples_per_action", 5000))
+    scene = bpy.context.scene
+    old_frame, old_subframe = scene.frame_current, scene.frame_subframe
+    data_rows, inventory, held_out = [], [], set(args.get("holdout_actions", []))
+    temp_obj = None
+    mesh_copies = []
+    try:
+        temp_obj = obj.copy()
+        temp_obj.data = obj.data.copy()
+        temp_obj.name = "_MG1_NativeArmDataset_Temporary"
+        temp_obj.data.name = "_MG1_NativeArmDataset_Temporary_Data"
+        scene.collection.objects.link(temp_obj)
+        for source in mesh_sources:
+            duplicate = source.copy()
+            duplicate.data = source.data.copy()
+            duplicate.name = "_MG1_NativeArmDataset_Mesh_" + str(len(mesh_copies))
+            scene.collection.objects.link(duplicate)
+            for modifier in duplicate.modifiers:
+                if modifier.type == "ARMATURE" and modifier.object == obj:
+                    modifier.object = temp_obj
+            mesh_copies.append(duplicate)
+
+        weight_rows = {}
+        for action in actions:
+            slots = list(getattr(action, "slots", []))
+            matches = [s for s in slots if not include_slots or s.identifier in include_slots]
+            if len(matches) != 1:
+                inventory.append({"action": action.name, "status": "excluded_ambiguous_slot",
+                                  "slots": _slot_data(action), "frame_range": [float(x) for x in action.frame_range]})
+                continue
+            slot = matches[0]
+            curves = [(fc, layer) for fc, layer, curve_slot in _action_curves(action)
+                      if curve_slot == slot and any(re.match(r'^pose\.bones\[\"' + re.escape(name) + r'\"\]', fc.data_path) for name in names)]
+            exact_key_times = sorted({float(point.co.x) for fc, _layer in curves for point in fc.keyframe_points})
+            if not exact_key_times:
+                inventory.append({"action": action.name, "slot_identifier": slot.identifier,
+                                  "status": "excluded_no_arm_keys", "frame_range": [float(x) for x in action.frame_range]})
+                continue
+            start, end = (float(x) for x in action.frame_range)
+            sample_times = sorted(set(exact_key_times) | {start, end})
+            if len(sample_times) > max_samples:
+                raise ValueError(action.name + " has more exact keyed times than max_samples_per_action")
+            temp_obj.animation_data_create()
+            temp_obj.animation_data.action = action
+            if hasattr(temp_obj.animation_data, "action_slot"):
+                temp_obj.animation_data.action_slot = slot
+            sample_rows = []
+            for time in sample_times:
+                base = math.floor(time)
+                scene.frame_set(int(base), subframe=time-base)
+                bpy.context.view_layer.update()
+                pose_rows = {}
+                for name in names:
+                    pose = temp_obj.pose.bones[name]
+                    rest = temp_obj.data.bones[name].matrix_local
+                    delta = rest.inverted_safe() @ pose.matrix
+                    pose_rows[name] = {"local_basis": _mat(pose.matrix_basis),
+                                       "armature_pose": _mat(pose.matrix),
+                                       "armature_pose_rotation_quaternion": _quat(pose.matrix.to_quaternion().normalized()),
+                                       "world_pose": _mat(temp_obj.matrix_world @ pose.matrix),
+                                       "world_pose_rotation_quaternion": _quat((temp_obj.matrix_world @ pose.matrix).to_quaternion().normalized()),
+                                       "rest_relative_se3": {"matrix": _mat(delta),
+                                           "translation": [float(v) for v in delta.translation],
+                                           "rotation_quaternion": _quat(delta.to_quaternion().normalized()),
+                                           "scale": [float(v) for v in delta.to_scale()]},
+                                       "head_armature": [float(v) for v in pose.head],
+                                       "tail_armature": [float(v) for v in pose.tail]}
+                landmarks = {}
+                for label, bone_name, endpoint in (
+                        ("shoulder", "bone_22", "head"), ("main_elbow", "bone_26", "head"),
+                        ("overlap_elbow", "bone_29", "head"), ("main_wrist", "bone_27", "tail"),
+                        ("glove_wrist", "bone_30", "head"), ("glove_tip", "bone_30", "tail")):
+                    if bone_name in pose_rows:
+                        arm_point = getattr(temp_obj.pose.bones[bone_name], endpoint)
+                        world_point = temp_obj.matrix_world @ arm_point
+                        landmarks[label] = {"bone": bone_name, "endpoint": endpoint,
+                            "armature": [float(v) for v in arm_point],
+                            "world": [float(v) for v in world_point]}
+                mesh_rows = {}
+                depsgraph = bpy.context.evaluated_depsgraph_get()
+                for source, duplicate in zip(mesh_sources, mesh_copies):
+                    evaluated = duplicate.evaluated_get(depsgraph)
+                    evaluated_mesh = evaluated.to_mesh()
+                    try:
+                        groups = {g.index: g.name for g in source.vertex_groups if g.name in names}
+                        sums = {n: Vector((0, 0, 0)) for n in names}
+                        weights = {n: 0.0 for n in names}
+                        counts = {n: 0 for n in names}
+                        for index, vertex in enumerate(evaluated_mesh.vertices):
+                            if index >= len(source.data.vertices):
+                                break
+                            world = evaluated.matrix_world @ vertex.co
+                            for assignment in source.data.vertices[index].groups:
+                                bone = groups.get(assignment.group)
+                                if bone and assignment.weight > 0:
+                                    w = float(assignment.weight)
+                                    sums[bone] += world * w
+                                    weights[bone] += w
+                                    counts[bone] += 1
+                        mesh_rows[source.name] = {n: {"weighted_vertex_count": counts[n],
+                            "weighted_centroid_world": [float(v) for v in sums[n]/weights[n]] if weights[n] else None}
+                            for n in names}
+                    finally:
+                        evaluated.to_mesh_clear()
+                sample_rows.append({"time": time, "bones": pose_rows, "branch_landmarks": landmarks,
+                                    "weighted_mesh_centroids": mesh_rows})
+            # Static weighted vertex positions are recorded once per action, in armature coordinates.
+            weight_rows = {}
+            for mesh in mesh_sources:
+                group_map = {g.index: g.name for g in mesh.vertex_groups if g.name in names}
+                per_bone = {n: [] for n in names}
+                arm_from_mesh = obj.matrix_world.inverted_safe() @ mesh.matrix_world
+                for vertex in mesh.data.vertices:
+                    for assignment in vertex.groups:
+                        bone = group_map.get(assignment.group)
+                        if bone and assignment.weight > 0:
+                            per_bone[bone].append({"vertex_index": vertex.index,
+                                "weight": float(assignment.weight),
+                                "position_armature": [float(v) for v in arm_from_mesh @ vertex.co]})
+                weight_rows[mesh.name] = per_bone
+            slot_name = slot.identifier
+            # The .004 slot family is anchored by the already established native Waluigi action.
+            confidence = "high" if slot_name == "OBArmature.004" else "ambiguous"
+            status = "candidate_training" if confidence == "high" else "excluded_ambiguous_provenance"
+            inventory.append({"action": action.name, "slot_name": slot_name,
+                "slot_identifier": slot.identifier, "status": status, "provenance_confidence": confidence,
+                "frame_range": [float(x) for x in action.frame_range], "exact_keyed_time_count": len(exact_key_times),
+                "split": "holdout" if action.name in held_out else "train_candidate",
+                "action_metadata": _custom_props(action)})
+            if status == "candidate_training":
+                channel_rows = []
+                for fc, layer_name in curves:
+                    keys = [float(point.co.y) for point in fc.keyframe_points]
+                    channel_rows.append({"data_path": fc.data_path, "array_index": int(fc.array_index),
+                        "layer": layer_name, "key_count": len(keys),
+                        "value_range": [min(keys), max(keys)] if keys else None,
+                        "key_times": [float(point.co.x) for point in fc.keyframe_points]})
+                data_rows.append({"action": action.name, "slot_name": slot_name,
+                    "slot_identifier": slot.identifier, "frame_range": [float(x) for x in action.frame_range],
+                    "action_metadata": _custom_props(action), "action_channels": channel_rows,
+                    "exact_key_times": exact_key_times, "sample_times": sample_times,
+                    "samples": sample_rows, "split": "holdout" if action.name in held_out else "train",
+                    "track_ids": {n: obj.data.bones[n].get("TrackId", obj.data.bones[n].get("track_id")) for n in names}})
+        rest_bones = {name: {"parent": obj.data.bones[name].parent.name if obj.data.bones[name].parent else None,
+            "children": [child.name for child in obj.data.bones[name].children],
+            "head": [float(v) for v in obj.data.bones[name].head_local],
+            "tail": [float(v) for v in obj.data.bones[name].tail_local],
+            "length": float(obj.data.bones[name].length),
+            "matrix": _mat(obj.data.bones[name].matrix_local),
+            "track_id": obj.data.bones[name].get("TrackId", obj.data.bones[name].get("track_id"))}
+            for name in names}
+        return {"schema": "mg1.native-arm-calibration.v1", "rig_object": obj.name,
+            "rig_data": obj.data.name, "rig_scale": [float(x) for x in obj.scale],
+            "rig_rest_signature_sha256": _armature_rest_signature(obj.data),
+            "bones": names, "rest_bones": rest_bones, "read_only": True,
+            "sample_time_policy": "union of exact fcurve keyframe x values plus action frame-range endpoints",
+            "provenance_policy": "OBArmature.004 is a high-confidence candidate family anchored by sequence_10.003; other slots excluded as ambiguous",
+            "inventory": inventory, "dataset": data_rows, "weighted_mesh_vertices_rest": weight_rows,
+            "dataset_action_count": len(data_rows),
+            "training_action_count": sum(1 for row in data_rows if row["split"] == "train"),
+            "validation_action_count": sum(1 for row in data_rows if row["split"] == "holdout"),
+            "sample_count": sum(len(row["samples"]) for row in data_rows),
+            "held_out_actions": sorted(held_out)}
+    finally:
+        scene.frame_set(old_frame, subframe=old_subframe)
+        for duplicate in mesh_copies:
+            data = duplicate.data
+            bpy.data.objects.remove(duplicate, do_unlink=True)
+            if data.users == 0:
+                bpy.data.meshes.remove(data)
+        if temp_obj:
+            data = temp_obj.data
+            bpy.data.objects.remove(temp_obj, do_unlink=True)
+            if data.users == 0:
+                bpy.data.armatures.remove(data)
 
 
 _ARM_BONES = {
@@ -828,7 +1077,9 @@ def _restore(args):
 
 _READ = {"inspect.objects": _inspect_objects, "inspect.armature": _inspect_armature,
          "inspect.weights": _inspect_weights, "inspect.actions": _inspect_actions,
-         "inspect.pose": _inspect_pose, "analyze.waluigi_arm": _analyze_waluigi_arm}
+         "inspect.pose": _inspect_pose, "analyze.waluigi_arm": _analyze_waluigi_arm,
+         "inspect.action_provenance": _inspect_action_provenance,
+         "extract.native_arm_dataset": _extract_native_arm_dataset}
 _MUTATE = {"mutate.duplicate_rig": _duplicate_rig, "mutate.restore": _restore,
            "mutate.prototype_waluigi_arm": _prototype_waluigi_arm}
 

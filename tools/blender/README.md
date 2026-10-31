@@ -73,3 +73,18 @@ python tools/blender/study_native_arm.py --object Waluigi_Arm_Test --sample-coun
 ```
 
 It samples five named `sequence_*` actions, reports branch-relative rotation statistics and armature-space endpoint divergence, and does not mutate Blender objects or actions.
+
+## Native Waluigi arm calibration dataset
+
+Reload the bridge after changing `bridge.py` by running `stop()` and then the startup command above in Blender's Python Console. The new read-only `inspect.action_provenance` operation lists Blender 5 action slots, their channel/bone signatures, and current object assignments. `extract.native_arm_dataset` evaluates only temporary duplicates and restores the scene frame.
+
+From PowerShell, extract the `.004` native Waluigi slot family on the disposable rig, verify the test rig's rest signature against production, and hold out complete actions:
+
+```powershell
+python tools/blender/extract_native_arm_dataset.py --object Waluigi_Arm_Test --output tools/blender/reports/native_waluigi_arm_calibration.json
+python tools/blender/label_native_arm_candidates.py tools/blender/reports/native_waluigi_arm_calibration.json --output tools/blender/reports/native_waluigi_arm_candidates.json
+```
+
+The bundle preserves exact FCurve keyframe/subframe times, local/armature/world matrices, rest-relative transforms, arm branch landmarks, static weighted vertex positions, evaluated per-bone mesh centroids, TrackIds, curve ranges, action metadata, and full slot inventory. It identifies `sequence_10.003` as the previously validated anchor for `OBArmature.004`; other slots are excluded because their source-rig link is ambiguous. The remaining `.004` actions are high-confidence family candidates; their source-owner object was not preserved, so that confidence remains an inference. The default action-level holdouts are `sequence_11.003`, `sequence_15.003`, `sequence_20.001`, `sequence_24`, and `sequence_26`.
+
+`test_native_arm_extract_blender.py` checks exact subframe sampling, rest-relative transforms, TrackIds, weighted vertices, scene-frame restoration, and temporary-object cleanup in Blender background mode. `test_native_arm_labels.py` covers sign-invariant action feature labels.
