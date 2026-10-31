@@ -278,7 +278,7 @@ fn spawn_game(
     port: u16,
     mute: bool,
     patch: &controller_patch::PreparedPatch,
-) -> Result<(), String> {
+) -> Result<process::Child, String> {
     let dolphin = dolphin
         .canonicalize()
         .map_err(|e| format!("cannot resolve Dolphin executable path: {e}"))?;
@@ -320,7 +320,7 @@ fn spawn_game(
     );
     println!("Mandatory pinned PAL AllStars + both shoulder swaps are enabled in this isolated profile ({} writes).", patch.total_writes);
     if gdb_enabled {
-        println!("GDB is enabled on port {port}. Dolphin starts paused; run probe-mario, which attaches once and sends the GDB continue packet before sampling.");
+        println!("debug stage=window-ready; GDB enabled on port {port}; emulation is expected to be paused until the launcher attaches.");
     } else {
         println!("GDB is disabled; emulation starts normally.");
     }
@@ -328,6 +328,111 @@ fn spawn_game(
         println!("Dolphin test/debug audio mute enabled.");
     }
     println!("Dolphin logs: {}", user_dir.display());
+    Ok(child)
+}
+
+fn connect_gdb_until_ready(
+    child: &mut process::Child,
+    port: u16,
+    timeout: Duration,
+) -> Result<gdb::DolphinGdb, String> {
+    let deadline = Instant::now() + timeout;
+    let address = format!("127.0.0.1:{port}").parse().unwrap();
+    let mut last_error;
+    loop {
+        if let Some(status) = child
+            .try_wait()
+            .map_err(|e| format!("cannot inspect Dolphin while waiting for GDB: {e}"))?
+        {
+            return Err(format!(
+                "Dolphin exited before its GDB stub was ready ({status})"
+            ));
+        }
+        match gdb::DolphinGdb::connect(address, Duration::from_millis(500)) {
+            Ok(client) => return Ok(client),
+            Err(error) => last_error = error,
+        }
+        if Instant::now() >= deadline {
+            return Err(format!(
+                "Dolphin GDB stub did not accept the automatic debug connection within {} seconds: {last_error}",
+                timeout.as_secs()
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn run_interactive_sampler(
+    mut client: gdb::DolphinGdb,
+    map: &player_probe::VerifiedPalMap,
+    port: u16,
+    interval: u64,
+    start_sampling: bool,
+) -> Result<(), String> {
+    println!("Persistent GDB session open on port {port}; emulation continues while this read-only sampler polls memory.");
+    println!(
+        "Sampling is {}. Type START, STOP, or Q. Use your controller to move Mario.",
+        if start_sampling {
+            "already active"
+        } else {
+            "stopped"
+        }
+    );
+    println!(
+        "Position field: MarioActor + 0x0c (three big-endian f32 values); interval: {interval} ms."
+    );
+    let (tx, rx) = std::sync::mpsc::channel::<String>();
+    std::thread::spawn(move || {
+        let stdin = std::io::stdin();
+        loop {
+            let mut line = String::new();
+            if stdin.read_line(&mut line).is_err() {
+                break;
+            }
+            if tx.send(line.trim().to_owned()).is_err() {
+                break;
+            }
+        }
+    });
+    let mut sampling = start_sampling;
+    loop {
+        match rx.recv_timeout(Duration::from_millis(interval)) {
+            Ok(command) if command.eq_ignore_ascii_case("start") => {
+                sampling = true;
+                println!("sampling=started");
+            }
+            Ok(command) if command.eq_ignore_ascii_case("stop") => {
+                sampling = false;
+                println!("sampling=stopped");
+            }
+            Ok(command)
+                if command.eq_ignore_ascii_case("q") || command.eq_ignore_ascii_case("quit") =>
+            {
+                break
+            }
+            Ok(command) if command.is_empty() => {}
+            Ok(command) => println!("unknown command {command:?}; use START, STOP, or Q"),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+        if sampling {
+            let timestamp = timestamp_unix_ms();
+            match player_probe::sample_position(&mut client, map) {
+                Ok(Ok(p)) => println!(
+                    "unix_ms={timestamp} state=ready MarioActor=0x{:08x} x={:.3} y={:.3} z={:.3}",
+                    p.mario_actor, p.x, p.y, p.z
+                ),
+                Ok(Err(waiting)) => println!("unix_ms={timestamp} state=waiting {waiting:?}"),
+                Err(error) => {
+                    eprintln!("unix_ms={timestamp} state=error {error}");
+                    eprintln!("GDB session is no longer usable. Dolphin accepts one GDB connection per process; close this sampler and restart Dolphin before reconnecting.");
+                    break;
+                }
+            }
+            let _ = std::io::stdout().flush();
+        }
+    }
+    println!("sampling=exited; persistent GDB connection closed");
     Ok(())
 }
 
@@ -441,6 +546,13 @@ fn run() -> Result<(), String> {
         let dol =
             fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
         let patch = controller_patch::prepare_allstars(&config.patch_folder, &dol)?;
+        let probe_map = if debug {
+            let symbols = fs::read(&config.pal_symbols)
+                .map_err(|e| format!("cannot read Petari symbols: {e}"))?;
+            Some(player_probe::verify_pal_inputs(&dol, &symbols)?)
+        } else {
+            None
+        };
         configure_isolated_profile(
             &user_dir,
             &patch,
@@ -449,7 +561,7 @@ fn run() -> Result<(), String> {
             if debug { Some(port) } else { None },
             mute,
         )?;
-        spawn_game(
+        let mut child = spawn_game(
             &config.dolphin,
             &user_dir,
             &config.game,
@@ -459,12 +571,50 @@ fn run() -> Result<(), String> {
             &patch,
         )?;
         if debug {
-            println!("Next, attach the persistent sampler in another terminal:");
-            println!(
-                ".\\target\\debug\\multigalaxy.exe probe-mario {port} \"{}\" \"{}\" 200",
-                config.pal_dol.display(),
-                config.pal_symbols.display()
-            );
+            println!("debug stage=gdb-attach; opening the persistent Rust GDB session");
+            let mut client =
+                match connect_gdb_until_ready(&mut child, port, Duration::from_secs(15)) {
+                    Ok(client) => client,
+                    Err(error) => {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(format!(
+                        "debug launch failed before resume; stopped its Dolphin process: {error}"
+                    ));
+                    }
+                };
+            let disc_id = match client.read_memory(0x8000_0000, 6) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!("debug launch could not verify live disc ID; stopped its Dolphin process: {error}"));
+                }
+            };
+            if disc_id != b"RMGP01" {
+                let found = String::from_utf8_lossy(&disc_id);
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("debug launch expected live PAL RMGP01, found {found}; stopped its Dolphin process"));
+            }
+            println!("debug stage=verified; live game ID RMGP01");
+            if let Err(error) = client.continue_execution() {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("debug launch could not resume Dolphin through GDB; stopped its process: {error}"));
+            }
+            println!("debug stage=continued; rendering/gameplay starts without an external probe attachment");
+            run_interactive_sampler(
+                client,
+                probe_map
+                    .as_ref()
+                    .expect("debug mode prevalidates the PAL map"),
+                port,
+                200,
+                true,
+            )?;
+        } else {
+            drop(child);
         }
         return Ok(());
     }
@@ -587,7 +737,7 @@ fn run() -> Result<(), String> {
             if gdb_enabled { Some(port) } else { None },
             mute,
         )?;
-        return spawn_game(
+        spawn_game(
             &dolphin,
             &user_dir,
             &game,
@@ -595,7 +745,8 @@ fn run() -> Result<(), String> {
             port,
             mute,
             &prepared_allstars,
-        );
+        )?;
+        return Ok(());
     }
     if (args.len() == 4 || args.len() == 5) && args[0] == "probe-mario" {
         let port = args[1]
@@ -637,63 +788,7 @@ fn run() -> Result<(), String> {
         client
             .continue_execution()
             .map_err(|e| format!("could not resume Dolphin through GDB: {e}"))?;
-        println!("Persistent GDB session open on port {port}; sent the GDB continue packet. Gameplay is running while this read-only sampler polls memory.");
-        println!("Type START then Enter to sample, STOP to pause, Q to quit. Use a controller to move Mario while this terminal has focus.");
-        println!("Position field: MarioActor + 0x0c (three big-endian f32 values); sample interval: {interval} ms.");
-        let (tx, rx) = std::sync::mpsc::channel::<String>();
-        std::thread::spawn(move || {
-            let stdin = std::io::stdin();
-            loop {
-                let mut line = String::new();
-                if stdin.read_line(&mut line).is_err() {
-                    break;
-                }
-                if tx.send(line.trim().to_owned()).is_err() {
-                    break;
-                }
-            }
-        });
-        let mut sampling = false;
-        loop {
-            match rx.recv_timeout(std::time::Duration::from_millis(interval)) {
-                Ok(command) if command.eq_ignore_ascii_case("start") => {
-                    sampling = true;
-                    println!("sampling=started");
-                }
-                Ok(command) if command.eq_ignore_ascii_case("stop") => {
-                    sampling = false;
-                    println!("sampling=stopped");
-                }
-                Ok(command)
-                    if command.eq_ignore_ascii_case("q")
-                        || command.eq_ignore_ascii_case("quit") =>
-                {
-                    break
-                }
-                Ok(command) if command.is_empty() => {}
-                Ok(command) => println!("unknown command {command:?}; use START, STOP, or Q"),
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
-            }
-            if sampling {
-                let timestamp = timestamp_unix_ms();
-                match player_probe::sample_position(&mut client, &map) {
-                    Ok(Ok(p)) => println!(
-                        "unix_ms={timestamp} state=ready MarioActor=0x{:08x} x={:.3} y={:.3} z={:.3}",
-                        p.mario_actor, p.x, p.y, p.z
-                    ),
-                    Ok(Err(waiting)) => println!("unix_ms={timestamp} state=waiting {waiting:?}"),
-                    Err(error) => {
-                        eprintln!("unix_ms={timestamp} state=error {error}");
-                        eprintln!("GDB session is no longer usable. Dolphin accepts one GDB connection per process; close this sampler and restart Dolphin before reconnecting.");
-                        break;
-                    }
-                }
-                let _ = std::io::stdout().flush();
-            }
-        }
-        println!("sampling=exited; persistent GDB connection closed");
-        return Ok(());
+        return run_interactive_sampler(client, &map, port, interval, false);
     }
     if args.len() == 4 && args[0] == "readmem" {
         let port = args[1]

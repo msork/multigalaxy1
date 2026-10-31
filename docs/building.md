@@ -10,7 +10,7 @@ All launches require user-selected Dolphin, game, isolated user directory, the t
 cargo run -p multigalaxy -- launch '<Dolphin.exe>' '<fresh-user-dir>' '<game.rvz>' 0 '<SMG\PAL\Individual Patches>' '<PAL-main.dol>'
 ```
 
-Add `--gdb` only for a debug session and `--mute` only for test/debug audio. When GDB is enabled the emulated CPU starts paused. The Rust `probe-mario` command attaches to the one Dolphin GDB session, sends the protocol continue packet, and keeps the socket open while reading memory. Dolphin 2609a accepts one client per process; after disconnect or timeout restart Dolphin before reconnecting. Normal production launch leaves GDB disabled.
+Add `--gdb` only for a debug session and `--mute` only for test/debug audio. Dolphin starts the emulated CPU paused when GDBPort is set. In debug mode the Rust launcher now attaches to that GDB stub automatically, verifies live game ID `RMGP01`, sends the protocol continue packet, then retains that single connection for the interactive sampler. It does not silently fall back to a non-debug launch. Dolphin 2609a accepts one client per process; if attach, identity validation, or continue fails, the launcher stops only the Dolphin process it started and reports the failed stage. Normal production launch leaves GDB disabled.
 
 The launcher uses only `-u <isolated-user-dir>` and `-e <game>` with Dolphin's executable directory as its working directory. It writes its settings and logs only inside that user directory, checks for a visible responsive window for at most 15 seconds, reports bounded log tails on failure, and leaves an unresponsive process open for inspection. A responsive window does not prove game rendering or gameplay.
 
@@ -30,10 +30,14 @@ Start a debug game session after the setup window is closed:
 cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-dev-profile' 55221 --debug
 ```
 
-This starts Dolphin with GDB enabled, D3D12, muted test audio, the selected controller profile, and mandatory AllStars. The command prints the exact sampler invocation. In a second terminal run it; sampling begins after you type `START`. The sampler resumes emulation automatically before sampling. Use `--unmute` only if needed for a local test.
+This starts Dolphin with GDB enabled, D3D12, muted test audio, the selected controller profile, and mandatory AllStars. The same command automatically attaches, resumes the emulated CPU, and begins sampling on its persistent GDB connection. Type `STOP`/`START` to pause/resume sampling and `Q` to close the sampler. Do not start `probe-mario` separately for this Dolphin: its single GDB connection is owned by `dev-launch`. Use `--unmute` only if needed for a local test.
 
 To test normal unpaused gameplay without GDB, omit `--debug`. Runtime verification remains split into separate claims: patch activation is statically checked in the isolated GameSettings file; Dolphin window/game boot requires visual confirmation; live X/Y/Z requires sampling during controlled movement and has not yet been confirmed.
 
 ## Validation and artifacts
 
 `inspect-allstars <patch-folder> <PAL-main.dol>` validates the three exact upstream patch files and their composition without starting Dolphin. No third-party patch file, game executable, RVZ, save, or controller profile is committed. Keep generated profiles under `target/` or another git-ignored local directory.
+
+### Debug startup diagnosis (Dolphin 2609a)
+
+The black viewport was reproduced with the same absolute isolated profile, PAL RVZ, D3D12 backend, and mandatory AllStars settings. The `GDBPort` difference was isolated: with GDB enabled, Dolphin's render window initialized and named `Super Mario Galaxy (RMGP01)`, but the viewport stayed black until the GDB client sent `c`. The persistent Rust session then displayed the Wii safety-strap screen and continued rendering during repeated memory reads. With only GDB disabled, the same isolated setup rendered the SMG1 title screen. Thus the pause-on-start behavior is the cause; neither AllStars nor D3D12 caused the black viewport. `dev-launch --debug` now has explicit `window-ready`, `gdb-attach`, `verified`, and `continued` stages to prevent that paused state from being mistaken for a rendering failure.

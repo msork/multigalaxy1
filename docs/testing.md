@@ -12,7 +12,11 @@ The current `reference/original/main.dol` is the user-supplied PAL build with SH
 
 The Petari-backed pointer chain and `MarioActor::mPosition` offset are statically checked against this PAL DOL and symbol map. The sampler validates `RMGP01`, keeps one GDB connection, sends the GDB `c` continue command, and reads the verified chain while Dolphin runs. It reports timestamped X/Y/Z values or a waiting state. No live actor pointer or position changes have yet been observed during controlled movement.
 
-On 2026-10-30, Dolphin 2609a listened on `0.0.0.0:55221` from the isolated GDB profile. The Rust sampler attached, read live `RMGP01`, sent `c`, and completed repeated 200 ms memory reads while the emulated CPU ran. The active scene returned `MarioHolder has not been created in this scene`; this verifies the resume/read transport, not a Mario coordinate sample, playable-scene boot, or controller input.
+On 2026-10-30, Dolphin 2609a listened on `0.0.0.0:55221` from the isolated GDB profile. The Rust sampler attached, read live `RMGP01`, sent `c`, and completed repeated 200 ms memory reads while the emulated CPU ran. The active scene returned `MarioHolder has not been created in this scene`; this verifies the resume/read transport, not a Mario coordinate sample or controller input.
+
+### Black-screen regression diagnosis
+
+The render-window capture was taken from the window titled `Dolphin 2609a | JIT64 SC | Direct3D 12 | HLE | Super Mario Galaxy (RMGP01)`, not Dolphin's separate library window. With GDB enabled it was black before attachment; attaching and sending `c` changed the rendered frame to the Wii safety strap screen, and it remained rendered while reads continued. A normal launch using the same absolute isolated profile, D3D12 configuration, and AllStars patch displayed the title screen. This isolates the cause to GDB's pause-on-start state, not the Gecko patch or graphics backend. The new debug launch waits up to 15 seconds for GDB, checks the Dolphin child remains alive, validates `RMGP01`, and explicitly resumes. If any stage fails, it kills and reaps only the child it launched. The debug command itself owns the persistent GDB connection and sampler.
 
 ## Manual debug movement test
 
@@ -24,13 +28,13 @@ Copy `development.local.example.toml` to ignored `development.local.toml` and pu
 
 In the isolated Dolphin window, use **Tools > Import Wii Save**, select the configured `wii_save`, wait for Dolphin's success confirmation, and close Dolphin. This is Dolphin's supported save-import UI; DolphinTool has no import command. The save source remains unchanged. `dev-setup` may be rerun for the same marked local profile to reopen its setup window; it refuses unmarked or differently configured directories.
 
-Launch the muted debug game with D3D12, the isolated controller profile, and required PAL AllStars patch:
+Launch the muted debug game with D3D12, the isolated controller profile, and required PAL AllStars patch. Give it an absolute isolated user-directory path (the example resolves from the repository directory):
 
 ```powershell
 .\target\debug\multigalaxy.exe dev-launch development.local.toml 'target\mg1-coordinate-manual' 55218 --debug
 ```
 
-In a second terminal, run the exact `probe-mario` command printed by the launcher. The sampler attaches to the GDB stub and resumes the game. Type `START`, enter a playable scene using the configured controller, stand still for five seconds, walk for five seconds, and jump twice. Type `STOP`, then `Q`. Save timestamped output. `state=waiting` means a pointer in the verified chain was null; it is not a coordinate sample.
+The command automatically attaches and resumes through GDB, then samples immediately. Type `STOP` to pause sampling, enter a playable scene using the configured controller, then type `START`; stand still for five seconds, walk for five seconds, and jump twice. Type `STOP`, then `Q`. Save timestamped output. `state=waiting` means a pointer in the verified chain was null; it is not a coordinate sample. Do not use a second `probe-mario` process against this Dolphin: Dolphin accepts only one GDB client.
 
 Dolphin 2609a accepts one GDB client per process. If a read times out or the connection drops, the sampler exits with a restart instruction; restart the debug Dolphin process before reconnecting. The sampler never writes emulated memory.
 
