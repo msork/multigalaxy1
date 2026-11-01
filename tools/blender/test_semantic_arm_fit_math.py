@@ -86,6 +86,55 @@ class SemanticArmFitMathTests(unittest.TestCase):
                         0.5 * float(np.sum(target * target)))
         self.assertTrue(np.isfinite(solved).all())
 
+    def test_joint_temporal_block_reduces_full_pose_context_jumps(self):
+        target = np.zeros((9, 3))
+        target[4:, 0] = 1.0
+        initial = np.column_stack((target[:, 0], target[:, 0] * -0.5,
+                                   np.zeros(len(target))))
+        prior = np.zeros_like(initial)
+        indices = np.asarray([1, 2])
+        solved, values, _history = refine_latent_sequence_joint(
+            initial, prior, lambda z: z.copy(), target, np.asarray([1.0, 0.0, 0.0]),
+            temporal_blocks=[{"indices": indices,
+                "velocity_target": np.zeros((8, 2)),
+                "acceleration_target": np.zeros((7, 2)),
+                "velocity_weights": 2.0, "acceleration_weights": 8.0}],
+            lambda_native=0.0, lambda_velocity=0.0,
+            lambda_acceleration=0.0, iterations=6)
+        self.assertLess(np.max(np.linalg.norm(np.diff(values[:, 1:], axis=0), axis=1)), 0.3)
+        self.assertTrue(np.isfinite(solved).all())
+
+    def test_latent_neighborhood_hinge_limits_distant_switches(self):
+        initial = np.zeros((7, 3))
+        initial[3:, :] = (3.0, -2.0, 1.0)
+        prior = np.zeros_like(initial)
+        solved, _values, _history = refine_latent_sequence_joint(
+            initial, prior, lambda z: z.copy(), initial.copy(), np.zeros(3),
+            lambda_native=0.0, lambda_velocity=0.0,
+            lambda_acceleration=0.0, iterations=12,
+            latent_jump_limit=0.2, lambda_latent_jump=80.0)
+        steps = np.linalg.norm(np.diff(solved, axis=0), axis=1)
+        self.assertLess(float(np.max(steps)), 0.45)
+        self.assertTrue(np.isfinite(solved).all())
+
+    def test_pose_velocity_hinge_limits_large_context_steps(self):
+        target = np.zeros((8, 2))
+        target[4:, 0] = 2.0
+        solved, values, _history = refine_latent_sequence_joint(
+            target.copy(), np.zeros_like(target), lambda z: z.copy(), target,
+            np.asarray([1.0, 0.0]), temporal_blocks=[{
+                "indices": np.asarray([0, 1]),
+                "velocity_target": np.zeros((7, 2)),
+                "acceleration_target": np.zeros((6, 2)),
+                "velocity_weights": 0.0,
+                "acceleration_weights": 0.0,
+                "velocity_limits": 0.2,
+                "velocity_limit_weights": 80.0}],
+            lambda_native=0.0, lambda_velocity=0.0,
+            lambda_acceleration=0.0, iterations=12)
+        self.assertLess(float(np.max(np.abs(np.diff(values[:, 0])))), 0.3)
+        self.assertTrue(np.isfinite(solved).all())
+
     def test_sagittal_mirror_maps_rest_pose_to_homologous_rest(self):
         torso = rest_matrix(0.0, 0.0, 0.0)
         left = rest_matrix(1.0, 2.0, 0.25)

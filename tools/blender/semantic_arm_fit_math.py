@@ -297,15 +297,20 @@ def smooth_latent_sequence(proposal, native_prior, latent_scale,
 
 def refine_latent_sequence_joint(initial, native_prior, evaluate, target,
                                  output_weights, temporal_specs=(),
+                                 temporal_blocks=(),
                                  lambda_native=0.01, lambda_velocity=0.002,
                                  lambda_acceleration=0.01, iterations=8,
-                                 cg_iterations=80, damping=1e-4):
+                                 cg_iterations=80, damping=1e-4,
+                                 latent_jump_limit=None,
+                                 lambda_latent_jump=0.0):
     """Jointly optimize every frame's latent pose with feature-time penalties.
 
     `evaluate(z_t)` returns a generic feature vector. Each temporal spec is a
     mapping with `index`, `velocity_target`, `acceleration_target`, and their
-    respective weights. This keeps the solver target-profile agnostic while
-    supporting timing-aware semantic channels and branch-continuity features.
+    respective weights. Temporal blocks apply the same losses to many output
+    channels together, which is useful for full-pose SE(3) features. An
+    optional latent jump hinge limits transitions beyond native-neighborhood
+    motion without constraining smaller steps.
     A matrix-free conjugate-gradient Gauss-Newton step avoids a dense
     (frames*latent)^2 solve.
     """
@@ -334,6 +339,41 @@ def refine_latent_sequence_joint(initial, native_prior, evaluate, target,
                       float(spec.get("velocity_weight", 0.0)),
                       float(spec.get("acceleration_weight", 0.0))))
 
+    blocks = []
+    for block in temporal_blocks:
+        indices = np.asarray(block["indices"], dtype=np.int64)
+        if indices.ndim != 1 or np.any(indices < 0) or np.any(indices >= feature_count):
+            raise ValueError("temporal block contains invalid output indices")
+        count = len(indices)
+        vel_target = np.asarray(block.get("velocity_target", np.zeros((n - 1, count))), dtype=np.float64)
+        acc_target = np.asarray(block.get("acceleration_target", np.zeros((n - 2, count))), dtype=np.float64)
+        if vel_target.shape == (n - 1,) and count == 1:
+            vel_target = vel_target[:, None]
+        if acc_target.shape == (n - 2,) and count == 1:
+            acc_target = acc_target[:, None]
+        if vel_target.shape != (n - 1, count) or acc_target.shape != (n - 2, count):
+            raise ValueError("temporal block targets must match frame-difference and channel dimensions")
+        vel_weights = np.broadcast_to(np.asarray(block.get("velocity_weights", 0.0), dtype=np.float64), (count,)).copy()
+        acc_weights = np.broadcast_to(np.asarray(block.get("acceleration_weights", 0.0), dtype=np.float64), (count,)).copy()
+        vel_limits = np.broadcast_to(np.asarray(block.get("velocity_limits", np.inf), dtype=np.float64), (count,)).copy()
+        limit_weights = np.broadcast_to(np.asarray(block.get("velocity_limit_weights", 0.0), dtype=np.float64), (count,)).copy()
+        if np.any(vel_weights < 0) or np.any(acc_weights < 0):
+            raise ValueError("temporal block weights must be nonnegative")
+        if np.any(vel_limits < 0) or np.any(limit_weights < 0):
+            raise ValueError("temporal velocity limits and weights must be nonnegative")
+        blocks.append((indices, vel_target, acc_target, vel_weights, acc_weights,
+                       vel_limits, limit_weights))
+    if latent_jump_limit is not None and (float(latent_jump_limit) < 0 or lambda_latent_jump < 0):
+        raise ValueError("latent jump limit and weight must be nonnegative")
+
+    def latent_jump(sequence):
+        diff = np.diff(sequence, axis=0)
+        norms = np.linalg.norm(diff, axis=1)
+        limit = float(latent_jump_limit)
+        excess = np.maximum(norms - limit, 0.0)
+        unit = diff / np.maximum(norms[:, None], 1e-12)
+        return diff, norms, excess, unit
+
     def outputs(sequence):
         return np.asarray([evaluate(row) for row in sequence], dtype=np.float64)
 
@@ -351,6 +391,16 @@ def refine_latent_sequence_joint(initial, native_prior, evaluate, target,
             rv = np.diff(values[:, index]) - vel_target
             ra = np.diff(values[:, index], n=2) - acc_target
             total += 0.5 * wv * float(rv @ rv) + 0.5 * wa * float(ra @ ra)
+        for indices, vel_target, acc_target, wv, wa, vlim, wlim in blocks:
+            rv = np.diff(values[:, indices], axis=0) - vel_target
+            ra = np.diff(values[:, indices], n=2, axis=0) - acc_target
+            total += 0.5 * float(np.sum(rv * rv * wv[None, :]))
+            total += 0.5 * float(np.sum(ra * ra * wa[None, :]))
+            excess = np.maximum(np.abs(rv) - vlim[None, :], 0.0)
+            total += 0.5 * float(np.sum(excess * excess * wlim[None, :]))
+        if latent_jump_limit is not None and lambda_latent_jump:
+            _diff, _norm, excess, _unit = latent_jump(sequence)
+            total += 0.5 * lambda_latent_jump * float(excess @ excess)
         return total, values
 
     history = []
@@ -388,6 +438,38 @@ def refine_latent_sequence_joint(initial, native_prior, evaluate, target,
                 grad_feature += np.r_[0.0, 0.0, wa * ra]
             gradient += feature_jac * grad_feature[:, None]
 
+        block_jac = []
+        for indices, vel_target, acc_target, wv, wa, vlim, wlim in blocks:
+            feature_jac = jac[:, indices, :]
+            rv = np.diff(values[:, indices], axis=0) - vel_target
+            ra = np.diff(values[:, indices], n=2, axis=0) - acc_target
+            excess = np.maximum(np.abs(rv) - vlim[None, :], 0.0)
+            active = excess > 0.0
+            hinge_grad = wlim[None, :] * excess * np.sign(rv)
+            grad = np.zeros((n, len(indices)), dtype=np.float64)
+            if n > 1 and np.any(wv):
+                weighted = rv * wv[None, :]
+                grad[:-1] -= weighted
+                grad[1:] += weighted
+            if n > 1 and np.any(wlim):
+                grad[:-1] -= hinge_grad
+                grad[1:] += hinge_grad
+            if n > 2 and np.any(wa):
+                weighted = ra * wa[None, :]
+                grad[:-2] += weighted
+                grad[1:-1] -= 2.0 * weighted
+                grad[2:] += weighted
+            gradient += np.einsum("tmd,tm->td", feature_jac, grad)
+            block_jac.append((feature_jac, wv, wa, active, wlim))
+
+        jump_unit = jump_active = None
+        if latent_jump_limit is not None and lambda_latent_jump:
+            jump_diff, jump_norm, jump_excess, jump_unit = latent_jump(z)
+            jump_active = jump_excess > 0.0
+            jump_gradient = lambda_latent_jump * jump_excess[:, None] * jump_unit
+            gradient[:-1] -= jump_gradient
+            gradient[1:] += jump_gradient
+
         local_h = np.einsum("tmd,m,tme->tde", jac, weights, jac)
         diagonal = np.diagonal(local_h, axis1=1, axis2=2).copy() + lambda_native + damping
         diagonal[:-1] += lambda_velocity
@@ -404,6 +486,21 @@ def refine_latent_sequence_joint(initial, native_prior, evaluate, target,
                 diagonal[:-2] += wa * square[:-2]
                 diagonal[1:-1] += 4.0 * wa * square[1:-1]
                 diagonal[2:] += wa * square[2:]
+        for feature_jac, wv, wa, active, wlim in block_jac:
+            square = feature_jac * feature_jac
+            diagonal[:-1] += np.einsum("tmd,m->td", square[:-1], wv)
+            diagonal[1:] += np.einsum("tmd,m->td", square[1:], wv)
+            diagonal[:-2] += np.einsum("tmd,m->td", square[:-2], wa)
+            diagonal[1:-1] += 4.0 * np.einsum("tmd,m->td", square[1:-1], wa)
+            diagonal[2:] += np.einsum("tmd,m->td", square[2:], wa)
+            if np.any(wlim):
+                limit_weight = active * wlim[None, :]
+                diagonal[:-1] += np.einsum("tmd,tm->td", square[:-1], limit_weight)
+                diagonal[1:] += np.einsum("tmd,tm->td", square[1:], limit_weight)
+        if jump_active is not None:
+            jump_hessian_diag = lambda_latent_jump * (jump_unit * jump_unit) * jump_active[:, None]
+            diagonal[:-1] += jump_hessian_diag
+            diagonal[1:] += jump_hessian_diag
         diagonal = np.maximum(diagonal, 1e-8)
 
         def hessian_product(value):
@@ -428,6 +525,35 @@ def refine_latent_sequence_joint(initial, native_prior, evaluate, target,
                     bu += np.r_[0.0, -2.0 * wa * ddu, 0.0]
                     bu += np.r_[0.0, 0.0, wa * ddu]
                     result += feature_jac * bu[:, None]
+            for feature_jac, wv, wa, active, wlim in block_jac:
+                u = np.einsum("tmd,td->tm", feature_jac, value)
+                if np.any(wv):
+                    du = np.diff(u, axis=0) * wv[None, :]
+                    bu = np.zeros_like(u)
+                    bu[:-1] -= du
+                    bu[1:] += du
+                    result += np.einsum("tmd,tm->td", feature_jac, bu)
+                if np.any(wa):
+                    ddu = np.diff(u, n=2, axis=0) * wa[None, :]
+                    bu = np.zeros_like(u)
+                    bu[:-2] += ddu
+                    bu[1:-1] -= 2.0 * ddu
+                    bu[2:] += ddu
+                    result += np.einsum("tmd,tm->td", feature_jac, bu)
+                if np.any(wlim):
+                    du = np.diff(u, axis=0)
+                    weight = active * wlim[None, :]
+                    du *= weight
+                    bu = np.zeros_like(u)
+                    bu[:-1] -= du
+                    bu[1:] += du
+                    result += np.einsum("tmd,tm->td", feature_jac, bu)
+            if jump_active is not None:
+                dv = np.diff(value, axis=0)
+                projection = np.einsum("td,td->t", jump_unit, dv) * jump_active
+                pair = lambda_latent_jump * jump_unit * projection[:, None]
+                result[:-1] -= pair
+                result[1:] += pair
             return result
 
         rhs = -gradient
