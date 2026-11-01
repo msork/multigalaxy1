@@ -946,7 +946,18 @@
       ],
       "max_rest_matrix_abs_error": 0.0,
       "bones_over_1e_5": [],
-      "missing_bones": []
+      "missing_bones": [],
+      "frame_zero_pose_basis_rotation_degrees": {
+        "bone_21": 12.205809601020897,
+        "bone_22": 37.937602986486276,
+        "bone_23": 40.664579419719075,
+        "bone_24": 8.57379657421518,
+        "bone_26": 132.52996792468545,
+        "bone_27": 29.59984266009765,
+        "bone_30": 40.72903901682757,
+        "bone_25": 40.91438828223581,
+        "bone_29": 129.6047827241412
+      }
     },
     "Waluigi_Arm_Test": {
       "object_matrix_world": [
@@ -1003,7 +1014,18 @@
       ],
       "max_rest_matrix_abs_error": 0.0,
       "bones_over_1e_5": [],
-      "missing_bones": []
+      "missing_bones": [],
+      "frame_zero_pose_basis_rotation_degrees": {
+        "bone_21": 12.205809601020897,
+        "bone_22": 0.0,
+        "bone_23": 0.0,
+        "bone_24": 0.0,
+        "bone_26": 0.0,
+        "bone_27": 0.0,
+        "bone_30": 0.0,
+        "bone_25": 0.0,
+        "bone_29": 0.0
+      }
     },
     "Waluigi_Arm_Clean_Backup": {
       "object_matrix_world": [
@@ -1060,7 +1082,18 @@
       ],
       "max_rest_matrix_abs_error": 0.0,
       "bones_over_1e_5": [],
-      "missing_bones": []
+      "missing_bones": [],
+      "frame_zero_pose_basis_rotation_degrees": {
+        "bone_21": 12.205809601020897,
+        "bone_22": 0.0,
+        "bone_23": 0.0,
+        "bone_24": 0.0,
+        "bone_26": 0.0,
+        "bone_27": 0.0,
+        "bone_30": 0.0,
+        "bone_25": 0.0,
+        "bone_29": 0.0
+      }
     }
   },
   "interpretation": {

@@ -67,6 +67,8 @@ def main():
     original = next(a for a in source["armatures"] if a["object"] == "123475520_waluigi.gpl")
     live_rigs = {name: request("inspect.armature", {"object": name})["result"]
                  for name in ("123475520_waluigi.gpl", "Waluigi_Arm_Test", "Waluigi_Arm_Clean_Backup")}
+    live_poses = {name: request("inspect.pose", {"object": name, "frame": 0})["result"]
+                  for name in live_rigs}
     rest_comparisons = {}
     for name, rig in live_rigs.items():
         current = {bone["name"]: bone for bone in rig["bones"]}
@@ -84,6 +86,11 @@ def main():
             "max_rest_matrix_abs_error": max(x for x in differences.values() if x is not None),
             "bones_over_1e_5": [n for n, x in differences.items() if x is not None and x > 1e-5],
             "missing_bones": [n for n, x in differences.items() if x is None],
+            "frame_zero_pose_basis_rotation_degrees": {
+                row["name"]: math.degrees(math.acos(min(1.0, max(-1.0,
+                    (row["matrix_basis"][0][0] + row["matrix_basis"][1][1] +
+                     row["matrix_basis"][2][2] - 1.0) * 0.5))))
+                for row in live_poses[name]["bones"] if row["name"] in ("bone_21",) + ARM_BONES},
         }
 
     provenance = request("inspect.action_provenance")["result"]
