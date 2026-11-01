@@ -145,3 +145,6 @@ source schema and action splits. Its current raw-model run is diagnostic only:
 the saved-action semantic residuals fail consistency with the fit report. See
 [`raw-anm-luigi-walk-refit.md`](../../docs/animation-retargeting/raw-anm-luigi-walk-refit.md)
 before attempting another fit.
+For the corrected save/reload matrix gate and remaining pre-bake elbow
+discontinuity, see
+[`semantic-walk-save-reload-fix.md`](../../docs/animation-retargeting/semantic-walk-save-reload-fix.md).

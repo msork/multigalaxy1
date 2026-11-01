@@ -97,6 +97,74 @@ def main():
     max_replay = {"error": 0.0}
     max_vertex_finite = 0
     max_basis_scale_error = 0.0
+    bake_reference = fit_report["preview"].get("bake_pose_reference")
+    if not bake_reference or bake_reference.get("frames") != frames:
+        raise RuntimeError("fit report lacks matching per-frame bake pose reference")
+    expected_pose_rows = bake_reference["matrices"]
+    requested_pose_rows = bake_reference.get("requested_matrices")
+    if requested_pose_rows is None:
+        raise RuntimeError("fit report lacks requested pre-bake matrices")
+    expected_basis_rows = bake_reference["basis_matrices"]
+    max_pose_reference_error = 0.0
+    max_requested_pose_error = 0.0
+    max_evaluated_fit_pose_error = 0.0
+    max_basis_reference_error = 0.0
+    first_pose_divergence = None
+    first_basis_divergence = None
+    max_pose_reference_detail = None
+    max_requested_pose_detail = None
+    max_evaluated_fit_pose_detail = None
+    max_basis_reference_detail = None
+    max_rest_reconstruction_error = 0.0
+    max_rest_reconstruction_detail = None
+    expected_pose_zero = expected_pose_rows[0]
+    expected_basis_zero = expected_basis_rows[0]
+    for bone_name, expected_basis_matrix in expected_basis_zero.items():
+        bone = rig.data.bones[bone_name]
+        expected_pose_matrix = fit.numpy_matrix(expected_pose_zero[bone_name])
+        basis_matrix = fit.numpy_matrix(expected_basis_matrix)
+        reconstructed_local_rest = np.linalg.inv(
+            fit.numpy_matrix(expected_pose_zero[bone.parent.name])
+            if bone.parent else np.eye(4)) @ expected_pose_matrix @ np.linalg.inv(basis_matrix)
+        actual_local_rest = (fit.numpy_matrix(bone.parent.matrix_local).astype(np.float64)
+                             if bone.parent else np.eye(4))
+        if bone.parent:
+            actual_local_rest = np.linalg.inv(actual_local_rest) @ fit.numpy_matrix(bone.matrix_local)
+        else:
+            actual_local_rest = fit.numpy_matrix(bone.matrix_local)
+        error = fit.matrix_error(reconstructed_local_rest, actual_local_rest)
+        if error > max_rest_reconstruction_error:
+            max_rest_reconstruction_error = error
+            max_rest_reconstruction_detail = {"bone": bone_name, "error": error}
+    action_bags = [bag for layer in target_action.layers for strip in layer.strips
+                   for bag in strip.channelbags if bag.slot == rig.animation_data.action_slot]
+    if len(action_bags) != 1:
+        raise RuntimeError(f"expected one baked action channelbag, found {len(action_bags)}")
+    interpolation_modes = sorted({point.interpolation for fc in action_bags[0].fcurves
+                                  for point in fc.keyframe_points})
+    keyed_times = sorted({float(point.co.x) for fc in action_bags[0].fcurves
+                          for point in fc.keyframe_points})
+    quaternion_curves = {}
+    for fc in action_bags[0].fcurves:
+        if '.rotation_quaternion' not in fc.data_path or 'pose.bones[' not in fc.data_path:
+            continue
+        bone_name = fc.data_path.split('pose.bones["', 1)[1].split('"]', 1)[0]
+        quaternion_curves.setdefault(bone_name, {})[fc.array_index] = fc
+    quaternion_sign_flip_count = 0
+    for bone_name, curves in quaternion_curves.items():
+        if set(curves) != {0, 1, 2, 3}:
+            continue
+        keyed = sorted({float(p.co.x) for curve in curves.values() for p in curve.keyframe_points})
+        previous = None
+        for time in keyed:
+            q = np.asarray([curves[i].evaluate(time) for i in range(4)], dtype=np.float64)
+            norm = np.linalg.norm(q)
+            if norm < 1e-12:
+                continue
+            q /= norm
+            if previous is not None and float(previous @ q) < -1e-5:
+                quaternion_sign_flip_count += 1
+            previous = q
     for frame in frames:
         set_frame(scene, float(frame))
         source_pose, _ = source_pose_from_curves(source, source_action, source_slot, float(frame))
@@ -110,7 +178,36 @@ def main():
         src_right = fit.source_right_to_left_semantics(
             src_right, right_forearm_to_left, body_reflection)
         source_semantics_right.append(src_right)
-        pose = evaluated_bone_matrices(rig)
+        evaluated_rig = rig.evaluated_get(bpy.context.evaluated_depsgraph_get())
+        pose = {pb.name: pb.matrix.copy() for pb in evaluated_rig.pose.bones}
+        evaluated_basis = {pb.name: pb.matrix_basis.copy()
+                           for pb in evaluated_rig.pose.bones}
+        frame_index = frames.index(frame)
+        expected_pose = expected_pose_rows[frame_index]
+        requested_pose = requested_pose_rows[frame_index]
+        expected_basis = expected_basis_rows[frame_index]
+        for bone_name, matrix in pose.items():
+            error = fit.matrix_error(matrix, fit.numpy_matrix(expected_pose[bone_name]))
+            if error > max_pose_reference_error:
+                max_pose_reference_error = error
+                max_pose_reference_detail = {"frame": frame, "bone": bone_name, "error": error}
+            if first_pose_divergence is None and error > 1e-5:
+                first_pose_divergence = {"frame": frame, "bone": bone_name, "error": error}
+            request_error = fit.matrix_error(matrix, fit.numpy_matrix(requested_pose[bone_name]))
+            if request_error > max_requested_pose_error:
+                max_requested_pose_error = request_error
+                max_requested_pose_detail = {"frame": frame, "bone": bone_name, "error": request_error}
+            if error > max_evaluated_fit_pose_error:
+                max_evaluated_fit_pose_error = error
+                max_evaluated_fit_pose_detail = {"frame": frame, "bone": bone_name, "error": error}
+        for bone_name, expected_matrix in expected_basis.items():
+            error = fit.matrix_error(evaluated_basis[bone_name],
+                                     fit.numpy_matrix(expected_matrix))
+            if error > max_basis_reference_error:
+                max_basis_reference_error = error
+                max_basis_reference_detail = {"frame": frame, "bone": bone_name, "error": error}
+            if first_basis_divergence is None and error > 1e-5:
+                first_basis_divergence = {"frame": frame, "bone": bone_name, "error": error}
         target_sem = fit.semantic_from_target_sample(rest,
             {name: fit.numpy_matrix(pose[name]) for name in bones})
         target_semantics.append(target_sem)
@@ -200,6 +297,29 @@ def main():
         "mesh_vertex_samples": max_vertex_finite,
         "runtime_constraints": constraints,
         "object_scale": [float(v) for v in rig.scale],
+        "bake_reference_comparison": {
+            "max_pose_matrix_error": max_pose_reference_error,
+            "max_pose_matrix_divergence": max_pose_reference_detail,
+            "first_pose_divergence_over_1e-5": first_pose_divergence,
+            "max_requested_pose_matrix_error": max_requested_pose_error,
+            "requested_pose_matrix_divergence": max_requested_pose_detail,
+            "max_evaluated_fit_pose_matrix_error": max_evaluated_fit_pose_error,
+            "evaluated_fit_pose_matrix_divergence": max_evaluated_fit_pose_detail,
+            "max_matrix_basis_error": max_basis_reference_error,
+            "max_matrix_basis_divergence": max_basis_reference_detail,
+            "first_basis_divergence_over_1e-5": first_basis_divergence,
+            "max_local_rest_reconstruction_error": max_rest_reconstruction_error,
+            "local_rest_reconstruction_divergence": max_rest_reconstruction_detail,
+        },
+        "action_curve_diagnostics": {
+            "channelbag_slot": rig.animation_data.action_slot.identifier,
+            "fcurve_count": len(action_bags[0].fcurves),
+            "keyed_time_count": len(keyed_times),
+            "keyed_time_minmax": [keyed_times[0], keyed_times[-1]] if keyed_times else None,
+            "all_requested_frames_keyed": all(float(frame) in set(keyed_times) for frame in frames),
+            "interpolation_modes": interpolation_modes,
+            "quaternion_sign_flips_after_normalization": quaternion_sign_flip_count,
+        },
         "semantic_rmse_from_saved_evaluation": rmse,
         "right_semantic_rmse_from_saved_evaluation": rmse_right,
         "elbow_curve_radians": elbow_curve,
@@ -235,7 +355,10 @@ def main():
         "fit_gates": fit_report["validation"],
         "max_right_semantic_rmse_delta_vs_fit_report": max(
             abs(rmse_right[k] - fitted_rmse_right[k]) for k in rmse_right),
-        "gate": "pass" if max(abs(rmse[k] - fitted_rmse[k]) for k in rmse) < 1e-5 and
+        "gate": "pass" if max_pose_reference_error < 1e-5 and
+            max_requested_pose_error < 1e-5 and
+            max_basis_reference_error < 1e-5 and
+            max(abs(rmse[k] - fitted_rmse[k]) for k in rmse) < 1e-5 and
             max(abs(rmse_right[k] - fitted_rmse_right[k]) for k in rmse_right) < 1e-5 and
             constraints == 0 and len(meshes) == 2 and all(float(v) > 0 for v in rig.scale) else "fail",
     }
