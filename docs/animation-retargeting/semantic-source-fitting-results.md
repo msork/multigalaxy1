@@ -68,3 +68,21 @@ The preview is for diagnostics only. If opening it to inspect the mismatch,
 check frames 0, 15, 30, 45, and 60, with special attention to the fingers at
 frame 54. Do not accept it as visually validated while the pose-write and
 semantic gates fail.
+
+## Preview visibility repair
+
+The first saved preview had the expected scene links, visible preview
+collection, and correct armature modifiers, but the duplicated meshes and rig
+inherited `Object.hide_viewport = true` from their source objects. The builder
+called `hide_set(False)`, which clears the per-view-layer hide state but does
+not clear the separate object-level `hide_viewport` flag. The saved mesh and
+rig therefore remained hidden. Their object transforms and modifier targets
+were otherwise correct.
+
+The generator now explicitly clears both object-level viewport/render hiding
+and per-layer hiding, checks that the preview collection is linked and
+included in the active view layer, and verifies each preview mesh is bound to
+the disposable rig before saving. The existing preview file was repaired and
+saved with those visibility settings. Reopening it in Blender confirmed both
+mesh objects and the rig are visible in the active scene/view layer, at frame
+0, with the intended armature modifiers.

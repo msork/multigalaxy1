@@ -345,6 +345,29 @@ def clear_constraints(rig):
     return removed
 
 
+def enable_preview_collection(scene, view_layer, collection):
+    """Make the generated collection visible in the saved active view layer."""
+    collection.hide_viewport = False
+    collection.hide_render = False
+
+    def visit(layer_collection):
+        if layer_collection.collection == collection:
+            layer_collection.exclude = False
+            layer_collection.hide_viewport = False
+            return True
+        for child in layer_collection.children:
+            if visit(child):
+                layer_collection.exclude = False
+                layer_collection.hide_viewport = False
+                return True
+        return False
+
+    if not visit(view_layer.layer_collection):
+        raise RuntimeError("preview collection is not linked into the active view layer")
+    if collection.name not in {child.name for child in scene.collection.children}:
+        raise RuntimeError("preview collection is not linked into the active scene")
+
+
 def mesh_vertices(mesh_objects):
     depsgraph = bpy.context.evaluated_depsgraph_get()
     output = {}
@@ -805,7 +828,20 @@ def main():
         for obj in old_objects:
             obj.hide_set(True)
         for obj in created_objects:
+            # Object copies inherit source-level viewport hiding independently
+            # from hide_set(); clear both before saving the standalone preview.
+            obj.hide_viewport = False
+            obj.hide_render = False
             obj.hide_set(False)
+        enable_preview_collection(scene, bpy.context.view_layer, preview_collection)
+        for obj in target_meshes:
+            armature_modifiers = [modifier for modifier in obj.modifiers
+                                  if modifier.type == "ARMATURE"]
+            if not armature_modifiers or any(modifier.object != target_copy
+                                             for modifier in armature_modifiers):
+                raise RuntimeError(f"preview mesh {obj.name} is not bound to the preview rig")
+            if preview_collection not in obj.users_collection:
+                raise RuntimeError(f"preview mesh {obj.name} is not linked to its preview collection")
         bpy.context.view_layer.objects.active = target_copy
         target_copy.select_set(True)
         bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(args.preview))
