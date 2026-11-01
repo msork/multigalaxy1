@@ -22,9 +22,11 @@ def _expected(rig, mesh, action, times):
         bpy.context.view_layer.update()
         centroids = bridge._mesh_weight_centroids([mesh], [mesh], bridge._ARM_BONES["left"], rig)
         result.append({"time": time,
-            "bones": {name: {"armature_pose": bridge._mat(rig.pose.bones[name].matrix)}
+            "bones": {name: {"armature_pose": bridge._mat(rig.pose.bones[name].matrix),
+                              "local_basis": bridge._mat(rig.pose.bones[name].matrix_basis)}
                       for name in bridge._ARM_BONES["left"]},
-            "weighted_mesh_centroids": {mesh.name: {name: {"weighted_centroid_world": row["centroid_world"]}
+            "weighted_mesh_centroids": {mesh.name: {name: {"weighted_centroid_world": row["centroid_world"],
+                "weighted_centroid_armature": row["centroid_armature"]}
                 for name, row in centroids[mesh.name].items()}}})
     return result
 
@@ -68,6 +70,9 @@ def run():
     group.add([0, 1, 2], 1.0, "REPLACE")
     modifier = mesh.modifiers.new("Armature", "ARMATURE")
     modifier.object = rig
+    bpy.context.view_layer.update()
+    mesh.parent = production
+    mesh.matrix_parent_inverse = production.matrix_world.inverted_safe()
 
     actions = []
     for action_name, radians in (("sequence_10.003", 0.0), ("sequence_15.003", 0.35), ("sequence_24", 0.7)):
@@ -104,16 +109,23 @@ def run():
     assert result["new_actions_created"] == []
     assert result["action_count"] == 3
     assert len([obj for obj in bpy.data.objects if obj.get("_mg1_native_preview_group") == result["preview_group"]]) == 6
+    assert all(row["mesh_relationships"][0]["preview_parent"] == row["preview_armature"]
+               for row in result["previews"])
     assert (scene.frame_current, scene.frame_subframe) == (0, 0.0)
-    old_engine = scene.render.engine
+    old_render_state = (scene.camera, scene.render.engine, scene.render.filepath,
+        scene.render.image_settings.file_format, scene.render.resolution_x,
+        scene.render.resolution_y, scene.render.resolution_percentage)
     with tempfile.TemporaryDirectory(prefix="mg1-preview-test-") as render_dir:
         capture = bridge._capture_native_arm_previews({"preview_group": result["preview_group"],
             "samples": {row["action"]: [sample["time"] for sample in row["samples"]]
                         for row in result["previews"]},
             "output_dir": render_dir, "resolution": 128})
         assert capture["image_count"] == 6
+        assert capture["isolated_render_scene"]
         assert all(Path(path).is_file() for path in capture["images"])
-        assert scene.render.engine == old_engine
+        assert (scene.camera, scene.render.engine, scene.render.filepath,
+            scene.render.image_settings.file_format, scene.render.resolution_x,
+            scene.render.resolution_y, scene.render.resolution_percentage) == old_render_state
         assert (scene.frame_current, scene.frame_subframe) == (0, 0.0)
     bridge._restore({})
     assert not any(obj.get("_mg1_native_preview_group") == result["preview_group"] for obj in bpy.data.objects)

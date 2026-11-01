@@ -72,6 +72,8 @@ def extract(object_name, meshes, holdouts):
         },
         "bones": ["bone_22", "bone_23", "bone_24", "bone_25", "bone_26", "bone_27", "bone_29", "bone_30"],
         "weighted_mesh_vertices_rest": rest_weights,
+        "sample_time_policy": "exact FCurve keys plus action range endpoints",
+        "pose_reset_policy": "all temporary pose bases reset to identity before each action",
         "holdout_actions": sorted(holdouts),
         "actions": rows,
         "training_eligible_count": sum(row["training_eligible"] for row in rows),
