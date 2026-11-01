@@ -1,0 +1,1306 @@
+{
+  "schema": "mg1.native-arm-pose-model-summary.v1",
+  "dataset": "native_waluigi_arm_calibration_production_basis.json.gz",
+  "dataset_schema": "mg1.native-arm-calibration.production-basis.v1",
+  "bone_names": [
+    "bone_22",
+    "bone_23",
+    "bone_24",
+    "bone_25",
+    "bone_26",
+    "bone_27",
+    "bone_29",
+    "bone_30"
+  ],
+  "feature_dimensions": 48,
+  "input_representation": "independent production-basis rest-relative SE(3): translation plus sign-invariant quaternion logarithm per bone",
+  "action_split": {
+    "train_actions": [
+      "sequence_0.004",
+      "sequence_1.004",
+      "sequence_10.003",
+      "sequence_12.003",
+      "sequence_13.003",
+      "sequence_14.003",
+      "sequence_16.003",
+      "sequence_17.001",
+      "sequence_18.001",
+      "sequence_19.001",
+      "sequence_2.004",
+      "sequence_21.001",
+      "sequence_22.001",
+      "sequence_23.001",
+      "sequence_25",
+      "sequence_27",
+      "sequence_3.004",
+      "sequence_4.004",
+      "sequence_5.004",
+      "sequence_6.004",
+      "sequence_7.004",
+      "sequence_8.004",
+      "sequence_9.003"
+    ],
+    "holdout_actions": [
+      "sequence_11.003",
+      "sequence_15.003",
+      "sequence_20.001",
+      "sequence_24",
+      "sequence_26"
+    ],
+    "train_samples": 838,
+    "holdout_samples": 262
+  },
+  "selection": {
+    "method": "action-grouped cross-validation on training actions only",
+    "fold_actions": [
+      [
+        "sequence_0.004",
+        "sequence_10.003",
+        "sequence_22.001",
+        "sequence_4.004"
+      ],
+      [
+        "sequence_12.003",
+        "sequence_18.001",
+        "sequence_23.001",
+        "sequence_6.004",
+        "sequence_8.004"
+      ],
+      [
+        "sequence_1.004",
+        "sequence_16.003",
+        "sequence_17.001",
+        "sequence_2.004",
+        "sequence_3.004"
+      ],
+      [
+        "sequence_13.003",
+        "sequence_19.001",
+        "sequence_21.001",
+        "sequence_7.004",
+        "sequence_9.003"
+      ],
+      [
+        "sequence_14.003",
+        "sequence_25",
+        "sequence_27",
+        "sequence_5.004"
+      ]
+    ],
+    "pca_latent_dimensions": 40,
+    "pca_cv": {
+      "2": {
+        "fold_mse": [
+          0.40835248975728944,
+          0.657706406094937,
+          3.4134611634445844,
+          0.409943957482011,
+          0.5368301688170266
+        ],
+        "mean_mse": 1.0852588371191696,
+        "se_mse": 0.583881561087333
+      },
+      "4": {
+        "fold_mse": [
+          0.1998706946147816,
+          0.3862569279792907,
+          2.5252569578314956,
+          0.23925552212964254,
+          0.326515450076312
+        ],
+        "mean_mse": 0.7354311105263045,
+        "se_mse": 0.44864386568928316
+      },
+      "6": {
+        "fold_mse": [
+          0.10057967216980009,
+          0.18300285210133058,
+          0.8478504297761672,
+          0.12457365499159077,
+          0.20168975361166316
+        ],
+        "mean_mse": 0.29153927253011036,
+        "se_mse": 0.14029937289517813
+      },
+      "8": {
+        "fold_mse": [
+          0.06363307902165298,
+          0.11906742290364702,
+          0.7364035997053188,
+          0.08060851189661683,
+          0.13015195236371369
+        ],
+        "mean_mse": 0.22597291317818985,
+        "se_mse": 0.1281863793553605
+      },
+      "10": {
+        "fold_mse": [
+          0.04903506877251812,
+          0.08165145819699048,
+          0.3836455418074721,
+          0.049008854187492214,
+          0.0809895676669704
+        ],
+        "mean_mse": 0.1288660981262887,
+        "se_mse": 0.06410308961826709
+      },
+      "12": {
+        "fold_mse": [
+          0.03794458868832694,
+          0.06446889047026705,
+          0.21223152484610763,
+          0.027726034163188168,
+          0.0531784304485631
+        ],
+        "mean_mse": 0.07910989372329058,
+        "se_mse": 0.033869641124860544
+      },
+      "16": {
+        "fold_mse": [
+          0.016383117798054233,
+          0.029237786790414083,
+          0.09828180668218874,
+          0.016294479138788873,
+          0.03031534017746158
+        ],
+        "mean_mse": 0.0381025061173815,
+        "se_mse": 0.015342902737513396
+      },
+      "20": {
+        "fold_mse": [
+          0.006319300411042951,
+          0.011853767691533562,
+          0.054186051971440025,
+          0.007357165704980366,
+          0.008066089673437759
+        ],
+        "mean_mse": 0.017556475090486932,
+        "se_mse": 0.009204928560932695
+      },
+      "24": {
+        "fold_mse": [
+          0.003003091951010174,
+          0.005327561632018859,
+          0.018877223675933398,
+          0.0034898815479400347,
+          0.0037426279469042595
+        ],
+        "mean_mse": 0.006888077350761346,
+        "se_mse": 0.0030224951376110263
+      },
+      "32": {
+        "fold_mse": [
+          0.00011811647206990429,
+          0.0010102898710374177,
+          0.0005725826668486983,
+          0.0004834826144585863,
+          0.000139868086212067
+        ],
+        "mean_mse": 0.00046486794212533477,
+        "se_mse": 0.0001635994402214947
+      },
+      "40": {
+        "fold_mse": [
+          5.008540337484593e-14,
+          1.0547794694044521e-12,
+          5.484029775939158e-13,
+          9.32670982255699e-13,
+          7.205847939803974e-14
+        ],
+        "mean_mse": 5.315994624053906e-13,
+        "se_mse": 2.095103512942378e-13
+      },
+      "48": {
+        "fold_mse": [
+          2.1523467356846092e-30,
+          2.663348184133485e-30,
+          1.20207271686319e-29,
+          1.670145962323437e-30,
+          5.495571984225165e-30
+        ],
+        "mean_mse": 4.800428006999719e-30,
+        "se_mse": 1.9234611433631007e-30
+      }
+    },
+    "rbf_centers": 48,
+    "rbf_width_factor": 3.0,
+    "rbf_ridge": 0.0001,
+    "rbf_cv_candidates": [
+      {
+        "width_factor": 0.6,
+        "ridge": 0.0001,
+        "fold_mse": [
+          0.09105639429450314,
+          0.22375297043025688,
+          3.592102202574086,
+          0.08136300549457857,
+          0.4546330307842783
+        ],
+        "mean_mse": 0.8885815207155406,
+        "se_mse": 0.679226782047549
+      },
+      {
+        "width_factor": 0.6,
+        "ridge": 0.001,
+        "fold_mse": [
+          0.09106449440870994,
+          0.2237751416026624,
+          3.5921439038270067,
+          0.08136125030771167,
+          0.4546558801652884
+        ],
+        "mean_mse": 0.8886001340622757,
+        "se_mse": 0.6792328950030971
+      },
+      {
+        "width_factor": 0.6,
+        "ridge": 0.01,
+        "fold_mse": [
+          0.09114600582360599,
+          0.22399735626827513,
+          3.592559608193767,
+          0.08134565346365254,
+          0.4548835805556165
+        ],
+        "mean_mse": 0.8887864408609835,
+        "se_mse": 0.6792936201791895
+      },
+      {
+        "width_factor": 0.6,
+        "ridge": 0.1,
+        "fold_mse": [
+          0.09199754372790667,
+          0.22625264328289135,
+          3.5965949993119812,
+          0.08135361847805553,
+          0.45708630507967596
+        ],
+        "mean_mse": 0.8906570219761021,
+        "se_mse": 0.6798656500836979
+      },
+      {
+        "width_factor": 1.0,
+        "ridge": 0.0001,
+        "fold_mse": [
+          0.035474273253333195,
+          0.08259910786798684,
+          3.2035517961773157,
+          0.032515911017341546,
+          0.18314750444277292
+        ],
+        "mean_mse": 0.7074577185517501,
+        "se_mse": 0.6246176159313397
+      },
+      {
+        "width_factor": 1.0,
+        "ridge": 0.001,
+        "fold_mse": [
+          0.0354892989270709,
+          0.08263058933594088,
+          3.2037900961922707,
+          0.03250193942001659,
+          0.1832937702171962
+        ],
+        "mean_mse": 0.7075411388184991,
+        "se_mse": 0.6246574642056085
+      },
+      {
+        "width_factor": 1.0,
+        "ridge": 0.01,
+        "fold_mse": [
+          0.03569407976944587,
+          0.08303253333071485,
+          3.20606246165735,
+          0.03244363695730858,
+          0.1846778350575476
+        ],
+        "mean_mse": 0.7083821093544733,
+        "se_mse": 0.6250254956817115
+      },
+      {
+        "width_factor": 1.0,
+        "ridge": 0.1,
+        "fold_mse": [
+          0.038410114657465015,
+          0.08804306940017477,
+          3.221751569664004,
+          0.03398124962123292,
+          0.19429255222234199
+        ],
+        "mean_mse": 0.7152957111130437,
+        "se_mse": 0.6272788313462041
+      },
+      {
+        "width_factor": 1.8,
+        "ridge": 0.0001,
+        "fold_mse": [
+          0.009005765411496388,
+          0.021028698589614845,
+          2.898115724096292,
+          0.01026564846722464,
+          0.0498251570034848
+        ],
+        "mean_mse": 0.5976481987136226,
+        "se_mse": 0.5751638524329341
+      },
+      {
+        "width_factor": 1.8,
+        "ridge": 0.001,
+        "fold_mse": [
+          0.009974462751363006,
+          0.021837765917642523,
+          2.8990998540335164,
+          0.01060885238716507,
+          0.051320806182621866
+        ],
+        "mean_mse": 0.5985683482544618,
+        "se_mse": 0.5751818137259053
+      },
+      {
+        "width_factor": 1.8,
+        "ridge": 0.01,
+        "fold_mse": [
+          0.014648440993200692,
+          0.027621358499167456,
+          2.90977334824691,
+          0.013119279104891742,
+          0.057925514157603074
+        ],
+        "mean_mse": 0.6046175882003546,
+        "se_mse": 0.5763451134218756
+      },
+      {
+        "width_factor": 1.8,
+        "ridge": 0.1,
+        "fold_mse": [
+          0.024961119399578752,
+          0.04633485526453093,
+          2.9451329229180057,
+          0.021997001807885733,
+          0.08141905630241772
+        ],
+        "mean_mse": 0.6239689911384837,
+        "se_mse": 0.5803879879552748
+      },
+      {
+        "width_factor": 3.0,
+        "ridge": 0.0001,
+        "fold_mse": [
+          0.00406831281387226,
+          0.008618945491933965,
+          2.20261746458819,
+          0.005282336468333155,
+          0.016007609234949222
+        ],
+        "mean_mse": 0.44731893371945575,
+        "se_mse": 0.43882955330127216
+      },
+      {
+        "width_factor": 3.0,
+        "ridge": 0.001,
+        "fold_mse": [
+          0.007512310910833148,
+          0.013135907322152359,
+          2.2096763718063808,
+          0.007967522260286346,
+          0.021418260176669764
+        ],
+        "mean_mse": 0.45194207449526447,
+        "se_mse": 0.439440706169806
+      },
+      {
+        "width_factor": 3.0,
+        "ridge": 0.01,
+        "fold_mse": [
+          0.01589581139584628,
+          0.02819547758544879,
+          2.241623011683831,
+          0.01537449854296258,
+          0.03733713050604044
+        ],
+        "mean_mse": 0.4676851859428258,
+        "se_mse": 0.4435033629553831
+      },
+      {
+        "width_factor": 3.0,
+        "ridge": 0.1,
+        "fold_mse": [
+          0.03889788898805883,
+          0.07074265985732742,
+          2.347241589527116,
+          0.038214581327595955,
+          0.07704317701462321
+        ],
+        "mean_mse": 0.5144279793429443,
+        "se_mse": 0.45827262219084314
+      }
+    ]
+  },
+  "models": {
+    "PCA": {
+      "latent_dimensions": 40,
+      "train": {
+        "action_count": 23,
+        "sample_count": 838,
+        "per_bone": {
+          "bone_22": {
+            "translation_rmse_armature": 5.719894142863405e-13,
+            "translation_rmse_world": 2.4845504345457358e-11,
+            "rotation_rmse_degrees": 4.4141261949409354e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          },
+          "bone_23": {
+            "translation_rmse_armature": 2.3541089110927876e-07,
+            "translation_rmse_world": 1.0225542941771272e-05,
+            "rotation_rmse_degrees": 4.755622901621945e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          },
+          "bone_24": {
+            "translation_rmse_armature": 2.693226634748364e-07,
+            "translation_rmse_world": 1.1698568607328147e-05,
+            "rotation_rmse_degrees": 4.043893043503544e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          },
+          "bone_25": {
+            "translation_rmse_armature": 2.534276372891189e-07,
+            "translation_rmse_world": 1.1008136350533437e-05,
+            "rotation_rmse_degrees": 4.606972809070213e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          },
+          "bone_26": {
+            "translation_rmse_armature": 1.797195504776304e-07,
+            "translation_rmse_world": 7.80647816345828e-06,
+            "rotation_rmse_degrees": 4.828232030659933e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          },
+          "bone_27": {
+            "translation_rmse_armature": 3.1322084885918416e-07,
+            "translation_rmse_world": 1.3605374097925058e-05,
+            "rotation_rmse_degrees": 4.3745368194968974e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          },
+          "bone_29": {
+            "translation_rmse_armature": 6.038308947938971e-11,
+            "translation_rmse_world": 2.622860274300962e-09,
+            "rotation_rmse_degrees": 4.5308192530769607e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          },
+          "bone_30": {
+            "translation_rmse_armature": 2.1606309181877668e-07,
+            "translation_rmse_world": 9.385132578675703e-06,
+            "rotation_rmse_degrees": 4.3745368194968974e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          }
+        },
+        "landmarks_world": {
+          "shoulder": {
+            "rmse": 7.83526631835559e-05,
+            "max": 9.388272291747898e-05
+          },
+          "main_elbow": {
+            "rmse": 8.242910742430965e-05,
+            "max": 0.00010890007752758856
+          },
+          "overlap_elbow": {
+            "rmse": 7.607714439019412e-05,
+            "max": 9.416881041985237e-05
+          },
+          "main_wrist": {
+            "rmse": 8.911375768624174e-05,
+            "max": 0.00014323342028324653
+          },
+          "glove_wrist": {
+            "rmse": 7.974593530874951e-05,
+            "max": 0.00012420058749564248
+          },
+          "glove_tip": {
+            "rmse": 8.021121104919098e-05,
+            "max": 0.00013632544039162895
+          }
+        },
+        "temporal": {
+          "velocity_rmse_standardized_per_frame": 1.0208676524111943e-06,
+          "acceleration_rmse_standardized_per_frame2": 1.0275818616879047e-05,
+          "source_acceleration_rms_standardized_per_frame2": 14.653320590842245,
+          "reconstructed_acceleration_rms_standardized_per_frame2": 14.653320590838645
+        },
+        "feature_rmse_standardized": 1.6036189762934216e-07,
+        "worst_bone_by_rotation_rmse": "bone_26",
+        "worst_bone_by_translation_rmse": "bone_27"
+      },
+      "holdout": {
+        "action_count": 5,
+        "sample_count": 262,
+        "per_bone": {
+          "bone_22": {
+            "translation_rmse_armature": 2.152484729885492e-12,
+            "translation_rmse_world": 9.34974798032337e-11,
+            "rotation_rmse_degrees": 5.274631201730122e-07,
+            "rotation_max_degrees": 1.7075472925031877e-06
+          },
+          "bone_23": {
+            "translation_rmse_armature": 1.3382569640457636e-06,
+            "translation_rmse_world": 5.812986811481908e-05,
+            "rotation_rmse_degrees": 3.498794520728043e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          },
+          "bone_24": {
+            "translation_rmse_armature": 1.3630485784549655e-06,
+            "translation_rmse_world": 5.920674147672081e-05,
+            "rotation_rmse_degrees": 3.9471725596923643e-07,
+            "rotation_max_degrees": 1.7075472925031877e-06
+          },
+          "bone_25": {
+            "translation_rmse_armature": 1.1234465523495195e-06,
+            "translation_rmse_world": 4.879914820296988e-05,
+            "rotation_rmse_degrees": 4.219704961384098e-07,
+            "rotation_max_degrees": 1.7075472925031877e-06
+          },
+          "bone_26": {
+            "translation_rmse_armature": 5.31237634725951e-07,
+            "translation_rmse_world": 2.3075369285499907e-05,
+            "rotation_rmse_degrees": 5.481557539550793e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          },
+          "bone_27": {
+            "translation_rmse_armature": 1.3875614910095944e-06,
+            "translation_rmse_world": 6.027150886608891e-05,
+            "rotation_rmse_degrees": 4.948042663170272e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          },
+          "bone_29": {
+            "translation_rmse_armature": 2.631376695621125e-10,
+            "translation_rmse_world": 1.1429911025042402e-08,
+            "rotation_rmse_degrees": 4.3495723161823816e-07,
+            "rotation_max_degrees": 1.7075472925031877e-06
+          },
+          "bone_30": {
+            "translation_rmse_armature": 9.121083977788838e-07,
+            "translation_rmse_world": 3.9619252724839436e-05,
+            "rotation_rmse_degrees": 4.0857117603373556e-07,
+            "rotation_max_degrees": 2.4148365394514667e-06
+          }
+        },
+        "landmarks_world": {
+          "shoulder": {
+            "rmse": 7.644943868550886e-05,
+            "max": 8.969193663428468e-05
+          },
+          "main_elbow": {
+            "rmse": 8.999439014086687e-05,
+            "max": 0.0001811054073455782
+          },
+          "overlap_elbow": {
+            "rmse": 7.819631673133755e-05,
+            "max": 9.223636242429747e-05
+          },
+          "main_wrist": {
+            "rmse": 0.00011470647277112681,
+            "max": 0.00039253437765283944
+          },
+          "glove_wrist": {
+            "rmse": 8.534284097662314e-05,
+            "max": 0.0002660478796883684
+          },
+          "glove_tip": {
+            "rmse": 8.627876556754605e-05,
+            "max": 0.0002753366721785528
+          }
+        },
+        "temporal": {
+          "velocity_rmse_standardized_per_frame": 2.6043765267317244e-06,
+          "acceleration_rmse_standardized_per_frame2": 2.2372702650060828e-05,
+          "source_acceleration_rms_standardized_per_frame2": 8.656824295368713,
+          "reconstructed_acceleration_rms_standardized_per_frame2": 8.656824295339804
+        },
+        "feature_rmse_standardized": 6.868852147344588e-07,
+        "worst_bone_by_rotation_rmse": "bone_26",
+        "worst_bone_by_translation_rmse": "bone_27"
+      },
+      "holdout_actions": [
+        {
+          "action": "sequence_11.003",
+          "sample_count": 41,
+          "feature_rmse_standardized": 1.9252769478073273e-07,
+          "worst_rotation_bone": "bone_26",
+          "worst_rotation_rmse_degrees": 7.542682134243976e-07,
+          "worst_translation_bone": "bone_27",
+          "landmark_rmse_world": {
+            "shoulder": 6.723182590111614e-05,
+            "main_elbow": 8.527194071600107e-05,
+            "overlap_elbow": 7.796444602081863e-05,
+            "main_wrist": 9.48759558319944e-05,
+            "glove_wrist": 7.479116890022141e-05,
+            "glove_tip": 7.729011289274416e-05
+          },
+          "temporal": {
+            "velocity_rmse_standardized_per_frame": 1.030507281942048e-06,
+            "acceleration_rmse_standardized_per_frame2": 1.0688508257643546e-05,
+            "source_acceleration_rms_standardized_per_frame2": 1.2490248085636848,
+            "reconstructed_acceleration_rms_standardized_per_frame2": 1.2490248085179516
+          },
+          "worst_weighted_centroid": {
+            "bone": "bone_22",
+            "rmse_world": 11.525574428368206
+          }
+        },
+        {
+          "action": "sequence_15.003",
+          "sample_count": 31,
+          "feature_rmse_standardized": 4.2531242636089453e-07,
+          "worst_rotation_bone": "bone_22",
+          "worst_rotation_rmse_degrees": 6.133690943900736e-07,
+          "worst_translation_bone": "bone_25",
+          "landmark_rmse_world": {
+            "shoulder": 7.576923049764298e-05,
+            "main_elbow": 8.831503209704645e-05,
+            "overlap_elbow": 7.615465574371176e-05,
+            "main_wrist": 9.970469464228904e-05,
+            "glove_wrist": 7.748018240660413e-05,
+            "glove_tip": 8.024006017634713e-05
+          },
+          "temporal": {
+            "velocity_rmse_standardized_per_frame": 9.465019230521815e-07,
+            "acceleration_rmse_standardized_per_frame2": 9.456198291478203e-06,
+            "source_acceleration_rms_standardized_per_frame2": 8.38056459109611,
+            "reconstructed_acceleration_rms_standardized_per_frame2": 8.380564591090774
+          },
+          "worst_weighted_centroid": {
+            "bone": "bone_22",
+            "rmse_world": 45.43552989391737
+          }
+        },
+        {
+          "action": "sequence_20.001",
+          "sample_count": 61,
+          "feature_rmse_standardized": 9.272658439866238e-07,
+          "worst_rotation_bone": "bone_27",
+          "worst_rotation_rmse_degrees": 6.183762721186349e-07,
+          "worst_translation_bone": "bone_25",
+          "landmark_rmse_world": {
+            "shoulder": 7.937681404673975e-05,
+            "main_elbow": 9.583534484138791e-05,
+            "overlap_elbow": 7.802109429095455e-05,
+            "main_wrist": 0.00012212404819858682,
+            "glove_wrist": 7.434428478237262e-05,
+            "glove_tip": 7.663875267048083e-05
+          },
+          "temporal": {
+            "velocity_rmse_standardized_per_frame": 3.0081771967933706e-06,
+            "acceleration_rmse_standardized_per_frame2": 2.5303055595553085e-05,
+            "source_acceleration_rms_standardized_per_frame2": 14.654193716223396,
+            "reconstructed_acceleration_rms_standardized_per_frame2": 14.654193716201556
+          },
+          "worst_weighted_centroid": {
+            "bone": "bone_22",
+            "rmse_world": 24.487761755488687
+          }
+        },
+        {
+          "action": "sequence_24",
+          "sample_count": 63,
+          "feature_rmse_standardized": 9.76407080192254e-07,
+          "worst_rotation_bone": "bone_22",
+          "worst_rotation_rmse_degrees": 5.691824308343958e-07,
+          "worst_translation_bone": "bone_24",
+          "landmark_rmse_world": {
+            "shoulder": 7.465898886489183e-05,
+            "main_elbow": 9.469416344819505e-05,
+            "overlap_elbow": 8.268496498402602e-05,
+            "main_wrist": 0.00014397518808227555,
+            "glove_wrist": 0.0001049000320588914,
+            "glove_tip": 0.00010937509656775316
+          },
+          "temporal": {
+            "velocity_rmse_standardized_per_frame": 4.143577924282504e-06,
+            "acceleration_rmse_standardized_per_frame2": 3.50384527147902e-05,
+            "source_acceleration_rms_standardized_per_frame2": 8.12624575997025,
+            "reconstructed_acceleration_rms_standardized_per_frame2": 8.126245759894712
+          },
+          "worst_weighted_centroid": {
+            "bone": "bone_22",
+            "rmse_world": 9.828760278402882
+          }
+        },
+        {
+          "action": "sequence_26",
+          "sample_count": 66,
+          "feature_rmse_standardized": 2.4543430970679755e-07,
+          "worst_rotation_bone": "bone_26",
+          "worst_rotation_rmse_degrees": 6.305536264558205e-07,
+          "worst_translation_bone": "bone_27",
+          "landmark_rmse_world": {
+            "shoulder": 8.094770879555579e-05,
+            "main_elbow": 8.319899975152516e-05,
+            "overlap_elbow": 7.497438454444844e-05,
+            "main_wrist": 9.164856810047988e-05,
+            "glove_wrist": 8.370270532141147e-05,
+            "glove_tip": 7.725117433598325e-05
+          },
+          "temporal": {
+            "velocity_rmse_standardized_per_frame": 1.045314744350283e-06,
+            "acceleration_rmse_standardized_per_frame2": 1.0506343991332458e-05,
+            "source_acceleration_rms_standardized_per_frame2": 1.4222147193450112,
+            "reconstructed_acceleration_rms_standardized_per_frame2": 1.4222147193062038
+          },
+          "worst_weighted_centroid": {
+            "bone": "bone_22",
+            "rmse_world": 18.52927333251314
+          }
+        }
+      ]
+    },
+    "RBF": {
+      "latent_dimensions": 40,
+      "train": {
+        "action_count": 23,
+        "sample_count": 838,
+        "per_bone": {
+          "bone_22": {
+            "translation_rmse_armature": 0.043880871013190596,
+            "translation_rmse_world": 1.9060534062522012,
+            "rotation_rmse_degrees": 3.4881970237370297,
+            "rotation_max_degrees": 24.69835659055556
+          },
+          "bone_23": {
+            "translation_rmse_armature": 0.03145231753565278,
+            "translation_rmse_world": 1.366194325434787,
+            "rotation_rmse_degrees": 5.20250095697305,
+            "rotation_max_degrees": 36.19876531460266
+          },
+          "bone_24": {
+            "translation_rmse_armature": 0.021200686033190735,
+            "translation_rmse_world": 0.9208942050466483,
+            "rotation_rmse_degrees": 3.0422873842265443,
+            "rotation_max_degrees": 31.58694504715296
+          },
+          "bone_25": {
+            "translation_rmse_armature": 0.0314523522487169,
+            "translation_rmse_world": 1.3661958332661626,
+            "rotation_rmse_degrees": 3.875737233689083,
+            "rotation_max_degrees": 14.57605992857257
+          },
+          "bone_26": {
+            "translation_rmse_armature": 0.03225923929790289,
+            "translation_rmse_world": 1.4012445862432725,
+            "rotation_rmse_degrees": 2.418222437592949,
+            "rotation_max_degrees": 17.051703237936337
+          },
+          "bone_27": {
+            "translation_rmse_armature": 0.03273181373302066,
+            "translation_rmse_world": 1.4217718021112793,
+            "rotation_rmse_degrees": 3.176492889946207,
+            "rotation_max_degrees": 12.000251910600959
+          },
+          "bone_29": {
+            "translation_rmse_armature": 0.032278936619334744,
+            "translation_rmse_world": 1.4021001787997178,
+            "rotation_rmse_degrees": 3.409346763806606,
+            "rotation_max_degrees": 28.244432420861646
+          },
+          "bone_30": {
+            "translation_rmse_armature": 0.06720833150215803,
+            "translation_rmse_world": 2.919328313918558,
+            "rotation_rmse_degrees": 3.373606144944327,
+            "rotation_max_degrees": 20.72010739200787
+          }
+        },
+        "landmarks_world": {
+          "shoulder": {
+            "rmse": 1.9060549173798405,
+            "max": 8.870660901858168
+          },
+          "main_elbow": {
+            "rmse": 1.4012449458529674,
+            "max": 5.260090672668994
+          },
+          "overlap_elbow": {
+            "rmse": 1.4021000038602647,
+            "max": 5.263281252732741
+          },
+          "main_wrist": {
+            "rmse": 1.6350869336820721,
+            "max": 7.5259976394159915
+          },
+          "glove_wrist": {
+            "rmse": 2.9193310817004665,
+            "max": 8.901606966901598
+          },
+          "glove_tip": {
+            "rmse": 3.0624408480081464,
+            "max": 10.056058095533304
+          }
+        },
+        "temporal": {
+          "velocity_rmse_standardized_per_frame": 0.15837680316799393,
+          "acceleration_rmse_standardized_per_frame2": 1.430936103608273,
+          "source_acceleration_rms_standardized_per_frame2": 14.653320590842245,
+          "reconstructed_acceleration_rms_standardized_per_frame2": 14.479568421652175
+        },
+        "feature_rmse_standardized": 0.038210744549508215,
+        "worst_bone_by_rotation_rmse": "bone_23",
+        "worst_bone_by_translation_rmse": "bone_30"
+      },
+      "holdout": {
+        "action_count": 5,
+        "sample_count": 262,
+        "per_bone": {
+          "bone_22": {
+            "translation_rmse_armature": 0.4134837292068578,
+            "translation_rmse_world": 17.96049285912498,
+            "rotation_rmse_degrees": 20.324804312412414,
+            "rotation_max_degrees": 80.18399745328732
+          },
+          "bone_23": {
+            "translation_rmse_armature": 0.3599462083550199,
+            "translation_rmse_world": 15.634983551179179,
+            "rotation_rmse_degrees": 30.100956927483065,
+            "rotation_max_degrees": 168.90415832452894
+          },
+          "bone_24": {
+            "translation_rmse_armature": 0.3307566529284177,
+            "translation_rmse_world": 14.367076824096708,
+            "rotation_rmse_degrees": 32.961552710262104,
+            "rotation_max_degrees": 156.85205605739503
+          },
+          "bone_25": {
+            "translation_rmse_armature": 0.3599463823212523,
+            "translation_rmse_world": 15.634991107750462,
+            "rotation_rmse_degrees": 34.72934077526943,
+            "rotation_max_degrees": 179.8624580798401
+          },
+          "bone_26": {
+            "translation_rmse_armature": 0.3268176314660819,
+            "translation_rmse_world": 14.195977547755342,
+            "rotation_rmse_degrees": 22.690093073393403,
+            "rotation_max_degrees": 146.803106808132
+          },
+          "bone_27": {
+            "translation_rmse_armature": 0.34504775777528174,
+            "translation_rmse_world": 14.98783954925511,
+            "rotation_rmse_degrees": 24.45952894263068,
+            "rotation_max_degrees": 171.9235743591558
+          },
+          "bone_29": {
+            "translation_rmse_armature": 0.32683577537451575,
+            "translation_rmse_world": 14.196765664710968,
+            "rotation_rmse_degrees": 18.600357593013392,
+            "rotation_max_degrees": 72.41950727886312
+          },
+          "bone_30": {
+            "translation_rmse_armature": 0.3942841697617647,
+            "translation_rmse_world": 17.126521590235154,
+            "rotation_rmse_degrees": 12.920108608428144,
+            "rotation_max_degrees": 74.16165486690345
+          }
+        },
+        "landmarks_world": {
+          "shoulder": {
+            "rmse": 17.960500967378312,
+            "max": 79.28249495895365
+          },
+          "main_elbow": {
+            "rmse": 14.19597373354157,
+            "max": 58.469532318742544
+          },
+          "overlap_elbow": {
+            "rmse": 14.196760445416132,
+            "max": 58.46774543611563
+          },
+          "main_wrist": {
+            "rmse": 15.86343486453542,
+            "max": 60.56464626837784
+          },
+          "glove_wrist": {
+            "rmse": 17.126525555656773,
+            "max": 66.68648084373959
+          },
+          "glove_tip": {
+            "rmse": 18.148599078251653,
+            "max": 67.30503073904265
+          }
+        },
+        "temporal": {
+          "velocity_rmse_standardized_per_frame": 0.5816445149260858,
+          "acceleration_rmse_standardized_per_frame2": 4.612444758282821,
+          "source_acceleration_rms_standardized_per_frame2": 8.656824295368713,
+          "reconstructed_acceleration_rms_standardized_per_frame2": 6.5130442816688285
+        },
+        "feature_rmse_standardized": 0.2945397248549996,
+        "worst_bone_by_rotation_rmse": "bone_25",
+        "worst_bone_by_translation_rmse": "bone_22"
+      },
+      "holdout_actions": [
+        {
+          "action": "sequence_11.003",
+          "sample_count": 41,
+          "feature_rmse_standardized": 0.04402020197583698,
+          "worst_rotation_bone": "bone_23",
+          "worst_rotation_rmse_degrees": 7.311327562837693,
+          "worst_translation_bone": "bone_30",
+          "landmark_rmse_world": {
+            "shoulder": 1.7808142678224188,
+            "main_elbow": 1.6741541583197155,
+            "overlap_elbow": 1.6725959004531659,
+            "main_wrist": 2.4102194398198544,
+            "glove_wrist": 4.846144198327058,
+            "glove_tip": 5.117712744684491
+          },
+          "temporal": {
+            "velocity_rmse_standardized_per_frame": 0.07151517960552264,
+            "acceleration_rmse_standardized_per_frame2": 0.24144729499282175,
+            "source_acceleration_rms_standardized_per_frame2": 1.2490248085636848,
+            "reconstructed_acceleration_rms_standardized_per_frame2": 1.2056799671289988
+          },
+          "worst_weighted_centroid": {
+            "bone": "bone_22",
+            "rmse_world": 11.549310798959054
+          }
+        },
+        {
+          "action": "sequence_15.003",
+          "sample_count": 31,
+          "feature_rmse_standardized": 0.6040602764098872,
+          "worst_rotation_bone": "bone_25",
+          "worst_rotation_rmse_degrees": 35.16039567542378,
+          "worst_translation_bone": "bone_22",
+          "landmark_rmse_world": {
+            "shoulder": 48.213689944005075,
+            "main_elbow": 35.85193731797227,
+            "overlap_elbow": 35.85119088895212,
+            "main_wrist": 37.35337600537483,
+            "glove_wrist": 40.81742279208471,
+            "glove_tip": 41.218944669298786
+          },
+          "temporal": {
+            "velocity_rmse_standardized_per_frame": 0.31868367082265586,
+            "acceleration_rmse_standardized_per_frame2": 0.8194037898933759,
+            "source_acceleration_rms_standardized_per_frame2": 8.38056459109611,
+            "reconstructed_acceleration_rms_standardized_per_frame2": 8.244193863636978
+          },
+          "worst_weighted_centroid": {
+            "bone": "bone_22",
+            "rmse_world": 71.33794131379729
+          }
+        },
+        {
+          "action": "sequence_20.001",
+          "sample_count": 61,
+          "feature_rmse_standardized": 0.37756281953196075,
+          "worst_rotation_bone": "bone_25",
+          "worst_rotation_rmse_degrees": 66.06790211415245,
+          "worst_translation_bone": "bone_30",
+          "landmark_rmse_world": {
+            "shoulder": 10.342770952477501,
+            "main_elbow": 13.016761029867055,
+            "overlap_elbow": 13.022348707581743,
+            "main_wrist": 16.559933733150686,
+            "glove_wrist": 15.993435399999942,
+            "glove_tip": 18.234293427349154
+          },
+          "temporal": {
+            "velocity_rmse_standardized_per_frame": 0.9942628657386766,
+            "acceleration_rmse_standardized_per_frame2": 7.875430442919581,
+            "source_acceleration_rms_standardized_per_frame2": 14.654193716223396,
+            "reconstructed_acceleration_rms_standardized_per_frame2": 10.511403068758977
+          },
+          "worst_weighted_centroid": {
+            "bone": "bone_22",
+            "rmse_world": 28.0760251187046
+          }
+        },
+        {
+          "action": "sequence_24",
+          "sample_count": 63,
+          "feature_rmse_standardized": 0.16369125537230814,
+          "worst_rotation_bone": "bone_27",
+          "worst_rotation_rmse_degrees": 43.614220527554075,
+          "worst_translation_bone": "bone_30",
+          "landmark_rmse_world": {
+            "shoulder": 5.683259899883159,
+            "main_elbow": 3.5116432809154796,
+            "overlap_elbow": 3.510876491789336,
+            "main_wrist": 7.500321459641585,
+            "glove_wrist": 8.637861145817977,
+            "glove_tip": 9.187367148102885
+          },
+          "temporal": {
+            "velocity_rmse_standardized_per_frame": 0.6169547631183625,
+            "acceleration_rmse_standardized_per_frame2": 5.291737126014407,
+            "source_acceleration_rms_standardized_per_frame2": 8.12624575997025,
+            "reconstructed_acceleration_rms_standardized_per_frame2": 5.742395429069165
+          },
+          "worst_weighted_centroid": {
+            "bone": "bone_22",
+            "rmse_world": 9.700391682747526
+          }
+        },
+        {
+          "action": "sequence_26",
+          "sample_count": 66,
+          "feature_rmse_standardized": 0.12026518513650901,
+          "worst_rotation_bone": "bone_30",
+          "worst_rotation_rmse_degrees": 17.575302063598592,
+          "worst_translation_bone": "bone_30",
+          "landmark_rmse_world": {
+            "shoulder": 7.552103148181945,
+            "main_elbow": 5.114024204172419,
+            "overlap_elbow": 5.112822823627393,
+            "main_wrist": 5.7314438014153675,
+            "glove_wrist": 7.721170224219452,
+            "glove_tip": 10.26390798392508
+          },
+          "temporal": {
+            "velocity_rmse_standardized_per_frame": 0.12292599369815041,
+            "acceleration_rmse_standardized_per_frame2": 0.22122643914673695,
+            "source_acceleration_rms_standardized_per_frame2": 1.4222147193450112,
+            "reconstructed_acceleration_rms_standardized_per_frame2": 1.4040394710301443
+          },
+          "worst_weighted_centroid": {
+            "bone": "bone_22",
+            "rmse_world": 21.842864154598967
+          }
+        }
+      ]
+    }
+  },
+  "weighted_mesh_centroid_reconstruction": {
+    "PCA": {
+      "train": {
+        "action_count": 23,
+        "per_bone": {
+          "bone_22": {
+            "rmse_world": 17.05643887663012,
+            "max_world": 88.46803447910575,
+            "sample_count": 838
+          },
+          "bone_23": {
+            "rmse_world": 2.8147320091509354,
+            "max_world": 14.784881941627228,
+            "sample_count": 838
+          },
+          "bone_24": {
+            "rmse_world": null,
+            "max_world": 0.0,
+            "sample_count": 0
+          },
+          "bone_25": {
+            "rmse_world": 3.3322561451070806e-05,
+            "max_world": 7.669818596986046e-05,
+            "sample_count": 838
+          },
+          "bone_26": {
+            "rmse_world": null,
+            "max_world": 0.0,
+            "sample_count": 0
+          },
+          "bone_27": {
+            "rmse_world": 2.291398780996306e-05,
+            "max_world": 7.717105226190151e-05,
+            "sample_count": 838
+          },
+          "bone_29": {
+            "rmse_world": 2.3886958835980223e-05,
+            "max_world": 7.866512537880432e-05,
+            "sample_count": 838
+          },
+          "bone_30": {
+            "rmse_world": 0.08240971207517664,
+            "max_world": 0.13725992042059346,
+            "sample_count": 838
+          }
+        },
+        "worst_bone": "bone_22"
+      },
+      "holdout": {
+        "action_count": 5,
+        "per_bone": {
+          "bone_22": {
+            "rmse_world": 22.679917516555495,
+            "max_world": 66.57522381240736,
+            "sample_count": 262
+          },
+          "bone_23": {
+            "rmse_world": 3.823246457252565,
+            "max_world": 10.896459588961017,
+            "sample_count": 262
+          },
+          "bone_24": {
+            "rmse_world": null,
+            "max_world": 0.0,
+            "sample_count": 0
+          },
+          "bone_25": {
+            "rmse_world": 5.187578403268963e-05,
+            "max_world": 0.00021745846150678512,
+            "sample_count": 262
+          },
+          "bone_26": {
+            "rmse_world": null,
+            "max_world": 0.0,
+            "sample_count": 0
+          },
+          "bone_27": {
+            "rmse_world": 3.970214880423096e-05,
+            "max_world": 0.00022634563866272926,
+            "sample_count": 262
+          },
+          "bone_29": {
+            "rmse_world": 2.6654124887257988e-05,
+            "max_world": 5.8424228357528696e-05,
+            "sample_count": 262
+          },
+          "bone_30": {
+            "rmse_world": 0.07470618837076609,
+            "max_world": 0.10925813831002072,
+            "sample_count": 262
+          }
+        },
+        "worst_bone": "bone_22"
+      }
+    },
+    "RBF": {
+      "train": {
+        "action_count": 23,
+        "per_bone": {
+          "bone_22": {
+            "rmse_world": 17.100501336751435,
+            "max_world": 93.31205687450175,
+            "sample_count": 838
+          },
+          "bone_23": {
+            "rmse_world": 3.1065499801792784,
+            "max_world": 21.976557950050758,
+            "sample_count": 838
+          },
+          "bone_24": {
+            "rmse_world": null,
+            "max_world": 0.0,
+            "sample_count": 0
+          },
+          "bone_25": {
+            "rmse_world": 1.3833170908839678,
+            "max_world": 7.2446224730396365,
+            "sample_count": 838
+          },
+          "bone_26": {
+            "rmse_world": null,
+            "max_world": 0.0,
+            "sample_count": 0
+          },
+          "bone_27": {
+            "rmse_world": 1.9420747814309425,
+            "max_world": 7.863217266034896,
+            "sample_count": 838
+          },
+          "bone_29": {
+            "rmse_world": 1.391861563666617,
+            "max_world": 5.706094838031351,
+            "sample_count": 838
+          },
+          "bone_30": {
+            "rmse_world": 2.6808784730399084,
+            "max_world": 8.966296319645467,
+            "sample_count": 838
+          }
+        },
+        "worst_bone": "bone_22"
+      },
+      "holdout": {
+        "action_count": 5,
+        "per_bone": {
+          "bone_22": {
+            "rmse_world": 30.811698360132045,
+            "max_world": 111.53559982941675,
+            "sample_count": 262
+          },
+          "bone_23": {
+            "rmse_world": 17.405095888116563,
+            "max_world": 76.21703634145102,
+            "sample_count": 262
+          },
+          "bone_24": {
+            "rmse_world": null,
+            "max_world": 0.0,
+            "sample_count": 0
+          },
+          "bone_25": {
+            "rmse_world": 13.784989371281707,
+            "max_world": 57.530850653541215,
+            "sample_count": 262
+          },
+          "bone_26": {
+            "rmse_world": null,
+            "max_world": 0.0,
+            "sample_count": 0
+          },
+          "bone_27": {
+            "rmse_world": 16.154748445430286,
+            "max_world": 62.348696565360285,
+            "sample_count": 262
+          },
+          "bone_29": {
+            "rmse_world": 15.182337836085232,
+            "max_world": 58.01537894383559,
+            "sample_count": 262
+          },
+          "bone_30": {
+            "rmse_world": 17.369047440898115,
+            "max_world": 65.9239988346561,
+            "sample_count": 262
+          }
+        },
+        "worst_bone": "bone_22"
+      }
+    }
+  },
+  "preview": {
+    "blend": "tools/blender/reports/native_arm_pose_model_previews.blend",
+    "models": {
+      "PCA": {
+        "rig": "Exploratory_PCA_Arm_Rig",
+        "meshes": [
+          "Exploratory_PCA_29_0x75c1640_submesh0",
+          "Exploratory_PCA_29_0x75c1640_submesh1"
+        ],
+        "actions": [
+          "Exploratory_PCA_sequence_11.003",
+          "Exploratory_PCA_sequence_15.003",
+          "Exploratory_PCA_sequence_20.001",
+          "Exploratory_PCA_sequence_24",
+          "Exploratory_PCA_sequence_26"
+        ],
+        "object_scale": [
+          43.4370002746582,
+          43.4370002746582,
+          43.4370002746582
+        ]
+      },
+      "RBF": {
+        "rig": "Exploratory_RBF_Arm_Rig",
+        "meshes": [
+          "Exploratory_RBF_29_0x75c1640_submesh0",
+          "Exploratory_RBF_29_0x75c1640_submesh1"
+        ],
+        "actions": [
+          "Exploratory_RBF_sequence_11.003",
+          "Exploratory_RBF_sequence_15.003",
+          "Exploratory_RBF_sequence_20.001",
+          "Exploratory_RBF_sequence_24",
+          "Exploratory_RBF_sequence_26"
+        ],
+        "object_scale": [
+          43.4370002746582,
+          43.4370002746582,
+          43.4370002746582
+        ]
+      }
+    },
+    "visual_review_required": true
+  },
+  "recommendation_gate": {
+    "semantic_source_fitting": "blocked_pending_visual_review_and_context_bone_coverage",
+    "reason": "PCA transform reconstruction is accurate, but weighted mesh shoulder/glove centroids diverge; the RBF model has high held-out pose/landmark error.",
+    "no_semantic_retargeting_performed": true
+  }
+}
