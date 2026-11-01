@@ -121,11 +121,34 @@ def _inspect_armature(args):
     obj = _object(args["object"])
     if obj.type != "ARMATURE":
         raise ValueError("object is not an armature")
-    return {"name": obj.name, "data": obj.data.name, "matrix_world": _mat(obj.matrix_world),
+    anim = obj.animation_data
+    action = anim.action if anim else None
+    slot = anim.action_slot if anim and hasattr(anim, "action_slot") else None
+    return {"name": obj.name, "data": obj.data.name,
+            "location": list(obj.location), "rotation_euler": list(obj.rotation_euler),
+            "scale": list(obj.scale), "matrix_world": _mat(obj.matrix_world),
+            "action": action.name if action else None,
+            "action_slot": slot.identifier if slot else None,
+            "constraints": [{"name": c.name, "type": c.type, "mute": c.mute,
+                             "target": c.target.name if hasattr(c, "target") and c.target else None}
+                            for c in obj.constraints],
             "bones": [{"name": b.name, "parent": b.parent.name if b.parent else None,
                        "head_local": list(b.head_local), "tail_local": list(b.tail_local),
                        "matrix_local": _mat(b.matrix_local), "use_connect": b.use_connect,
-                       "use_deform": b.use_deform} for b in obj.data.bones]}
+                       "use_deform": b.use_deform,
+                       "use_inherit_rotation": b.use_inherit_rotation,
+                       "inherit_scale": b.inherit_scale,
+                       "use_local_location": b.use_local_location,
+                       "pose": {"rotation_mode": obj.pose.bones[b.name].rotation_mode,
+                                "location": list(obj.pose.bones[b.name].location),
+                                "rotation_quaternion": list(obj.pose.bones[b.name].rotation_quaternion),
+                                "rotation_euler": list(obj.pose.bones[b.name].rotation_euler),
+                                "scale": list(obj.pose.bones[b.name].scale),
+                                "matrix_basis": _mat(obj.pose.bones[b.name].matrix_basis),
+                                "constraints": [{"name": c.name, "type": c.type, "mute": c.mute,
+                                    "target": c.target.name if hasattr(c, "target") and c.target else None}
+                                    for c in obj.pose.bones[b.name].constraints]}}
+                      for b in obj.data.bones]}
 
 
 def _inspect_weights(args):

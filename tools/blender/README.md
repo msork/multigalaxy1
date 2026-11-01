@@ -85,7 +85,7 @@ python tools/blender/extract_native_arm_dataset.py --object Waluigi_Arm_Test --o
 python tools/blender/label_native_arm_candidates.py tools/blender/reports/native_waluigi_arm_calibration.json --output tools/blender/reports/native_waluigi_arm_candidates.json
 ```
 
-The bundle preserves exact FCurve keyframe/subframe times, local/armature/world matrices, rest-relative transforms, arm branch landmarks, static weighted vertex positions, evaluated per-bone mesh centroids, TrackIds, curve ranges, action metadata, and full slot inventory. It identifies `sequence_10.003` as the previously validated anchor for `OBArmature.004`; other slots are excluded because their source-rig link is ambiguous. The remaining `.004` actions are high-confidence family candidates; their source-owner object was not preserved, so that confidence remains an inference. The default action-level holdouts are `sequence_11.003`, `sequence_15.003`, `sequence_20.001`, `sequence_24`, and `sequence_26`.
+The bundle preserves exact FCurve keyframe/subframe times, local/armature/world matrices, rest-relative transforms, arm branch landmarks, static weighted vertex positions, evaluated per-bone mesh centroids, TrackIds, curve ranges, action metadata, and full slot inventory. The `.004` family was previously treated as high-confidence Waluigi data, but visual validation disproved direct application. Until its missing source object or importer basis is recovered, exclude all `.004` actions from training. The default action-level holdouts remain `sequence_11.003`, `sequence_15.003`, `sequence_20.001`, `sequence_24`, and `sequence_26`.
 
 `test_native_arm_extract_blender.py` checks exact subframe sampling, rest-relative transforms, TrackIds, weighted vertices, scene-frame restoration, and temporary-object cleanup in Blender background mode. `test_native_arm_labels.py` covers sign-invariant action feature labels.
 
@@ -95,4 +95,16 @@ To create the disposable viewport validation set after extracting the dataset:
 python tools/blender/preview_native_waluigi_arm.py --dataset tools/blender/reports/native_waluigi_arm_calibration.json --output tools/blender/reports/native_waluigi_preview_validation.json
 ```
 
-The default three actions are `sequence_10.003`, `sequence_15.003`, and `sequence_24`. The command assigns each existing `.004` action unchanged to its own duplicate armature, duplicates both explicitly named weighted mesh objects, rebinds only those duplicate modifiers, spaces the preview characters apart, and compares sampled transforms and weighted centroids against the dataset. It also writes Workbench renders at five exact sample times per action under `tools/blender/reports/native_arm_preview_renders/`. Render setup, object visibility, camera, engine, frame, and shading settings are restored afterward. It creates no actions and refuses to run if the disposable rig's rest signature or scale differs from production. Preview objects are bridge-tagged for later targeted cleanup.
+The default three actions are `sequence_10.003`, `sequence_15.003`, and `sequence_24`. The command assigns each existing `.004` action unchanged to its own duplicate armature, duplicates both explicitly named weighted mesh objects, rebinds only those duplicate modifiers, and compares sampled transforms and weighted centroids against the dataset. This is only a dataset replay check, not an independent action-source validation; the user reported detached glove/hand and incorrect arm deformation. Do not treat passing matrix or centroid checks as evidence of a correct native action. Workbench renders are written at five exact sample times per action under `tools/blender/reports/native_arm_preview_renders/` using an isolated temporary scene.
+
+## Native action basis provenance audit
+
+The following read-only scripts compare the live action-slot ownership and channel values with the recovered source Waluigi rest rig. In Blender background mode, create a local report from the source Sluggers blend (do not commit the report because it includes extracted rig data):
+
+```powershell
+$env:MG1_PROVENANCE_OUTPUT = "tools/blender/reports/provenance_Waluigi_Sluggers.json"
+& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" --background --disable-autoexec "C:\MultiGalaxy1-Assets\Working\SMG\Waluigi_Sluggers.blend" --python tools/blender/inspect_saved_armature_provenance.py
+python tools/blender/audit_native_action_basis.py --source-blend-report tools/blender/reports/provenance_Waluigi_Sluggers.json --source-glb "C:\MultiGalaxy1-Assets\Working\MSS\Waluigi\123475520_waluigi.gpl.glb"
+```
+
+The report includes only derived comparison values, action-slot provenance, and channel norms/angles; it omits raw action key values and full rest matrices. `inspect.armature` also reports object transforms, action/slot binding, bone inheritance settings, pose rotation modes/channels/basis matrices, and constraints. The original Waluigi GLB contains a 92-joint skin but no animation clips. No surviving workfile contains the `.004` action owner, so the action source basis cannot currently be proven.

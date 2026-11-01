@@ -61,6 +61,14 @@ def run():
     assert action_record["assigned_armatures"][0]["object"] == rig.name
     assert len(action_record["slots"][0]["bone_names"]) == 1
 
+    armature_info = bridge._inspect_armature({"object": rig.name})
+    bone_info = next(row for row in armature_info["bones"] if row["name"] == "bone_22")
+    assert armature_info["action"] == action.name
+    assert armature_info["action_slot"] == slot.identifier
+    assert bone_info["pose"]["rotation_mode"] == rig.pose.bones["bone_22"].rotation_mode
+    assert bone_info["pose"]["matrix_basis"] == bridge._mat(rig.pose.bones["bone_22"].matrix_basis)
+    assert bone_info["inherit_scale"] == rig.data.bones["bone_22"].inherit_scale
+
     original_frame = (bpy.context.scene.frame_current, bpy.context.scene.frame_subframe)
     result = bridge._extract_native_arm_dataset({
         "object": rig.name, "actions": [action.name], "include_slots": [slot.identifier],

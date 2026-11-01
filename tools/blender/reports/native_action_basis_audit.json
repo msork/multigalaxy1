@@ -1,0 +1,1073 @@
+{
+  "schema": "mg1.native-action-basis-audit.v1",
+  "read_only": true,
+  "action": {
+    "name": "sequence_10.003",
+    "frame_range": [
+      0.0,
+      13.666666984558105
+    ],
+    "layers": [
+      "layer0"
+    ],
+    "fcurve_count": 246,
+    "slot": {
+      "name": "OBArmature.004",
+      "identifier": "OBArmature.004",
+      "target_id_type": "OBJECT",
+      "fcurve_count": 246,
+      "data_path_count": 62,
+      "bone_names": [
+        "bone_10",
+        "bone_13",
+        "bone_14",
+        "bone_15",
+        "bone_16",
+        "bone_19",
+        "bone_20",
+        "bone_22",
+        "bone_23",
+        "bone_24",
+        "bone_25",
+        "bone_26",
+        "bone_27",
+        "bone_29",
+        "bone_3",
+        "bone_30",
+        "bone_31",
+        "bone_32",
+        "bone_33",
+        "bone_35",
+        "bone_36",
+        "bone_37",
+        "bone_39",
+        "bone_40",
+        "bone_41",
+        "bone_43",
+        "bone_44",
+        "bone_45",
+        "bone_47",
+        "bone_48",
+        "bone_49",
+        "bone_5",
+        "bone_52",
+        "bone_53",
+        "bone_57",
+        "bone_58",
+        "bone_59",
+        "bone_60",
+        "bone_61",
+        "bone_62",
+        "bone_64",
+        "bone_65",
+        "bone_66",
+        "bone_67",
+        "bone_68",
+        "bone_7",
+        "bone_70",
+        "bone_71",
+        "bone_72",
+        "bone_74",
+        "bone_75",
+        "bone_76",
+        "bone_78",
+        "bone_79",
+        "bone_8",
+        "bone_80",
+        "bone_82",
+        "bone_83",
+        "bone_84",
+        "bone_86",
+        "bone_9"
+      ]
+    },
+    "arm_initial_key_quaternions": {
+      "bone_22": {
+        "time": 0.0,
+        "norm": 1.000000005212339,
+        "angular_distance_from_identity_degrees": 62.09517884024303
+      },
+      "bone_23": {
+        "time": 0.0,
+        "norm": 0.9999999921966933,
+        "angular_distance_from_identity_degrees": 52.767494702614606
+      },
+      "bone_24": {
+        "time": 0.0,
+        "norm": 0.9999999749904294,
+        "angular_distance_from_identity_degrees": 1.1443617496808627
+      },
+      "bone_25": {
+        "time": 0.0,
+        "norm": 0.9999999565470583,
+        "angular_distance_from_identity_degrees": 54.20422590051133
+      },
+      "bone_26": {
+        "time": 0.0,
+        "norm": 0.9999998846222181,
+        "angular_distance_from_identity_degrees": 15.826926213041844
+      },
+      "bone_27": {
+        "time": 0.0,
+        "norm": 0.9999999073141501,
+        "angular_distance_from_identity_degrees": 10.401666708190055
+      },
+      "bone_29": {
+        "time": 0.0,
+        "norm": 0.9999998686656806,
+        "angular_distance_from_identity_degrees": 10.846200982188758
+      },
+      "bone_30": {
+        "time": 0.0,
+        "norm": 0.9999999725582011,
+        "angular_distance_from_identity_degrees": 41.10225473275692
+      }
+    }
+  },
+  "provenance": {
+    "sequence_action_count": 78,
+    "missing_slot_owner_objects": [
+      "Armature.004"
+    ],
+    "slot_004_action_count": 28,
+    "slot_004_all_unassigned": false,
+    "slot_004_actions": [
+      {
+        "action": "sequence_0.004",
+        "frame_range": [
+          0.0,
+          6.6666669845581055
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_1.004",
+        "frame_range": [
+          0.0,
+          0.8333333730697632
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_10.003",
+        "frame_range": [
+          0.0,
+          13.666666984558105
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [
+          {
+            "object": "Waluigi_NativePreview_sequence_10_003",
+            "data": "Waluigi_NativePreview_sequence_10_003_Data",
+            "slot_identifier": "OBArmature.004"
+          }
+        ],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_11.003",
+        "frame_range": [
+          0.0,
+          6.6666669845581055
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_12.003",
+        "frame_range": [
+          0.0,
+          0.8333333730697632
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_13.003",
+        "frame_range": [
+          0.0,
+          6.6666669845581055
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_14.003",
+        "frame_range": [
+          0.0,
+          2.1666667461395264
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_15.003",
+        "frame_range": [
+          0.0,
+          5.0
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [
+          {
+            "object": "Waluigi_NativePreview_sequence_15_003",
+            "data": "Waluigi_NativePreview_sequence_15_003_Data",
+            "slot_identifier": "OBArmature.004"
+          }
+        ],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_16.003",
+        "frame_range": [
+          0.0,
+          8.833333015441895
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_17.001",
+        "frame_range": [
+          0.0,
+          11.666666030883789
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_18.001",
+        "frame_range": [
+          0.0,
+          11.833333015441895
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_19.001",
+        "frame_range": [
+          0.0,
+          11.666666030883789
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_2.004",
+        "frame_range": [
+          0.0,
+          2.5
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_20.001",
+        "frame_range": [
+          0.0,
+          10.0
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_21.001",
+        "frame_range": [
+          0.0,
+          5.5
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_22.001",
+        "frame_range": [
+          0.0,
+          2.5
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_23.001",
+        "frame_range": [
+          0.0,
+          6.6666669845581055
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_24",
+        "frame_range": [
+          0.0,
+          10.333333015441895
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [
+          {
+            "object": "Waluigi_NativePreview_sequence_24",
+            "data": "Waluigi_NativePreview_sequence_24_Data",
+            "slot_identifier": "OBArmature.004"
+          }
+        ],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_25",
+        "frame_range": [
+          0.0,
+          10.0
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_26",
+        "frame_range": [
+          0.0,
+          10.833333969116211
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_27",
+        "frame_range": [
+          0.0,
+          10.0
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_3.004",
+        "frame_range": [
+          0.0,
+          3.3333334922790527
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_4.004",
+        "frame_range": [
+          0.0,
+          5.0
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_5.004",
+        "frame_range": [
+          0.0,
+          5.0
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_6.004",
+        "frame_range": [
+          0.0,
+          3.3333334922790527
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_7.004",
+        "frame_range": [
+          0.0,
+          0.8333333730697632
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_8.004",
+        "frame_range": [
+          0.0,
+          5.666666507720947
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      },
+      {
+        "action": "sequence_9.003",
+        "frame_range": [
+          0.0,
+          3.3333334922790527
+        ],
+        "slot_identifier": "OBArmature.004",
+        "slot_target_id_type": "OBJECT",
+        "animated_path_count": 62,
+        "animated_bone_count": 61,
+        "arm_bones_present": [
+          "bone_22",
+          "bone_23",
+          "bone_24",
+          "bone_25",
+          "bone_26",
+          "bone_27",
+          "bone_29",
+          "bone_30"
+        ],
+        "assigned_armatures": [],
+        "metadata": {},
+        "library": null
+      }
+    ]
+  },
+  "source_blend": {
+    "filepath": "C:\\MultiGalaxy1-Assets\\Working\\SMG\\Waluigi_Sluggers.blend",
+    "sequence_actions": [],
+    "source_armature": {
+      "object": "123475520_waluigi.gpl",
+      "data": "123475520_waluigi.gpl",
+      "bone_count": 92,
+      "location": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_euler": [
+        1.5707963705062866,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        43.4370002746582,
+        43.4370002746582,
+        43.4370002746582
+      ],
+      "matrix_world": [
+        [
+          43.4370002746582,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -1.8986916074936744e-06,
+          -43.4370002746582,
+          0.0
+        ],
+        [
+          0.0,
+          43.4370002746582,
+          -1.8986916074936744e-06,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "arm_pose_basis_identity": true
+    }
+  },
+  "source_glb": {
+    "version": 2,
+    "byte_length": 386180,
+    "node_count": 94,
+    "skin_count": 1,
+    "skins": [
+      {
+        "name": null,
+        "joint_count": 92,
+        "skeleton_node": 0
+      }
+    ],
+    "animation_count": 0,
+    "animation_names": []
+  },
+  "rest_comparisons_to_source_blend": {
+    "123475520_waluigi.gpl": {
+      "object_matrix_world": [
+        [
+          43.4370002746582,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -1.8986916074936744e-06,
+          -43.4370002746582,
+          0.0
+        ],
+        [
+          0.0,
+          43.4370002746582,
+          -1.8986916074936744e-06,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "source_blend_object_matrix_world": [
+        [
+          43.4370002746582,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -1.8986916074936744e-06,
+          -43.4370002746582,
+          0.0
+        ],
+        [
+          0.0,
+          43.4370002746582,
+          -1.8986916074936744e-06,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "max_rest_matrix_abs_error": 0.0,
+      "bones_over_1e_5": [],
+      "missing_bones": []
+    },
+    "Waluigi_Arm_Test": {
+      "object_matrix_world": [
+        [
+          43.4370002746582,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -1.8986916074936744e-06,
+          -43.4370002746582,
+          0.0
+        ],
+        [
+          0.0,
+          43.4370002746582,
+          -1.8986916074936744e-06,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "source_blend_object_matrix_world": [
+        [
+          43.4370002746582,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -1.8986916074936744e-06,
+          -43.4370002746582,
+          0.0
+        ],
+        [
+          0.0,
+          43.4370002746582,
+          -1.8986916074936744e-06,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "max_rest_matrix_abs_error": 0.0,
+      "bones_over_1e_5": [],
+      "missing_bones": []
+    },
+    "Waluigi_Arm_Clean_Backup": {
+      "object_matrix_world": [
+        [
+          43.4370002746582,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -1.8986916074936744e-06,
+          -43.4370002746582,
+          0.0
+        ],
+        [
+          0.0,
+          43.4370002746582,
+          -1.8986916074936744e-06,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "source_blend_object_matrix_world": [
+        [
+          43.4370002746582,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          -1.8986916074936744e-06,
+          -43.4370002746582,
+          0.0
+        ],
+        [
+          0.0,
+          43.4370002746582,
+          -1.8986916074936744e-06,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "max_rest_matrix_abs_error": 0.0,
+      "bones_over_1e_5": [],
+      "missing_bones": []
+    }
+  },
+  "interpretation": {
+    "source_model_rest_basis_recovered": true,
+    "source_action_owner_rest_basis_recovered": false,
+    "action_first_key_is_proven_rest_pose": false,
+    "action_channel_values_prove_conversion": false,
+    "reason": "The saved source rig and GLB establish Waluigi's bind/rest basis, but the animation GLB contains no clips and the OBArmature.004 action slots have no surviving owner object, library, or custom provenance metadata."
+  }
+}
