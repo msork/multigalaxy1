@@ -8,7 +8,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from semantic_arm_fit_math import (
     farthest_centers, predict_rbf, fit_rbf_ridge, semantic_features,
-    smooth_latent_sequence,
+    smooth_latent_sequence, mirror_pose_across_sagittal,
 )
 
 
@@ -67,6 +67,26 @@ class SemanticArmFitMathTests(unittest.TestCase):
         self.assertLess(np.mean(np.diff(smooth[:, 0]) ** 2),
                         np.mean(np.diff(proposal[:, 0]) ** 2))
         self.assertTrue(np.isfinite(smooth).all())
+
+    def test_sagittal_mirror_maps_rest_pose_to_homologous_rest(self):
+        torso = rest_matrix(0.0, 0.0, 0.0)
+        left = rest_matrix(1.0, 2.0, 0.25)
+        right = rest_matrix(-1.0, 2.0, 0.25)
+        actual = mirror_pose_across_sagittal(left, torso, torso, left, right)
+        np.testing.assert_allclose(actual, right, atol=1e-12)
+
+    def test_sagittal_mirror_preserves_proper_pose_rotation(self):
+        torso = rest_matrix(0.0, 0.0, 0.0)
+        left = rest_matrix(1.0, 2.0, 0.25)
+        right = rest_matrix(-1.0, 2.0, 0.25)
+        moved = left.copy()
+        angle = 0.4
+        moved[:3, :3] = np.array([[np.cos(angle), -np.sin(angle), 0.0],
+                                  [np.sin(angle), np.cos(angle), 0.0],
+                                  [0.0, 0.0, 1.0]])
+        actual = mirror_pose_across_sagittal(moved, torso, torso, left, right)
+        self.assertAlmostEqual(np.linalg.det(actual[:3, :3]), 1.0, places=12)
+        self.assertGreater(np.linalg.norm(actual[:3, :3] - np.eye(3)), 0.1)
 
 
 if __name__ == "__main__":

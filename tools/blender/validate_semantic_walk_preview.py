@@ -72,12 +72,27 @@ def main():
                              rig, rest, fit.TARGET_PROFILE["torso"])
     forearm_map = fit.frame_map(source, src_rest, fit.SOURCE_PROFILE["forearm"],
                                 rig, rest, fit.TARGET_PROFILE["forearm"])
+    rest_all = fit.source_rest_from_rig(rig)
+    body_map_right = fit.frame_map(source, src_rest, fit.SOURCE_PROFILE_RIGHT["torso"],
+                                   rig, rest_all, fit.TARGET_PROFILE_RIGHT["torso"])
+    forearm_map_right = fit.frame_map(source, src_rest, fit.SOURCE_PROFILE_RIGHT["forearm"],
+                                      rig, rest_all, fit.TARGET_PROFILE_RIGHT["forearm"])
+    left_forearm = fit.proper_rotation(fit.numpy_matrix(
+        rest_all[fit.TARGET_PROFILE["forearm"]]["rest_matrix"]))
+    right_forearm = fit.proper_rotation(fit.numpy_matrix(
+        rest_all[fit.TARGET_PROFILE_RIGHT["forearm"]]["rest_matrix"]))
+    right_forearm_to_left = left_forearm.T @ right_forearm
+    torso_rotation = fit.proper_rotation(fit.numpy_matrix(
+        rest_all[fit.TARGET_PROFILE["torso"]]["rest_matrix"]))
+    body_reflection = torso_rotation.T @ np.diag((-1.0, 1.0, 1.0)) @ torso_rotation
     # The report currently carries explicit frame numbers; validate that they
     # are the requested 0..60 interval before evaluating the saved action.
     frames = fit_report["source_frames"]
     target_semantics, source_semantics = [], []
+    target_semantics_right, source_semantics_right = [], []
     elbow_curve = []
     elbow_branches = {"main": [], "overlap": []}
+    elbow_branches_right = {"main": [], "overlap": []}
     max_replay = {"error": 0.0}
     max_vertex_finite = 0
     max_basis_scale_error = 0.0
@@ -88,18 +103,30 @@ def main():
             {name: fit.numpy_matrix(matrix) for name, matrix in source_pose.items()},
             body_map, forearm_map)
         source_semantics.append(src_sem)
+        src_right = fit.semantic_from_source_sample(src_rest,
+            {name: fit.numpy_matrix(matrix) for name, matrix in source_pose.items()},
+            body_map_right, forearm_map_right, fit.SOURCE_PROFILE_RIGHT)
+        src_right = fit.source_right_to_left_semantics(
+            src_right, right_forearm_to_left, body_reflection)
+        source_semantics_right.append(src_right)
         pose = evaluated_bone_matrices(rig)
         target_sem = fit.semantic_from_target_sample(rest,
             {name: fit.numpy_matrix(pose[name]) for name in bones})
         target_semantics.append(target_sem)
+        target_right = fit.semantic_from_target_sample(rest_all,
+            {name: fit.numpy_matrix(pose[name]) for name in rest_all},
+            fit.TARGET_PROFILE_RIGHT, right_forearm_to_left)
+        target_right = fit.source_right_to_left_semantics(
+            target_right, right_forearm_to_left, body_reflection)
+        target_semantics_right.append(target_right)
         elbow_curve.append({"frame": int(frame), "source_raw": float(src_sem[3]),
                             "target": float(target_sem[3])})
         # Measure each Waluigi elbow branch geometrically. The context feature
         # uses their midpoint; separate curves reveal whether that average
         # hides motion or one branch lacks leverage.
         def moved_point(bone_name, endpoint):
-            rest_matrix = fit.numpy_matrix(rest[bone_name]["rest_matrix"])
-            local = np.r_[rest[bone_name][endpoint], 1.0]
+            rest_matrix = fit.numpy_matrix(rest_all[bone_name]["rest_matrix"])
+            local = np.r_[rest_all[bone_name][endpoint], 1.0]
             return (fit.numpy_matrix(pose[bone_name]) @
                     np.linalg.inv(rest_matrix) @ local)[:3]
         shoulder = moved_point("bone_23", "head")
@@ -113,6 +140,17 @@ def main():
                               float(np.dot(upper, lower)))
         elbow_branches["main"].append({"frame": int(frame), "angle": bend(elbow_main)})
         elbow_branches["overlap"].append({"frame": int(frame), "angle": bend(elbow_overlap)})
+        shoulder_r = moved_point("bone_58", "head")
+        elbow_main_r = moved_point("bone_61", "head")
+        elbow_overlap_r = moved_point("bone_64", "head")
+        wrist_r = moved_point("bone_62", "tail")
+        def bend_right(elbow):
+            upper = elbow - shoulder_r
+            lower = wrist_r - elbow
+            return math.atan2(float(np.linalg.norm(np.cross(upper, lower))),
+                              float(np.dot(upper, lower)))
+        elbow_branches_right["main"].append({"frame": int(frame), "angle": bend_right(elbow_main_r)})
+        elbow_branches_right["overlap"].append({"frame": int(frame), "angle": bend_right(elbow_overlap_r)})
         evaluated = []
         for mesh in meshes:
             ev = mesh.evaluated_get(bpy.context.evaluated_depsgraph_get())
@@ -132,12 +170,23 @@ def main():
     elbow_reference = fit_report["elbow_source_mapping"]["frame_0_reference_radians"]
     source_semantics[:, 3] -= elbow_reference
     source_semantics[:, 3] *= fit_report["elbow_source_mapping"].get("excursion_gain", 1.0)
+    source_semantics_right = np.asarray(source_semantics_right)
+    elbow_reference_right = fit_report["right_elbow_source_mapping"]["frame_0_reference_radians"]
+    source_semantics_right[:, 3] -= elbow_reference_right
+    source_semantics_right[:, 3] *= fit_report["right_elbow_source_mapping"].get("excursion_gain", 1.0)
     for row, mapped in zip(elbow_curve, source_semantics[:, 3]):
         row["source"] = float(mapped)
     residual = np.asarray(target_semantics) - source_semantics
+    residual_right = np.asarray(target_semantics_right) - source_semantics_right
     rmse = {name: float(np.sqrt(np.mean(residual[:, i] ** 2)))
             for i, name in enumerate(fit.SEMANTIC_NAMES)}
     fitted_rmse = fit_report["preview"]["semantic_feature_rmse_after_solve"]
+    rmse_right = {name: float(np.sqrt(np.mean(residual_right[:, i] ** 2)))
+                  for i, name in enumerate(fit.SEMANTIC_NAMES)}
+    fitted_rmse_right = fit_report["right_source_target_semantic_rmse"]
+    for index, row in enumerate(elbow_curve):
+        row["source_raw"] = float(np.asarray(source_semantics)[index, 3] /
+            fit_report["elbow_source_mapping"].get("excursion_gain", 1.0) + elbow_reference)
     report = {
         "schema": "mg1.semantic-walk-saved-preview-validation.v1",
         "file": bpy.data.filepath,
@@ -151,6 +200,7 @@ def main():
         "runtime_constraints": constraints,
         "object_scale": [float(v) for v in rig.scale],
         "semantic_rmse_from_saved_evaluation": rmse,
+        "right_semantic_rmse_from_saved_evaluation": rmse_right,
         "elbow_curve_radians": elbow_curve,
         "elbow_curve_ranges_radians": {
             "source_raw": fit_report["elbow_source_mapping"]["raw_source_range_radians"],
@@ -165,10 +215,27 @@ def main():
                                              float(max(row["angle"] for row in elbow_branches["overlap"]))],
         },
         "target_branch_elbow_angles_radians": elbow_branches,
+        "right_target_branch_elbow_angles_radians": elbow_branches_right,
+        "right_target_branch_angle_ranges_radians": {
+            name: [float(min(row["angle"] for row in rows)),
+                   float(max(row["angle"] for row in rows))]
+            for name, rows in elbow_branches_right.items()},
+        "right_elbow_curve_radians": [{"frame": int(frame),
+            "source": float(source_semantics_right[i, 3]),
+            "target": float(target_semantics_right[i][3])}
+            for i, frame in enumerate(frames)],
+        "right_elbow_curve_ranges_radians": {
+            "source_mapped": [float(source_semantics_right[:, 3].min()),
+                              float(source_semantics_right[:, 3].max())],
+            "target": [float(min(row[3] for row in target_semantics_right)),
+                       float(max(row[3] for row in target_semantics_right))]},
         "max_semantic_rmse_delta_vs_fit_report": max(abs(rmse[k] - fitted_rmse[k]) for k in rmse),
         "max_bone_scale_deviation": max_basis_scale_error,
         "fit_gates": fit_report["validation"],
+        "max_right_semantic_rmse_delta_vs_fit_report": max(
+            abs(rmse_right[k] - fitted_rmse_right[k]) for k in rmse_right),
         "gate": "pass" if max(abs(rmse[k] - fitted_rmse[k]) for k in rmse) < 1e-5 and
+            max(abs(rmse_right[k] - fitted_rmse_right[k]) for k in rmse_right) < 1e-5 and
             constraints == 0 and len(meshes) == 2 and all(float(v) > 0 for v in rig.scale) else "fail",
     }
     os.makedirs(os.path.dirname(os.path.abspath(args.report)), exist_ok=True)

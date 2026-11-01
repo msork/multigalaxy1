@@ -216,6 +216,29 @@ def encode_context_sample(sample, bones):
     return np.asarray(features, dtype=np.float64)
 
 
+def mirror_pose_across_sagittal(left_pose, torso_pose, torso_rest,
+                                left_bone_rest, right_bone_rest):
+    """Reflect an armature-space bone pose into its homologous right rest basis.
+
+    Reflection is performed in torso-local coordinates. A per-bone local
+    correspondence matrix is derived from the two rest transforms, so mirrored
+    bones with different local roll still land exactly on the right rest pose.
+    """
+    left_pose = _matrix(left_pose)
+    torso_pose = _matrix(torso_pose)
+    torso_rest = _matrix(torso_rest)
+    left_bone_rest = _matrix(left_bone_rest)
+    right_bone_rest = _matrix(right_bone_rest)
+    sagittal = np.eye(4, dtype=np.float64)
+    sagittal[0, 0] = -1.0
+    left_rest_relative = np.linalg.inv(torso_rest) @ left_bone_rest
+    right_rest_relative = np.linalg.inv(torso_rest) @ right_bone_rest
+    local_correspondence = (np.linalg.inv(left_rest_relative) @ sagittal @
+                            right_rest_relative)
+    left_pose_relative = np.linalg.inv(torso_pose) @ left_pose
+    return torso_pose @ sagittal @ left_pose_relative @ local_correspondence
+
+
 def rbf_features(x, centers, gamma):
     x = np.asarray(x, dtype=np.float64)
     centers = np.asarray(centers, dtype=np.float64)

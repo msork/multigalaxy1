@@ -27,7 +27,8 @@ from test_semantic_preview_noop import foot_positions, weighted_group_centroid
 from fit_native_context_pca import fit as fit_pca
 from semantic_arm_fit_math import (
     encode_context_sample, farthest_centers, fit_rbf_ridge,
-    predict_rbf, semantic_features, smooth_latent_sequence,
+    mirror_pose_across_sagittal, predict_rbf, semantic_features,
+    smooth_latent_sequence,
 )
 
 HOLDOUTS = {"sequence_11.003", "sequence_15.003", "sequence_20.001",
@@ -53,6 +54,42 @@ TARGET_PROFILE = {
     "elbow_endpoint_a": "head", "elbow_endpoint_b": "head",
     "forearm_endpoint": "tail", "overlap_endpoint": "tail",
     "wrist_endpoint": "head", "hand_endpoint": "tail",
+}
+SOURCE_PROFILE_RIGHT = {
+    "torso": "Spine2", "shoulder": "ArmR1", "upper": "ArmR1",
+    "elbow_a": "ArmR1", "elbow_b": "ArmR2", "forearm": "ArmR2",
+    "forearm_overlap": "ArmR2", "wrist": "HandR", "hand": "HandR",
+    "shoulder_point_bone": "ArmR1", "shoulder_endpoint": "head",
+    "elbow_endpoint_a": "tail", "elbow_endpoint_b": "head",
+    "forearm_endpoint": "tail", "overlap_endpoint": "tail",
+    "wrist_endpoint": "head", "hand_endpoint": "tail",
+}
+TARGET_PROFILE_RIGHT = {
+    "torso": "bone_21", "shoulder": "bone_58", "upper": "bone_58",
+    "elbow_a": "bone_61", "elbow_b": "bone_64", "forearm": "bone_62",
+    "forearm_overlap": "bone_64", "wrist": "bone_65", "hand": "bone_65",
+    "shoulder_point_bone": "bone_58", "shoulder_endpoint": "head",
+    "elbow_endpoint_a": "head", "elbow_endpoint_b": "head",
+    "forearm_endpoint": "tail", "overlap_endpoint": "tail",
+    "wrist_endpoint": "head", "hand_endpoint": "tail",
+}
+LEFT_TO_RIGHT_BONES = {
+    "bone_22": "bone_57", "bone_23": "bone_58", "bone_24": "bone_59",
+    "bone_25": "bone_60", "bone_26": "bone_61", "bone_27": "bone_62",
+    "bone_29": "bone_64", "bone_30": "bone_65",
+    "bone_31": "bone_66", "bone_32": "bone_67", "bone_33": "bone_68",
+    "bone_34": "bone_69", "bone_35": "bone_70", "bone_36": "bone_71",
+    "bone_37": "bone_72", "bone_38": "bone_73", "bone_39": "bone_74",
+    "bone_40": "bone_75", "bone_41": "bone_76", "bone_42": "bone_77",
+    "bone_43": "bone_78", "bone_44": "bone_79", "bone_45": "bone_80",
+    "bone_46": "bone_81", "bone_47": "bone_82", "bone_48": "bone_83",
+    "bone_49": "bone_84", "bone_50": "bone_85", "bone_51": "bone_86",
+}
+RIGHT_GAP_PAIRS = {
+    "shoulder": ("bone_21", "tail", "bone_57", "head"),
+    "elbow_main": ("bone_59", "tail", "bone_61", "head"),
+    "elbow_overlap": ("bone_60", "tail", "bone_64", "head"),
+    "wrist_glove": ("bone_62", "tail", "bone_65", "head"),
 }
 SEMANTIC_NAMES = ("shoulder_rot_x", "shoulder_rot_y", "shoulder_rot_z",
                   "elbow_flexion", "forearm_roll", "wrist_rot_x",
@@ -143,12 +180,14 @@ def pose_dict_from_sample(sample, bones):
             for name in bones}
 
 
-def semantic_from_source_sample(rest, pose, body_map, forearm_map):
-    return semantic_features(rest, pose, SOURCE_PROFILE, body_map, forearm_map)
+def semantic_from_source_sample(rest, pose, body_map, forearm_map,
+                                profile=SOURCE_PROFILE):
+    return semantic_features(rest, pose, profile, body_map, forearm_map)
 
 
-def semantic_from_target_sample(rest, pose):
-    return semantic_features(rest, pose, TARGET_PROFILE)
+def semantic_from_target_sample(rest, pose, profile=TARGET_PROFILE,
+                                forearm_frame_map=None):
+    return semantic_features(rest, pose, profile, forearm_frame_map=forearm_frame_map)
 
 
 def folds_by_action(action_rows, count):
@@ -225,7 +264,8 @@ def target_semantics_from_latent(z_normalized, latent_std, pca_model, bones,
 def solve_semantic_latents(source_semantics, native_prior, latent_std, pca_model,
                            bones, rest_bones, sem_mean, sem_std,
                            native_gap_targets, native_weight=0.01, iterations=24,
-                           initial_proposal=None, elbow_weight=1.0):
+                           initial_proposal=None, elbow_weight=1.0,
+                           gap_scales=(0.01, 0.005, 0.005, 0.005)):
     """Invert the PCA pose manifold for semantic targets, regularized to native poses."""
     targets = np.c_[(np.asarray(source_semantics, dtype=np.float64) - sem_mean) / sem_std,
                      np.zeros((len(source_semantics), len(GAP_PAIRS)), dtype=np.float64)]
@@ -239,7 +279,7 @@ def solve_semantic_latents(source_semantics, native_prior, latent_std, pca_model
         def residual(value):
             result = target_semantics_from_latent(value, latent_std, pca_model,
                 bones, rest_bones, sem_mean, sem_std, native_gap_targets,
-                np.asarray((0.01, 0.005, 0.005, 0.005))) - target
+                np.asarray(gap_scales, dtype=np.float64)) - target
             result[3] *= elbow_weight
             return result
 
@@ -419,6 +459,46 @@ def continuity(rig):
     return out
 
 
+def continuity_for_pairs(rig, pairs):
+    ev = rig.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    pb = ev.pose.bones
+    return {name: float((getattr(pb[a], ea) - getattr(pb[b], eb)).length)
+            for name, (a, ea, b, eb) in pairs.items()}
+
+
+def descendant_bone_names(armature_data, root_name):
+    result = set()
+    for bone in armature_data.bones:
+        parent = bone.parent
+        while parent is not None:
+            if parent.name == root_name:
+                result.add(bone.name)
+                break
+            parent = parent.parent
+    return result
+
+
+def rebase_elbow_excursion(semantics, gain):
+    mapped = np.asarray(semantics, dtype=np.float64).copy()
+    reference = float(mapped[0, 3])
+    mapped[:, 3] = (mapped[:, 3] - reference) * float(gain)
+    return mapped, reference
+
+
+def source_right_to_left_semantics(values, forearm_right_to_left, body_reflection):
+    original = np.asarray(values, dtype=np.float64)
+    result = np.atleast_2d(original.copy())
+    torso_reflection = np.asarray(body_reflection, dtype=np.float64)
+    angular_reflection = float(np.linalg.det(torso_reflection)) * torso_reflection
+    forearm_map = np.asarray(forearm_right_to_left, dtype=np.float64)
+    result[:, 0:3] = result[:, 0:3] @ angular_reflection.T
+    roll_sign = 1.0 if float((forearm_map @ np.array((0.0, 1.0, 0.0)))[1]) >= 0 else -1.0
+    result[:, 4] *= roll_sign
+    result[:, 5:8] = result[:, 5:8] @ forearm_map.T
+    result[:, 8:11] = result[:, 8:11] @ torso_reflection.T
+    return result[0] if original.ndim == 1 else result
+
+
 def native_continuity_ranges(actions):
     pairs = {"shoulder": ("bone_21", "tail_armature", "bone_22", "head_armature"),
              "elbow_main": ("bone_24", "tail_armature", "bone_26", "head_armature"),
@@ -486,6 +566,9 @@ def main():
     source_profile_names = {SOURCE_PROFILE[key] for key in (
         "torso", "shoulder", "upper", "elbow_a", "elbow_b", "forearm",
         "forearm_overlap", "wrist", "hand", "shoulder_point_bone")}
+    source_profile_names |= {SOURCE_PROFILE_RIGHT[key] for key in (
+        "torso", "shoulder", "upper", "elbow_a", "elbow_b", "forearm",
+        "forearm_overlap", "wrist", "hand", "shoulder_point_bone")}
     if not source_profile_names.issubset(set(source_rig.data.bones.keys())):
         raise RuntimeError("source Luigi profile bones are missing: " + repr(sorted(source_profile_names - set(source_rig.data.bones.keys()))))
     if not set(bones).issubset(set(target_original.data.bones.keys())):
@@ -505,11 +588,25 @@ def main():
         raise RuntimeError("this prototype is limited to the Luigi walk's frames 0–60")
 
     target_rest = target_rest_from_dataset(dataset)
+    target_rest_all = source_rest_from_rig(target_original)
     source_rest = source_rest_from_rig(source_rig)
     body_map = frame_map(source_rig, source_rest, SOURCE_PROFILE["torso"],
                          target_original, target_rest, TARGET_PROFILE["torso"])
     forearm_map = frame_map(source_rig, source_rest, SOURCE_PROFILE["forearm"],
                             target_original, target_rest, TARGET_PROFILE["forearm"])
+    body_map_right = frame_map(source_rig, source_rest, SOURCE_PROFILE_RIGHT["torso"],
+                               target_original, target_rest_all, TARGET_PROFILE_RIGHT["torso"])
+    forearm_map_right = frame_map(source_rig, source_rest, SOURCE_PROFILE_RIGHT["forearm"],
+                                  target_original, target_rest_all, TARGET_PROFILE_RIGHT["forearm"])
+    left_forearm_rotation = proper_rotation(numpy_matrix(
+        target_rest_all[TARGET_PROFILE["forearm"]]["rest_matrix"]))
+    right_forearm_rotation = proper_rotation(numpy_matrix(
+        target_rest_all[TARGET_PROFILE_RIGHT["forearm"]]["rest_matrix"]))
+    right_forearm_to_left = left_forearm_rotation.T @ right_forearm_rotation
+    torso_rotation = proper_rotation(numpy_matrix(
+        target_rest_all[TARGET_PROFILE["torso"]]["rest_matrix"]))
+    armature_reflection = np.diag((-1.0, 1.0, 1.0))
+    body_reflection = torso_rotation.T @ armature_reflection @ torso_rotation
 
     target_actions = [row for row in dataset["actions"] if row["split"] == "train"]
     target_holdouts = [row for row in dataset["actions"] if row["split"] == "holdout"]
@@ -622,14 +719,21 @@ def main():
         walk_slot = walk_action.slots[0]
         created_actions.append(walk_action)
         source_semantics = []
+        source_semantics_right = []
+        source_pose_rows = []
         frames = list(range(start, end + 1))
         for frame in frames:
             set_frame(scene, float(frame))
             pose, _basis = source_pose_from_curves(source_rig, source_action,
                                                    source_slot, float(frame))
             pose_np = {name: numpy_matrix(matrix) for name, matrix in pose.items()}
+            source_pose_rows.append(pose_np)
             source_semantics.append(semantic_from_source_sample(source_rest, pose_np,
                                                                   body_map, forearm_map))
+            right_sem = semantic_from_source_sample(source_rest, pose_np,
+                body_map_right, forearm_map_right, SOURCE_PROFILE_RIGHT)
+            source_semantics_right.append(source_right_to_left_semantics(
+                right_sem, right_forearm_to_left, body_reflection))
         source_semantics = np.asarray(source_semantics, dtype=np.float64)
         raw_source_semantics = source_semantics.copy()
         # Flexion is an excursion from the source walk's starting bend, not an
@@ -639,6 +743,9 @@ def main():
         source_elbow_reference = float(source_semantics[0, 3])
         source_semantics[:, 3] -= source_elbow_reference
         source_semantics[:, 3] *= args.elbow_gain
+        raw_source_semantics_right = np.asarray(source_semantics_right, dtype=np.float64)
+        source_semantics_right, source_elbow_reference_right = rebase_elbow_excursion(
+            raw_source_semantics_right, args.elbow_gain)
         source_norm = (source_semantics - sem_mean) / sem_std
         train_distance = np.linalg.norm(sem_train_norm[:, None, :] - source_norm[None, :, :], axis=2)
         nearest_indices = np.argmin(train_distance, axis=0)
@@ -658,6 +765,42 @@ def main():
         decoded_features = decode_features(smoothed, latent_std, pca)
         pca_pose_rows = [decode_context_poses(row, bones, target_rest)
                          for row in decoded_features]
+
+        # Fit the right semantic stream independently through the same
+        # character-agnostic left-profile latent model. Convert its wrist
+        # semantic into the canonical model frame, then mirror the resulting
+        # per-bone transforms into Waluigi's distinct right rest basis.
+        source_norm_right = (source_semantics_right - sem_mean) / sem_std
+        distance_right = np.linalg.norm(
+            sem_train_norm[:, None, :] - source_norm_right[None, :, :], axis=2)
+        nearest_right = latent_train_norm[np.argmin(distance_right, axis=0)]
+        rbf_right = predict_rbf(source_norm_right, regressor)
+        proposal_right, inverse_costs_right = solve_semantic_latents(
+            source_semantics_right, nearest_right, latent_std, pca, bones,
+            target_rest, sem_mean, sem_std, native_gap_targets.copy(),
+            native_weight=args.inverse_native_weight,
+            iterations=args.inverse_iterations, initial_proposal=rbf_right,
+            elbow_weight=args.elbow_weight,
+            gap_scales=(0.001, 0.0025, 0.0025, 0.0025))
+        smoothed_right = smooth_latent_sequence(proposal_right, nearest_right,
+            np.ones(args.latent_dimensions),
+            lambda_native=args.sequence_native_weight,
+            lambda_velocity=args.sequence_velocity_weight,
+            lambda_acceleration=args.sequence_acceleration_weight)
+        # Temporal smoothing can move a frame away from the strict branch-gap
+        # manifold. Reproject the smoothed right sequence independently, using
+        # each smoothed frame as its prior and a tighter shoulder/branch gap
+        # tolerance; the already-validated left v5 path remains untouched.
+        right_gap_scales = (0.001, 0.0025, 0.0025, 0.0025)
+        proposal_right, inverse_costs_right = solve_semantic_latents(
+            source_semantics_right, smoothed_right, latent_std, pca, bones,
+            target_rest, sem_mean, sem_std, native_gap_targets.copy(),
+            native_weight=max(args.inverse_native_weight, 0.01),
+            iterations=args.inverse_iterations, initial_proposal=smoothed_right,
+            elbow_weight=args.elbow_weight, gap_scales=right_gap_scales)
+        smoothed_right = proposal_right
+        pca_pose_rows_right = [decode_context_poses(row, bones, target_rest)
+                               for row in decode_features(smoothed_right, latent_std, pca)]
 
         mesh_sources = sorted((obj for obj in bpy.data.objects
             if obj.type == "MESH" and obj.name.startswith(args.baseline_mesh_prefix) and
@@ -681,6 +824,7 @@ def main():
         # Leaving its action active would let animated channels overwrite
         # matrix_basis assignments during dependency-graph evaluation.
         walk_pose_rows, walk_scale_rows, baseline_gaps = [], [], []
+        baseline_gaps_right = []
         walk_foot_rows, walk_cap_rows = [], []
         for frame in frames:
             set_frame(scene, float(frame))
@@ -689,6 +833,7 @@ def main():
             walk_scale_rows.append({pb.name: np.asarray(tuple(pb.scale), dtype=np.float64)
                                     for pb in target_copy.pose.bones})
             baseline_gaps.append(continuity(target_copy))
+            baseline_gaps_right.append(continuity_for_pairs(target_copy, RIGHT_GAP_PAIRS))
             walk_foot_rows.append(foot_positions(target_copy, ("bone_8", "bone_14")))
             baseline_vertices = mesh_vertices(target_meshes)
             walk_cap_rows.append(weighted_group_centroid(target_meshes,
@@ -698,10 +843,20 @@ def main():
         combined_pose_rows = []
         basis_samples = []
         combined_gaps = []
+        combined_gaps_right = []
         max_pose_scale_delta_vs_walk = 0.0
         semantic_target_rows = []
+        semantic_target_right_rows = []
         mesh_finite_failures = []
         arm_bones = set(bones) - TORSO_CONTEXT
+        semantic_arm_names = {"bone_22", "bone_23", "bone_24", "bone_25",
+                              "bone_26", "bone_27", "bone_29", "bone_30"}
+        right_arm_bones = {LEFT_TO_RIGHT_BONES[name] for name in semantic_arm_names}
+        right_subtree = descendant_bone_names(target_copy.data, "bone_57") | {"bone_57"}
+        written_arm_bones = arm_bones | right_subtree
+        right_root_anchor_corrections = []
+        right_finger_names = right_subtree - right_arm_bones - {"bone_57"}
+        max_right_finger_local_error = 0.0
         max_pose_write_error = 0.0
         max_pose_write_detail = None
         max_foot_baseline_error = 0.0
@@ -718,11 +873,56 @@ def main():
             mixed_pose = {name: matrix.copy() for name, matrix in base_pose.items()}
             for name in arm_bones:
                 mixed_pose[name] = Matrix((rebase @ pca_pose[name]).tolist())
+            torso_rest_matrix = numpy_matrix(target_rest[TARGET_PROFILE["torso"]]["rest_matrix"])
+            right_profile_pose = pca_pose_rows_right[index]
+            for left_name in semantic_arm_names:
+                right_name = LEFT_TO_RIGHT_BONES[left_name]
+                left_matrix = rebase @ right_profile_pose[left_name]
+                right_matrix = mirror_pose_across_sagittal(
+                    left_matrix, torso_to, torso_rest_matrix,
+                    numpy_matrix(target_rest[left_name]["rest_matrix"]),
+                    numpy_matrix(target_rest_all[right_name]["rest_matrix"]))
+                mixed_pose[right_name] = Matrix(right_matrix.tolist())
+            # The right latent fit can infer a small translation on the
+            # unweighted clavicle/root bone. Anchor its head to the validated
+            # clean-walk shoulder and carry that translation through every
+            # descendant (including non-profile finger bones). This preserves
+            # all fitted relative arm/branch poses while preventing shoulder
+            # drift and keeping the fingers attached to the glove.
+            right_root_delta = (numpy_matrix(base_pose["bone_57"])[0:3, 3] -
+                                numpy_matrix(mixed_pose["bone_57"])[0:3, 3])
+            right_root_anchor_corrections.append(float(np.linalg.norm(right_root_delta)))
+            for name in right_subtree:
+                shifted = numpy_matrix(mixed_pose[name]).copy()
+                shifted[:3, 3] += right_root_delta
+                mixed_pose[name] = Matrix(shifted.tolist())
+            # Keep right thumb/finger/helper transforms in their validated
+            # baseline parent-local pose while following the new hand and
+            # forearm. Rebuild them parent-first so they remain attached.
+            def hierarchy_depth(name):
+                depth, bone = 0, target_copy.data.bones[name]
+                while bone.parent is not None:
+                    depth += 1
+                    bone = bone.parent
+                return depth
+            for name in sorted(right_finger_names, key=hierarchy_depth):
+                parent_name = target_copy.data.bones[name].parent.name
+                relative = (np.linalg.inv(numpy_matrix(base_pose[parent_name])) @
+                            numpy_matrix(base_pose[name]))
+                mixed_pose[name] = Matrix((numpy_matrix(mixed_pose[parent_name]) @
+                                           relative).tolist())
             for name in TORSO_CONTEXT:
                 # Keep the validated target walk root/torso channels.
                 mixed_pose[name] = base_pose[name].copy()
             bases = assign_pose_matrices_hierarchical(target_copy, mixed_pose)
             actual = evaluated_bone_matrices(target_copy)
+            for finger_name in right_finger_names:
+                parent_name = target_copy.data.bones[finger_name].parent.name
+                actual_relative = np.linalg.inv(numpy_matrix(actual[parent_name])) @ numpy_matrix(actual[finger_name])
+                baseline_relative = (np.linalg.inv(numpy_matrix(base_pose[parent_name])) @
+                                     numpy_matrix(base_pose[finger_name]))
+                max_right_finger_local_error = max(max_right_finger_local_error,
+                    matrix_error(actual_relative, baseline_relative))
             for foot_name, baseline_position in walk_foot_rows[index].items():
                 current_position = foot_positions(target_copy, (foot_name,))[foot_name]
                 max_foot_baseline_error = max(max_foot_baseline_error,
@@ -739,7 +939,7 @@ def main():
                                          base_scales[pb.name])))
                     for pb in target_copy.pose.bones))
             for name in actual:
-                if name not in arm_bones:
+                if name not in written_arm_bones:
                     max_nonmodel_pose_error = max(max_nonmodel_pose_error,
                         matrix_error(actual[name], base_pose[name]))
                 error = matrix_error(actual[name], mixed_pose[name])
@@ -750,9 +950,16 @@ def main():
                         "actual": matrix_rows(actual[name])}
             combined_pose_rows.append({name: matrix.copy() for name, matrix in actual.items()})
             combined_gaps.append(continuity(target_copy))
+            combined_gaps_right.append(continuity_for_pairs(target_copy, RIGHT_GAP_PAIRS))
             target_semantics = semantic_from_target_sample(target_rest,
                 {name: numpy_matrix(actual[name]) for name in bones})
             semantic_target_rows.append(target_semantics)
+            target_right_semantics = semantic_from_target_sample(
+                target_rest_all, {name: numpy_matrix(actual[name])
+                                  for name in target_rest_all},
+                TARGET_PROFILE_RIGHT, right_forearm_to_left)
+            semantic_target_right_rows.append(source_right_to_left_semantics(
+                target_right_semantics, right_forearm_to_left, body_reflection))
             failures = finite_pose(target_copy)
             if failures:
                 mesh_finite_failures.extend({"frame": frame, "bone": item} for item in failures)
@@ -763,7 +970,7 @@ def main():
                                                      "vertex": vertex_index})
             basis_samples.append((float(frame), bases))
 
-        action_name = "Waluigi_LuigiWalk_SemanticLeftArm_Elbow_v1"
+        action_name = "Waluigi_LuigiWalk_SemanticBothArms_v1"
         if bpy.data.actions.get(action_name):
             action_name += "_Prototype"
         baked_action = make_action(target_copy, action_name, basis_samples)
@@ -795,7 +1002,16 @@ def main():
             name: max(max(0.0, native_gap_ranges[name]["min"] - min(row[name] for row in combined_gaps)),
                       max(0.0, max(row[name] for row in combined_gaps) - native_gap_ranges[name]["max"]))
             for name in native_gap_ranges}
+        baseline_gap_change_right = {
+            key: max(abs(baseline_gaps_right[i][key] - combined_gaps_right[i][key])
+                     for i in range(len(frames))
+                     ) for key in baseline_gaps_right[0]}
+        native_gap_outside_range_right = {
+            name: max(max(0.0, native_gap_ranges[name]["min"] - min(row[name] for row in combined_gaps_right)),
+                      max(0.0, max(row[name] for row in combined_gaps_right) - native_gap_ranges[name]["max"]))
+            for name in native_gap_ranges}
         semantic_error = np.asarray(semantic_target_rows) - source_semantics
+        semantic_error_right = np.asarray(semantic_target_right_rows) - source_semantics_right
         if os.path.isfile(args.v1_report):
             with open(args.v1_report, "r", encoding="utf-8") as stream:
                 v1_report = json.load(stream)
@@ -805,6 +1021,8 @@ def main():
             raise RuntimeError("v1 residual report is required for the improvement gate")
         current_rmse = {name: float(np.sqrt(np.mean(semantic_error[:, i] ** 2)))
                         for i, name in enumerate(SEMANTIC_NAMES)}
+        current_rmse_right = {name: float(np.sqrt(np.mean(semantic_error_right[:, i] ** 2)))
+                              for i, name in enumerate(SEMANTIC_NAMES)}
         semantic_groups = {
             "shoulder_orientation": (0, 1, 2), "elbow_flexion": (3,),
             "forearm_roll": (4,), "wrist_orientation": (5, 6, 7),
@@ -821,6 +1039,13 @@ def main():
             "feature": SEMANTIC_NAMES[int(np.argmax(np.abs(semantic_error[worst_frame_index])))],
             "absolute_residual": float(np.max(np.abs(semantic_error[worst_frame_index]))),
             "per_feature_absolute_residual": {name: float(abs(semantic_error[worst_frame_index, i]))
+                for i, name in enumerate(SEMANTIC_NAMES)}}
+        worst_right_index = int(np.argmax(np.max(np.abs(semantic_error_right), axis=1)))
+        worst_semantic_right = {"frame": frames[worst_right_index],
+            "feature": SEMANTIC_NAMES[int(np.argmax(np.abs(semantic_error_right[worst_right_index])))],
+            "absolute_residual": float(np.max(np.abs(semantic_error_right[worst_right_index]))),
+            "per_feature_absolute_residual": {
+                name: float(abs(semantic_error_right[worst_right_index, i]))
                 for i, name in enumerate(SEMANTIC_NAMES)}}
         squared_vel = np.diff(smoothed, axis=0)
         squared_acc = np.diff(smoothed, n=2, axis=0)
@@ -851,7 +1076,7 @@ def main():
                     "weight_sum": float(sum(weights))}
 
         report = {
-            "schema": "mg1.semantic-luigi-walk-to-waluigi-left-arm.v1",
+            "schema": "mg1.semantic-luigi-walk-to-waluigi-both-arms.v1",
             "source_rig": source_rig.name, "source_action": source_action.name,
             "source_slot": source_slot.identifier, "source_frames": frames,
             "target_rig": target_original.name, "target_walk_action": walk_source_action.name,
@@ -871,8 +1096,32 @@ def main():
                 "standardized_residual_weight": float(args.elbow_weight),
                 "target_native_training_range_radians": [float(sem_train[:, 3].min()),
                                                           float(sem_train[:, 3].max())]},
+            "right_arm_mapping": {
+                "source_bones": {key: SOURCE_PROFILE_RIGHT[key] for key in
+                    ("shoulder", "upper", "elbow_a", "elbow_b", "forearm", "forearm_overlap", "wrist", "hand")},
+                "target_bones": {key: TARGET_PROFILE_RIGHT[key] for key in
+                    ("shoulder", "upper", "elbow_a", "elbow_b", "forearm", "forearm_overlap", "wrist", "hand")},
+                "left_to_right_deform_bone_map": LEFT_TO_RIGHT_BONES,
+                "method": "independent right-source semantic solve through shared context PCA, followed by rest-calibrated sagittal reflection into the homologous right basis",
+                "branch_constraints_independent": True,
+                "finger_bones_preserved_from_baseline": [f"bone_{i}" for i in range(66, 87)]},
+            "right_elbow_source_mapping": {
+                "definition": "right source flexion excursion relative to frame 0 in the canonical semantic frame",
+                "raw_source_range_radians": [float(raw_source_semantics_right[:, 3].min()),
+                                             float(raw_source_semantics_right[:, 3].max())],
+                "frame_0_reference_radians": source_elbow_reference_right,
+                "excursion_gain": float(args.elbow_gain),
+                "mapped_source_range_radians": [float(source_semantics_right[:, 3].min()),
+                                                float(source_semantics_right[:, 3].max())],
+                "standardized_residual_weight": float(args.elbow_weight)},
             "source_target_semantic_rmse": {name: float(np.sqrt(np.mean(semantic_error[:, i] ** 2)))
                                               for i, name in enumerate(SEMANTIC_NAMES)},
+            "right_source_target_semantic_rmse": current_rmse_right,
+            "right_worst_semantic_residual": worst_semantic_right,
+            "right_elbow_curve_radians": [{"frame": int(frame),
+                "source": float(source_semantics_right[i, 3]),
+                "target": float(semantic_target_right_rows[i][3])}
+                for i, frame in enumerate(frames)],
             "residual_comparison_to_v1": {"v1_rmse": v1_rmse,
                 "current_rmse": current_rmse, "semantic_group_rmse": group_comparison,
                 "worst_frame": worst_semantic},
@@ -922,12 +1171,18 @@ def main():
                 "max_foot_tail_error_vs_walk": max_foot_baseline_error,
                 "max_head_cap_centroid_error_vs_walk": max_cap_baseline_error,
                 "max_baked_action_replay_matrix_error": max_baked_replay_error,
+                "left_max_joint_gap_change_vs_validated_walk": baseline_gap_change,
+                "right_max_joint_gap_change_vs_validated_walk": baseline_gap_change_right,
+                "max_right_root_anchor_translation_correction": max(right_root_anchor_corrections),
+                "max_right_finger_local_matrix_error_vs_clean_walk": max_right_finger_local_error,
                 "walk_root_world_matrix": matrix_rows(target_copy.matrix_world),
-                "max_joint_gap_change_vs_validated_walk": baseline_gap_change,
                 "native_training_joint_gap_ranges_armature_units": native_gap_ranges,
-                "max_joint_gap_outside_native_range_armature_units": native_gap_outside_range,
+                "left_max_joint_gap_outside_native_range_armature_units": native_gap_outside_range,
+                "right_max_joint_gap_outside_native_range_armature_units": native_gap_outside_range_right,
                 "semantic_feature_rmse_after_solve": {name: float(np.sqrt(np.mean(semantic_error[:, i] ** 2)))
                                                         for i, name in enumerate(SEMANTIC_NAMES)},
+                "semantic_feature_rmse_by_side": {"left": current_rmse,
+                                                   "right": current_rmse_right},
                 "finite_value_failures": mesh_finite_failures,
                 "sampled_frames_for_visual_review": [0, 15, 30, 45, 60]},
             "safety": {"production_objects_mutated": False, "production_actions_mutated": False,
@@ -938,9 +1193,11 @@ def main():
             "fit_gate": "pass" if not mesh_finite_failures and max_pose_write_error < 2e-3 and
                          max_baked_replay_error < 1e-4 and
                          max_nonmodel_pose_error < 2e-3 and
+                         max_right_finger_local_error < 2e-3 and
                          max_foot_baseline_error < 2e-4 and
                          max_cap_baseline_error < 2e-4 and
-                         all(value < 0.02 for value in native_gap_outside_range.values()) else "fail",
+                         all(value < 0.02 for value in native_gap_outside_range.values()) and
+                         all(value < 0.02 for value in native_gap_outside_range_right.values()) else "fail",
             "semantic_fit_gate": "pass" if all(
                 row["relative_improvement"] >= 0.25 for row in group_comparison.values()) else "fail",
             "max_pose_write_matrix_tolerance": 2e-3,

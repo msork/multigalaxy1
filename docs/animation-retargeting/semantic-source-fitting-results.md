@@ -127,3 +127,32 @@ Increasing only the elbow residual weight from 4 to 16 did not change the solved
 Fit report: `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v5_elbow_fit.json`.
 Saved-file validation and full elbow curves: `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v5_elbow_validation.json`.
 Local preview (ignored by Git): `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v5_elbow.blend`, rig `SemanticWalk_Waluigi_Target_Rig`, action `Waluigi_LuigiWalk_SemanticLeftArm_Elbow_v1`.
+
+## Combined left and right walk preview
+
+The right side uses Luigi `ShoulderR`, `ArmR1`, `ArmR2`, and `HandR`; the target homologues are Waluigi `bone_57`, `bone_58`, `bone_62`, and `bone_65`. The complete deform/context correspondence is `22?57`, `23?58`, `24?59`, `25?60`, `26?61`, `27?62`, `29?64`, `30?65`; left finger/context bones `31–51` correspond to right `66–86`. The right source features are converted into the left-canonical model coordinates with torso-space reflection for shoulder rotation and hand displacement, the calibrated forearm frame map for wrist rotation, and the corresponding signed forearm-roll conversion. The armature-space transforms are then reflected through a per-bone correspondence derived from both sides' production rest matrices. Reflection reproduces all 28 homologous rest transforms with a maximum matrix error of 8.9e-16.
+
+Each side has a separate semantic latent solve and separate four-joint continuity residual set. The validated 38-bone target context model is reused for both fits; the source action is sampled once per side from `luigi.001_armature_walk`. Waluigi's 43.437 object scale is retained. The right shoulder root is anchored to the validated walk shoulder position; this correction is carried through its arm subtree and baseline parent-local finger/helper transforms are reconstructed so the glove and fingers stay attached.
+
+| Semantic feature | Left RMSE | Right RMSE |
+|---|---:|---:|
+| Shoulder rotation X | 0.508 rad | 0.607 rad |
+| Shoulder rotation Y | 0.286 rad | 0.324 rad |
+| Shoulder rotation Z | 0.835 rad | 0.851 rad |
+| Elbow flexion | 0.233 rad | 0.270 rad |
+| Forearm roll | 1.085 rad | 1.409 rad |
+| Wrist rotation X | 0.273 rad | 0.215 rad |
+| Wrist rotation Y | 0.147 rad | 0.129 rad |
+| Wrist rotation Z | 0.037 rad | 0.037 rad |
+| Hand displacement X | 0.242 | 0.271 |
+| Hand displacement Y | 0.334 | 0.334 |
+| Hand displacement Z | 0.602 | 0.552 |
+
+The largest left residual is forearm roll at frame 23 (1.241 rad). The largest right residual is forearm roll at frame 43 (1.658 rad). Right mapped elbow excursion is -0.073 to 0.630 rad; both right branch angle curves span 0.217 to 0.591 rad and agree within 0.0002 rad. Right branch-gap excursions stay within 0.0025 armature units of native range; left stays within 0.00245. The maximum right shoulder anchor translation is 0.1059 armature units. Right finger/helper parent-local transform error is 1.36e-6.
+
+Fit gate and fresh-process saved-preview validation both pass. The saved action replays with maximum semantic RMSE difference 6.81e-8, matrix replay error 7.15e-7, zero runtime constraints, 184,220 finite mesh-vertex samples, and unchanged object scale. Foot-tail and cap-centroid errors remain 1.64e-5 and 1.63e-5.
+
+Local complete preview (ignored by Git): `tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_v7.blend`. Rig: `SemanticWalk_Waluigi_Target_Rig`. Action: `Waluigi_LuigiWalk_SemanticBothArms_v1`. Inspect frames 6, 23, 31, 36, 43, 51, and 60. Frame 31 shows the left maximum bend; frame 43 shows the right maximum bend and the largest right roll residual. The right forearm-roll error remains high, so the user must visually verify both arms before any other animations are fit.
+
+Fit report: `tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_v7_fit.json`.
+Saved-preview report: `tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_v7_saved_validation.json`.
