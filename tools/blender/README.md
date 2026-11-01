@@ -88,3 +88,11 @@ python tools/blender/label_native_arm_candidates.py tools/blender/reports/native
 The bundle preserves exact FCurve keyframe/subframe times, local/armature/world matrices, rest-relative transforms, arm branch landmarks, static weighted vertex positions, evaluated per-bone mesh centroids, TrackIds, curve ranges, action metadata, and full slot inventory. It identifies `sequence_10.003` as the previously validated anchor for `OBArmature.004`; other slots are excluded because their source-rig link is ambiguous. The remaining `.004` actions are high-confidence family candidates; their source-owner object was not preserved, so that confidence remains an inference. The default action-level holdouts are `sequence_11.003`, `sequence_15.003`, `sequence_20.001`, `sequence_24`, and `sequence_26`.
 
 `test_native_arm_extract_blender.py` checks exact subframe sampling, rest-relative transforms, TrackIds, weighted vertices, scene-frame restoration, and temporary-object cleanup in Blender background mode. `test_native_arm_labels.py` covers sign-invariant action feature labels.
+
+To create the disposable viewport validation set after extracting the dataset:
+
+```powershell
+python tools/blender/preview_native_waluigi_arm.py --dataset tools/blender/reports/native_waluigi_arm_calibration.json --output tools/blender/reports/native_waluigi_preview_validation.json
+```
+
+The default three actions are `sequence_10.003`, `sequence_15.003`, and `sequence_24`. The command assigns each existing `.004` action unchanged to its own duplicate armature, duplicates both explicitly named weighted mesh objects, rebinds only those duplicate modifiers, spaces the preview characters apart, and compares sampled transforms and weighted centroids against the dataset. It also writes Workbench renders at five exact sample times per action under `tools/blender/reports/native_arm_preview_renders/`. Render setup, object visibility, camera, engine, frame, and shading settings are restored afterward. It creates no actions and refuses to run if the disposable rig's rest signature or scale differs from production. Preview objects are bridge-tagged for later targeted cleanup.

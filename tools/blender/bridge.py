@@ -223,6 +223,7 @@ def _extract_native_arm_dataset(args):
         temp_obj.name = "_MG1_NativeArmDataset_Temporary"
         temp_obj.data.name = "_MG1_NativeArmDataset_Temporary_Data"
         scene.collection.objects.link(temp_obj)
+        temp_obj.animation_data_create()
         for source in mesh_sources:
             duplicate = source.copy()
             duplicate.data = source.data.copy()
@@ -253,7 +254,9 @@ def _extract_native_arm_dataset(args):
             sample_times = sorted(set(exact_key_times) | {start, end})
             if len(sample_times) > max_samples:
                 raise ValueError(action.name + " has more exact keyed times than max_samples_per_action")
-            temp_obj.animation_data_create()
+            temp_obj.animation_data.action = None
+            for pose_bone in temp_obj.pose.bones:
+                pose_bone.matrix_basis = Matrix.Identity(4)
             temp_obj.animation_data.action = action
             if hasattr(temp_obj.animation_data, "action_slot"):
                 temp_obj.animation_data.action_slot = slot
@@ -1028,6 +1031,321 @@ def _prototype_waluigi_arm(args):
             _remove_owned_object(source_temp)
 
 
+def _create_native_arm_previews(args):
+    """Create skinned preview copies with original native actions assigned unchanged."""
+    source = _object(args.get("object", "Waluigi_Arm_Test"))
+    if source.type != "ARMATURE":
+        raise ValueError("preview source must be an armature")
+    production = _object(args.get("production_object", "123475520_waluigi.gpl"))
+    if production.type != "ARMATURE":
+        raise ValueError("production reference must be an armature")
+    source_signature = _armature_rest_signature(source.data)
+    production_signature = _armature_rest_signature(production.data)
+    if source_signature != production_signature:
+        raise ValueError("disposable rig rest signature differs from production Waluigi")
+    if list(source.scale) != list(production.scale):
+        raise ValueError("disposable rig scale differs from production reference")
+    names = list(args.get("bones", _ARM_BONES["left"]))
+    source_scale_before = [float(v) for v in source.scale]
+    if any(source.data.bones.get(n) is None for n in names):
+        raise ValueError("requested arm bone missing from preview source")
+    mesh_sources = [_object(n) for n in args.get("meshes", [])]
+    if not mesh_sources:
+        raise ValueError("supply explicit weighted mesh objects for skinned previews")
+    for mesh in mesh_sources:
+        if mesh.type != "MESH":
+            raise ValueError("preview mesh source is not a mesh: " + mesh.name)
+        if not any(mod.type == "ARMATURE" and mod.object == source for mod in mesh.modifiers):
+            raise ValueError("preview mesh is not bound to disposable armature " + source.name + ": " + mesh.name)
+    mesh_scale_before = {mesh.name: [float(v) for v in mesh.scale] for mesh in mesh_sources}
+    action_requests = args.get("actions", [])
+    if len(action_requests) != 3:
+        raise ValueError("provide exactly three native action previews")
+    if len({row.get("name") for row in action_requests}) != 3:
+        raise ValueError("preview actions must be unique")
+    spacing = float(args.get("spacing_world", 350.0))
+    created_objects = []
+    preview_rows = []
+    scene = bpy.context.scene
+    original_frame, original_subframe = scene.frame_current, scene.frame_subframe
+    success = False
+    group = "native-arm-preview-" + uuid.uuid4().hex
+    try:
+        for index, request_row in enumerate(action_requests):
+            action_name = request_row["name"]
+            action = bpy.data.actions.get(action_name)
+            if action is None:
+                raise ValueError("action not found: " + action_name)
+            slot_identifier = request_row.get("slot_identifier")
+            slots = [slot for slot in getattr(action, "slots", []) if slot.identifier == slot_identifier]
+            if len(slots) != 1 or slots[0].target_id_type != "OBJECT":
+                raise ValueError("action slot is absent or not object-targeted: " + action_name)
+            slot = slots[0]
+            action_bones = sorted({match.group(1) for fc, _layer, curve_slot in _action_curves(action)
+                if curve_slot == slot and (match := re.match(r'^pose\.bones\["([^"]+)"\]', fc.data_path))})
+            missing = [name for name in action_bones if source.data.bones.get(name) is None]
+            if missing:
+                raise ValueError(action_name + " targets bones absent from the disposable Waluigi rig: " + ", ".join(missing))
+            if slot_identifier != "OBArmature.004":
+                raise ValueError("preview action is outside the selected high-confidence candidate family: " + action_name)
+            if not request_row.get("samples"):
+                raise ValueError("expected dataset samples are required for comparison: " + action_name)
+
+            safe = re.sub(r"[^A-Za-z0-9]+", "_", action_name).strip("_")
+            base_name = "Waluigi_NativePreview_" + safe
+            preview_obj = source.copy()
+            preview_obj.data = source.data.copy()
+            preview_obj.name = _unique_id_name(bpy.data.objects, base_name)
+            preview_obj.data.name = preview_obj.name + "_Data"
+            preview_obj[TAG] = True
+            preview_obj["_mg1_native_preview_group"] = group
+            preview_obj["_mg1_native_preview_source_action"] = action.name
+            preview_obj["_mg1_native_preview_slot"] = slot.identifier
+            scene.collection.objects.link(preview_obj)
+            offset = Vector(((index + 1) * spacing, 0.0, 0.0))
+            preview_obj.matrix_world = Matrix.Translation(offset) @ source.matrix_world
+            preview_obj.animation_data_create()
+            preview_obj.animation_data.action = None
+            for pose in preview_obj.pose.bones:
+                pose.matrix_basis = Matrix.Identity(4)
+            preview_obj.animation_data.action = action
+            preview_obj.animation_data.action_slot = slot
+            created_objects.append(preview_obj)
+
+            mesh_copies = []
+            for mesh_source in mesh_sources:
+                duplicate = mesh_source.copy()
+                duplicate.data = mesh_source.data.copy()
+                duplicate.name = _unique_id_name(bpy.data.objects, base_name + "_" + re.sub(r"[^A-Za-z0-9]+", "_", mesh_source.name))
+                duplicate.data.name = duplicate.name + "_Data"
+                duplicate[TAG] = True
+                duplicate["_mg1_native_preview_group"] = group
+                duplicate["_mg1_native_preview_source_mesh"] = mesh_source.name
+                duplicate["_mg1_native_preview_source_action"] = action.name
+                duplicate.matrix_world = Matrix.Translation(offset) @ mesh_source.matrix_world
+                for modifier in duplicate.modifiers:
+                    if modifier.type == "ARMATURE" and modifier.object == source:
+                        modifier.object = preview_obj
+                scene.collection.objects.link(duplicate)
+                mesh_copies.append(duplicate)
+                created_objects.append(duplicate)
+
+            comparison_rows = []
+            max_matrix_error = 0.0
+            max_centroid_error = 0.0
+            max_scale_deviation = 0.0
+            for expected in request_row["samples"]:
+                time = float(expected["time"])
+                base_frame = math.floor(time)
+                scene.frame_set(int(base_frame), subframe=time-base_frame)
+                bpy.context.view_layer.update()
+                pose_rows = {}
+                sample_matrix_error = 0.0
+                for bone_name in names:
+                    pose = preview_obj.pose.bones[bone_name]
+                    actual_matrix = _mat(pose.matrix)
+                    expected_matrix = expected["bones"][bone_name]["armature_pose"]
+                    error = max(abs(actual_matrix[r][c] - expected_matrix[r][c]) for r in range(4) for c in range(4))
+                    max_matrix_error = max(max_matrix_error, error)
+                    sample_matrix_error = max(sample_matrix_error, error)
+                    max_scale_deviation = max(max_scale_deviation, *(abs(float(x)-1.0) for x in pose.scale))
+                    pose_rows[bone_name] = actual_matrix
+                actual_centroids = _mesh_weight_centroids(mesh_sources, mesh_copies, names, preview_obj)
+                centroid_error = 0.0
+                for mesh_source in mesh_sources:
+                    expected_mesh = expected.get("weighted_mesh_centroids", {}).get(mesh_source.name, {})
+                    actual_mesh = actual_centroids.get(mesh_source.name, {})
+                    for bone_name in names:
+                        expected_point = expected_mesh.get(bone_name, {}).get("weighted_centroid_world")
+                        actual_point = actual_mesh.get(bone_name, {}).get("centroid_world")
+                        if expected_point is None or actual_point is None:
+                            continue
+                        # Remove the preview's placement offset before comparing with the saved dataset.
+                        error = math.sqrt(sum((actual_point[axis] - offset[axis] - expected_point[axis])**2
+                                              for axis in range(3)))
+                        centroid_error = max(centroid_error, error)
+                max_centroid_error = max(max_centroid_error, centroid_error)
+                p = preview_obj.pose.bones
+                joint_gaps = {
+                    "shoulder_parent_to_head": float((preview_obj.matrix_world @ p["bone_21"].tail - preview_obj.matrix_world @ p["bone_22"].head).length),
+                    "main_elbow_parent_to_head": float((preview_obj.matrix_world @ p["bone_24"].tail - preview_obj.matrix_world @ p["bone_26"].head).length),
+                    "overlap_elbow_parent_to_head": float((preview_obj.matrix_world @ p["bone_25"].tail - preview_obj.matrix_world @ p["bone_29"].head).length),
+                    "main_wrist_parent_to_head": float((preview_obj.matrix_world @ p["bone_26"].tail - preview_obj.matrix_world @ p["bone_27"].head).length),
+                    "glove_parent_to_head": float((preview_obj.matrix_world @ p["bone_27"].tail - preview_obj.matrix_world @ p["bone_30"].head).length),
+                    "overlap_forearm_to_glove": float((preview_obj.matrix_world @ p["bone_29"].tail - preview_obj.matrix_world @ p["bone_30"].head).length),
+                }
+                comparison_rows.append({"time": time, "max_armature_matrix_abs_error": sample_matrix_error,
+                    "max_weighted_centroid_error_world": centroid_error,
+                    "pose_scales": {n: [float(x) for x in preview_obj.pose.bones[n].scale] for n in names},
+                    "joint_gaps_world": joint_gaps})
+            finger_descendants = {bone.name for bone in source.data.bones["bone_30"].children_recursive} if source.data.bones.get("bone_30") else set()
+            preview_rows.append({"action": action.name, "slot_identifier": slot.identifier,
+                "preview_armature": preview_obj.name, "preview_meshes": [m.name for m in mesh_copies],
+                "animated_bone_count": len(action_bones), "animated_bones": action_bones,
+                "finger_bones_animated": sorted(finger_descendants.intersection(action_bones)),
+                "offset_world": [float(v) for v in offset],
+                "object_scale": [float(v) for v in preview_obj.scale],
+                "mesh_object_scales": {s.name: [float(v) for v in m.scale] for s, m in zip(mesh_sources, mesh_copies)},
+                "max_matrix_error": max_matrix_error, "max_centroid_error_world": max_centroid_error,
+                "max_pose_scale_deviation": max_scale_deviation,
+                "runtime_constraint_count": len(preview_obj.constraints) + sum(len(p.constraints) for p in preview_obj.pose.bones),
+                "samples": comparison_rows})
+        # Leave the preview set at its start pose for immediate viewport inspection.
+        scene.frame_set(0)
+        bpy.context.view_layer.update()
+        result = {"schema": "mg1.native-arm-visual-preview.v1", "read_only_sources": True,
+            "source_object": source.name, "production_object": production.name,
+            "rest_signature_match": source_signature == production_signature,
+            "production_scale": [float(v) for v in production.scale],
+            "source_scale_unchanged": source_scale_before == [float(v) for v in source.scale],
+            "action_count": len(preview_rows), "action_data_copied": False,
+            "new_actions_created": [], "preview_group": group,
+            "placement_spacing_world": spacing, "previous_scene_frame": [original_frame, original_subframe],
+            "preview_frame": [scene.frame_current, scene.frame_subframe], "previews": preview_rows,
+            "validation": {"rest_signature_matches_production": True,
+                "all_action_bones_exist": True,
+                "source_scale_unchanged": source_scale_before == [float(v) for v in source.scale],
+                "preview_scales_match_source": all(row["object_scale"] == source_scale_before and
+                    all(values == mesh_scale_before[name] for name, values in row["mesh_object_scales"].items())
+                    for row in preview_rows),
+                "max_matrix_error": max(row["max_matrix_error"] for row in preview_rows),
+                "max_weighted_centroid_error_world": max(row["max_centroid_error_world"] for row in preview_rows),
+                "pose_scale_deviation_max": max(row["max_pose_scale_deviation"] for row in preview_rows),
+                "no_runtime_constraints": all(row["runtime_constraint_count"] == 0 for row in preview_rows),
+                "transform_match_within_tolerance": all(row["max_matrix_error"] < float(args.get("matrix_tolerance", 1e-5)) for row in preview_rows),
+                "centroid_match_within_tolerance": all(row["max_centroid_error_world"] < float(args.get("centroid_tolerance", 1e-4)) for row in preview_rows),
+                "finite": _finite_tree(preview_rows)}}
+        if (not result["validation"]["finite"] or not result["validation"]["transform_match_within_tolerance"] or
+                not result["validation"]["centroid_match_within_tolerance"] or not result["validation"]["no_runtime_constraints"]):
+            summary = [{"action": row["action"], "slot": row["slot_identifier"],
+                        "matrix_error": row["max_matrix_error"],
+                        "centroid_error_world": row["max_centroid_error_world"],
+                        "constraints": row["runtime_constraint_count"]} for row in preview_rows]
+            raise RuntimeError("native preview numerical validation failed: " + json.dumps(
+                {"validation": result["validation"], "actions": summary}))
+        if not result["validation"]["source_scale_unchanged"] or not result["validation"]["preview_scales_match_source"]:
+            raise RuntimeError("native preview changed or failed to preserve an object scale")
+        success = True
+        return result
+    except Exception:
+        for obj in reversed(created_objects):
+            _remove_owned_object(obj)
+        raise
+    finally:
+        if not success:
+            scene.frame_set(original_frame, subframe=original_subframe)
+
+
+def _capture_native_arm_previews(args):
+    """Render requested bridge-owned preview meshes, restoring all scene render state."""
+    group = args.get("preview_group")
+    if not group:
+        raise ValueError("preview_group is required")
+    objects = [obj for obj in bpy.data.objects if obj.get(TAG, False) and
+               obj.get("_mg1_native_preview_group") == group]
+    meshes = [obj for obj in objects if obj.type == "MESH"]
+    armatures = [obj for obj in objects if obj.type == "ARMATURE"]
+    if not meshes or len(armatures) != 3:
+        raise ValueError("preview group must contain three armatures and their meshes")
+    samples = args.get("samples", {})
+    output_dir = os.path.abspath(args["output_dir"])
+    os.makedirs(output_dir, exist_ok=True)
+    scene = bpy.context.scene
+    saved = {"camera": scene.camera, "engine": scene.render.engine,
+        "filepath": scene.render.filepath, "format": scene.render.image_settings.file_format,
+        "resolution_x": scene.render.resolution_x, "resolution_y": scene.render.resolution_y,
+        "resolution_percentage": scene.render.resolution_percentage,
+        "frame": scene.frame_current, "subframe": scene.frame_subframe,
+        "hide_render": {obj.name: obj.hide_render for obj in bpy.data.objects},
+        "shading": {key: getattr(scene.display.shading, key) for key in
+                    ("light", "color_type", "show_cavity", "show_shadows", "background_type", "background_color")
+                    if hasattr(scene.display.shading, key)}}
+    camera_data = bpy.data.cameras.new("_MG1_NativeArmPreview_Camera_Data")
+    camera = bpy.data.objects.new("_MG1_NativeArmPreview_Camera", camera_data)
+    scene.collection.objects.link(camera)
+    camera.data.type = "ORTHO"
+    scene.camera = camera
+    paths = []
+    try:
+        for obj in bpy.data.objects:
+            obj.hide_render = obj not in meshes and obj != camera
+        scene.render.engine = "BLENDER_WORKBENCH"
+        scene.render.resolution_x = int(args.get("resolution", 800))
+        scene.render.resolution_y = int(args.get("resolution", 800))
+        scene.render.resolution_percentage = 100
+        scene.render.image_settings.file_format = "PNG"
+        shading = scene.display.shading
+        if hasattr(shading, "light"):
+            shading.light = "STUDIO"
+        if hasattr(shading, "color_type"):
+            shading.color_type = "MATERIAL"
+        if hasattr(shading, "show_cavity"):
+            shading.show_cavity = True
+        if hasattr(shading, "show_shadows"):
+            shading.show_shadows = True
+        if hasattr(shading, "background_type"):
+            shading.background_type = "WORLD"
+        if hasattr(shading, "background_color"):
+            shading.background_color = (0.025, 0.03, 0.045)
+
+        for armature in armatures:
+            action_name = armature.get("_mg1_native_preview_source_action")
+            action_samples = samples.get(action_name, [])
+            arm_meshes = [mesh for mesh in meshes if mesh.get("_mg1_native_preview_source_action") == action_name]
+            # Object names have a sanitized action suffix; use their world bounds to fit the view.
+            if not action_samples:
+                raise ValueError("missing render sample times for " + str(action_name))
+            for sample_time in action_samples:
+                base = math.floor(float(sample_time))
+                scene.frame_set(int(base), subframe=float(sample_time)-base)
+                bpy.context.view_layer.update()
+                points = []
+                for mesh in arm_meshes:
+                    evaluated = mesh.evaluated_get(bpy.context.evaluated_depsgraph_get())
+                    mesh_eval = evaluated.to_mesh()
+                    try:
+                        points.extend(evaluated.matrix_world @ vertex.co for vertex in mesh_eval.vertices)
+                    finally:
+                        evaluated.to_mesh_clear()
+                if not points:
+                    raise ValueError("preview meshes contain no renderable vertices: " + str(action_name))
+                minimum = Vector(tuple(min(point[i] for point in points) for i in range(3)))
+                maximum = Vector(tuple(max(point[i] for point in points) for i in range(3)))
+                center = (minimum + maximum) * 0.5
+                extent = maximum - minimum
+                camera.data.ortho_scale = max(float(extent.x), float(extent.z), 1.0) * 1.2
+                distance = max(float(extent.x), float(extent.y), float(extent.z), 1.0) * 3.0
+                camera.data.clip_end = distance * 4.0
+                camera.location = center + Vector((0.0, -distance, 0.0))
+                camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Z").to_euler()
+                safe = re.sub(r"[^A-Za-z0-9]+", "_", action_name).strip("_")
+                time_label = ("%0.4f" % float(sample_time)).rstrip("0").rstrip(".").replace(".", "p")
+                path = os.path.join(output_dir, safe + "_f" + time_label + ".png")
+                scene.render.filepath = path
+                bpy.ops.render.render(write_still=True)
+                paths.append(path)
+        return {"preview_group": group, "render_engine": "BLENDER_WORKBENCH",
+                "images": paths, "image_count": len(paths), "restored_scene_state": True}
+    finally:
+        scene.camera = saved["camera"]
+        scene.render.engine = saved["engine"]
+        scene.render.filepath = saved["filepath"]
+        scene.render.image_settings.file_format = saved["format"]
+        scene.render.resolution_x = saved["resolution_x"]
+        scene.render.resolution_y = saved["resolution_y"]
+        scene.render.resolution_percentage = saved["resolution_percentage"]
+        for name, hide in saved["hide_render"].items():
+            obj = bpy.data.objects.get(name)
+            if obj:
+                obj.hide_render = hide
+        for key, value in saved["shading"].items():
+            setattr(scene.display.shading, key, value)
+        scene.frame_set(saved["frame"], subframe=saved["subframe"])
+        bpy.data.objects.remove(camera, do_unlink=True)
+        if camera_data.users == 0:
+            bpy.data.cameras.remove(camera_data)
+
+
 def _duplicate_rig(args):
     source = _object(args["object"])
     if source.type != "ARMATURE":
@@ -1081,7 +1399,9 @@ _READ = {"inspect.objects": _inspect_objects, "inspect.armature": _inspect_armat
          "inspect.action_provenance": _inspect_action_provenance,
          "extract.native_arm_dataset": _extract_native_arm_dataset}
 _MUTATE = {"mutate.duplicate_rig": _duplicate_rig, "mutate.restore": _restore,
-           "mutate.prototype_waluigi_arm": _prototype_waluigi_arm}
+           "mutate.prototype_waluigi_arm": _prototype_waluigi_arm,
+           "mutate.native_arm_previews": _create_native_arm_previews,
+           "mutate.capture_native_arm_previews": _capture_native_arm_previews}
 
 
 def _dispatch(req):
