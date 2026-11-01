@@ -77,6 +77,22 @@ def _twist_y(rotation):
     return (angle + math.pi) % (2.0 * math.pi) - math.pi
 
 
+def _twist_about_axis(rotation, axis):
+    """Signed quaternion twist around a supplied rest-local anatomical axis."""
+    q = _matrix_to_quaternion(rotation)
+    axis = _normalize(axis)
+    if np.linalg.norm(axis) < 1e-10:
+        raise ValueError("anatomical forearm twist axis is degenerate")
+    projected = axis * float(np.dot(q[1:], axis))
+    twist = np.r_[q[0], projected]
+    norm = float(np.linalg.norm(twist))
+    if norm < 1e-10:
+        return 0.0
+    twist /= norm
+    angle = 2.0 * math.atan2(float(np.dot(twist[1:], axis)), float(twist[0]))
+    return (angle + math.pi) % (2.0 * math.pi) - math.pi
+
+
 def _point(rest_bones, pose, bone_name, endpoint):
     rest = _matrix(rest_bones[bone_name]["rest_matrix"])
     current = _matrix(pose[bone_name])
@@ -107,7 +123,8 @@ def _angle(a, b):
 
 
 def semantic_features(rest_bones, pose, profile, body_frame_map=None,
-                      forearm_frame_map=None):
+                      forearm_frame_map=None, forearm_axes_local=None,
+                      elbow_absolute=False):
     """Return the shared 11D semantic state defined by a rig profile.
 
     ``profile`` keys: torso, shoulder, upper, elbow_a/elbow_b, forearm,
@@ -170,14 +187,24 @@ def semantic_features(rest_bones, pose, profile, body_frame_map=None,
     lower_rest_vec = wrist_rest - elbow_rest
     upper_cur_vec = elbow_cur - shoulder_cur
     lower_cur_vec = wrist_cur - elbow_cur
-    elbow_delta = _angle(upper_cur_vec, lower_cur_vec) - _angle(upper_rest_vec, lower_rest_vec)
+    elbow_angle = _angle(upper_cur_vec, lower_cur_vec)
+    elbow_delta = (elbow_angle if elbow_absolute else
+                   elbow_angle - _angle(upper_rest_vec, lower_rest_vec))
 
     forearm_rest = _rotation(rest_bones[forearm]["rest_matrix"])
     forearm_pose = _rotation(_matrix(pose[forearm]))
     overlap_rest = _rotation(rest_bones[body_names["forearm_overlap"]]["rest_matrix"])
     overlap_pose = _rotation(_matrix(pose[body_names["forearm_overlap"]]))
-    twist_a = _twist_y(np.linalg.inv(forearm_rest) @ forearm_pose)
-    twist_b = _twist_y(np.linalg.inv(overlap_rest) @ overlap_pose)
+    if forearm_axes_local is None:
+        twist_a = _twist_y(np.linalg.inv(forearm_rest) @ forearm_pose)
+        twist_b = _twist_y(np.linalg.inv(overlap_rest) @ overlap_pose)
+    else:
+        axis_a = forearm_axes_local[forearm]
+        axis_b = forearm_axes_local[body_names["forearm_overlap"]]
+        twist_a = _twist_about_axis(np.linalg.inv(forearm_rest) @ forearm_pose,
+                                    axis_a)
+        twist_b = _twist_about_axis(np.linalg.inv(overlap_rest) @ overlap_pose,
+                                    axis_b)
     forearm_roll = math.atan2(math.sin(twist_a) + math.sin(twist_b),
                               math.cos(twist_a) + math.cos(twist_b))
 

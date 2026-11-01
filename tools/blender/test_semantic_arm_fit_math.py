@@ -8,10 +8,11 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from semantic_arm_fit_math import (
     farthest_centers, predict_rbf, fit_rbf_ridge, semantic_features,
-    smooth_latent_sequence, mirror_pose_across_sagittal,
+    smooth_latent_sequence, mirror_pose_across_sagittal, _twist_about_axis,
     refine_latent_sequence_joint,
 )
 from native_pose_graph import pose_pair_distance, solve_native_pose_path
+from anatomical_semantic_frames import derive_anatomical_frames
 
 
 def rest_matrix(x, y, z):
@@ -20,7 +21,58 @@ def rest_matrix(x, y, z):
     return m
 
 
+def anatomical_fixture():
+    points = {
+        "Spine2": ((0, 0, 0), (0, 1, 0)),
+        "ShoulderL": ((-1, 1, 0), (-1.2, 1, 0)),
+        "ArmL1": ((-1, 1, 0), (-2, 1, 0)),
+        "ArmL2": ((-2, 1, 0), (-3, 1, 0)),
+        "HandL": ((-3, 1, 0), (-3.5, 1, 0)),
+        "ShoulderR": ((1, 1, 0), (1.2, 1, 0)),
+        "ArmR1": ((1, 1, 0), (2, 1, 0)),
+        "ArmR2": ((2, 1, 0), (3, 1, 0)),
+        "HandR": ((3, 1, 0), (3.5, 1, 0)),
+    }
+    rest = {name: {"rest_matrix": np.eye(4).tolist(),
+                   "head": list(head), "tail": list(tail)}
+            for name, (head, tail) in points.items()}
+
+    def profile(side):
+        return {"torso": "Spine2", "shoulder_point_bone": "Shoulder" + side,
+            "shoulder_endpoint": "head", "upper": "Arm" + side + "1",
+            "elbow_a": "Arm" + side + "1", "elbow_endpoint_a": "tail",
+            "elbow_b": "Arm" + side + "2", "elbow_endpoint_b": "head",
+            "forearm": "Arm" + side + "2", "forearm_overlap": "Arm" + side + "2",
+            "wrist": "Hand" + side, "wrist_endpoint": "head",
+            "hand": "Hand" + side, "hand_endpoint": "tail",
+            "forearm_endpoint": "tail", "overlap_endpoint": "tail"}
+    return rest, profile("L"), profile("R")
+
+
 class SemanticArmFitMathTests(unittest.TestCase):
+    def test_character_neutral_frames_ignore_uniform_object_scale_and_rotation(self):
+        rest, left, right = anatomical_fixture()
+        identity = np.eye(4)
+        angle = 0.73
+        rotated = np.eye(4)
+        rotated[:3, :3] = np.asarray([
+            [np.cos(angle), -np.sin(angle), 0.0],
+            [np.sin(angle), np.cos(angle), 0.0], [0.0, 0.0, 1.0]]) * 17.5
+        first = derive_anatomical_frames(rest, identity, left, right)
+        second = derive_anatomical_frames(rest, rotated, left, right)
+        np.testing.assert_allclose(first["torso_to_anatomical"],
+                                   second["torso_to_anatomical"], atol=1e-10)
+        np.testing.assert_allclose(first["forearm_to_anatomical"],
+                                   second["forearm_to_anatomical"], atol=1e-10)
+        self.assertAlmostEqual(np.linalg.det(second["body_frame_world"]), 1.0, places=10)
+
+    def test_twist_axis_is_rest_local_and_not_assumed_to_be_local_y(self):
+        angle = 0.63
+        axis = np.asarray((1.0, 0.0, 0.0))
+        c, s = np.cos(angle), np.sin(angle)
+        rotation = np.asarray([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]])
+        self.assertAlmostEqual(_twist_about_axis(rotation, axis), angle, places=10)
+
     def test_rest_pose_has_zero_semantics(self):
         rest = {
             "torso": rest_matrix(0, 0, 0),

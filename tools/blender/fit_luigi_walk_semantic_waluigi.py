@@ -271,13 +271,17 @@ def pose_dict_from_sample(sample, bones):
 
 
 def semantic_from_source_sample(rest, pose, body_map, forearm_map,
-                                profile=SOURCE_PROFILE):
-    return semantic_features(rest, pose, profile, body_map, forearm_map)
+                                profile=SOURCE_PROFILE, forearm_axes_local=None,
+                                elbow_absolute=False):
+    return semantic_features(rest, pose, profile, body_map, forearm_map,
+                             forearm_axes_local, elbow_absolute)
 
 
 def semantic_from_target_sample(rest, pose, profile=TARGET_PROFILE,
-                                forearm_frame_map=None):
-    return semantic_features(rest, pose, profile, forearm_frame_map=forearm_frame_map)
+                                forearm_frame_map=None, forearm_axes_local=None,
+                                body_frame_map=None, elbow_absolute=False):
+    return semantic_features(rest, pose, profile, body_frame_map,
+                             forearm_frame_map, forearm_axes_local, elbow_absolute)
 
 
 GAP_PAIRS = {"shoulder": ("bone_21", "tail", "bone_22", "head"),
