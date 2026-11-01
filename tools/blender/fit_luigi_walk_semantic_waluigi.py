@@ -28,7 +28,7 @@ from fit_native_context_pca import fit as fit_pca
 from semantic_arm_fit_math import (
     encode_context_sample, farthest_centers, fit_rbf_ridge,
     mirror_pose_across_sagittal, predict_rbf, semantic_features,
-    smooth_latent_sequence,
+    refine_latent_sequence_joint, smooth_latent_sequence,
 )
 from context_dataset import normalize_context_dataset
 
@@ -122,6 +122,11 @@ def args_parse():
     parser.add_argument("--sequence-native-weight", type=float, default=0.01)
     parser.add_argument("--sequence-velocity-weight", type=float, default=0.002)
     parser.add_argument("--sequence-acceleration-weight", type=float, default=0.01)
+    parser.add_argument("--sequence-elbow-velocity-weight", type=float, default=2048.0)
+    parser.add_argument("--sequence-elbow-acceleration-weight", type=float, default=1024.0)
+    parser.add_argument("--sequence-gap-velocity-weight", type=float, default=8.0)
+    parser.add_argument("--sequence-gap-acceleration-weight", type=float, default=4.0)
+    parser.add_argument("--sequence-joint-iterations", type=int, default=12)
     parser.add_argument("--rbf-centers", type=int, default=72)
     parser.add_argument("--cv-folds", type=int, default=5)
     parser.add_argument("--preview", required=True)
@@ -130,6 +135,8 @@ def args_parse():
     parser.add_argument("--preview-rig-name", default="SemanticWalk_Waluigi_Target_Rig")
     parser.add_argument("--preview-collection-name", default="SemanticWalk_Waluigi_LeftArm_Preview")
     parser.add_argument("--v1-report", default="tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_fit.json")
+    parser.add_argument("--comparison-report", default="",
+                        help="optional prior fit report for feature-by-feature residual deltas")
     return parser.parse_args(argv)
 
 
@@ -642,6 +649,8 @@ def main():
             semantic_from_target_sample(rest, pose_dict_from_sample(sample, bones))
             for sample in action_row["samples"]], dtype=np.float64)
     x_train = np.concatenate([x_by_action[row["action"]] for row in target_actions])
+    train_sample_action_names = [row["action"] for row in target_actions
+                                 for _sample in row["samples"]]
     sem_train = np.concatenate([s_by_action[row["action"]] for row in target_actions])
     pca = fit_pca(x_train, args.latent_dimensions)
     pca_mean, pca_scale, pca_components = pca
@@ -789,14 +798,55 @@ def main():
             native_weight=args.inverse_native_weight,
             iterations=args.inverse_iterations, initial_proposal=rbf_proposal,
             elbow_weight=args.elbow_weight)
-        smoothed = smooth_latent_sequence(proposal, nearest_prior,
+        smoothed_initial = smooth_latent_sequence(proposal, nearest_prior,
             np.ones(args.latent_dimensions),
             lambda_native=args.sequence_native_weight,
             lambda_velocity=args.sequence_velocity_weight,
             lambda_acceleration=args.sequence_acceleration_weight)
-        decoded_features = decode_features(smoothed, latent_std, pca)
-        pca_pose_rows = [decode_context_poses(row, bones, target_rest)
-                         for row in decoded_features]
+
+        left_gap_scales = (0.001, 0.0015, 0.0015, 0.0015)
+
+        def evaluate_sequence_row(z_row, gap_scales):
+            decoded = decode_features(z_row, latent_std, pca)
+            pose = decode_context_poses(decoded, bones, target_rest)
+            semantic = semantic_from_target_sample(target_rest, pose)
+            gaps = (context_joint_gaps(pose, target_rest) - native_gap_targets) / np.asarray(gap_scales)
+            return np.r_[(semantic - sem_mean) / sem_std, gaps]
+
+        def temporal_specs(source_values, gap_velocity_weight,
+                           gap_acceleration_weight):
+            standardized = (source_values - sem_mean) / sem_std
+            specs = [{"index": 3,
+                "velocity_target": np.diff(standardized[:, 3]),
+                "acceleration_target": np.diff(standardized[:, 3], n=2),
+                "velocity_weight": args.sequence_elbow_velocity_weight,
+                "acceleration_weight": args.sequence_elbow_acceleration_weight}]
+            for gap_index in range(4):
+                specs.append({"index": 11 + gap_index,
+                    "velocity_target": np.zeros(len(source_values) - 1),
+                    "acceleration_target": np.zeros(len(source_values) - 2),
+                    "velocity_weight": gap_velocity_weight,
+                    "acceleration_weight": gap_acceleration_weight})
+            return specs
+
+        left_target_outputs = np.column_stack((
+            (source_semantics - sem_mean) / sem_std,
+            np.zeros((len(frames), len(GAP_PAIRS)), dtype=np.float64)))
+        left_output_weights = np.ones(left_target_outputs.shape[1], dtype=np.float64)
+        left_output_weights[3] = args.elbow_weight ** 2
+        smoothed, left_joint_outputs, left_joint_history = refine_latent_sequence_joint(
+            smoothed_initial, nearest_prior,
+            lambda row: evaluate_sequence_row(row, left_gap_scales),
+            left_target_outputs, left_output_weights,
+            temporal_specs(source_semantics, args.sequence_gap_velocity_weight,
+                           args.sequence_gap_acceleration_weight),
+            lambda_native=args.sequence_native_weight,
+            lambda_velocity=args.sequence_velocity_weight,
+            lambda_acceleration=args.sequence_acceleration_weight,
+            iterations=args.sequence_joint_iterations)
+        pca_pose_rows = [decode_context_poses(decode_features(row, latent_std, pca),
+                                               bones, target_rest)
+                         for row in smoothed]
 
         # Fit the right semantic stream independently through the same
         # character-agnostic left-profile latent model. Convert its wrist
@@ -805,7 +855,8 @@ def main():
         source_norm_right = (source_semantics_right - sem_mean) / sem_std
         distance_right = np.linalg.norm(
             sem_train_norm[:, None, :] - source_norm_right[None, :, :], axis=2)
-        nearest_right = latent_train_norm[np.argmin(distance_right, axis=0)]
+        nearest_indices_right = np.argmin(distance_right, axis=0)
+        nearest_right = latent_train_norm[nearest_indices_right]
         rbf_right = predict_rbf(source_norm_right, regressor)
         proposal_right, inverse_costs_right = solve_semantic_latents(
             source_semantics_right, nearest_right, latent_std, pca, bones,
@@ -814,23 +865,27 @@ def main():
             iterations=args.inverse_iterations, initial_proposal=rbf_right,
             elbow_weight=args.elbow_weight,
             gap_scales=(0.001, 0.0025, 0.0025, 0.0025))
-        smoothed_right = smooth_latent_sequence(proposal_right, nearest_right,
+        smoothed_right_initial = smooth_latent_sequence(proposal_right, nearest_right,
             np.ones(args.latent_dimensions),
             lambda_native=args.sequence_native_weight,
             lambda_velocity=args.sequence_velocity_weight,
             lambda_acceleration=args.sequence_acceleration_weight)
-        # Temporal smoothing can move a frame away from the strict branch-gap
-        # manifold. Reproject the smoothed right sequence independently, using
-        # each smoothed frame as its prior and a tighter shoulder/branch gap
-        # tolerance; the already-validated left v5 path remains untouched.
-        right_gap_scales = (0.001, 0.0025, 0.0025, 0.0025)
-        proposal_right, inverse_costs_right = solve_semantic_latents(
-            source_semantics_right, smoothed_right, latent_std, pca, bones,
-            target_rest, sem_mean, sem_std, native_gap_targets.copy(),
-            native_weight=max(args.inverse_native_weight, 0.01),
-            iterations=args.inverse_iterations, initial_proposal=smoothed_right,
-            elbow_weight=args.elbow_weight, gap_scales=right_gap_scales)
-        smoothed_right = proposal_right
+        right_gap_scales = (0.001, 0.0015, 0.0015, 0.0015)
+        right_target_outputs = np.column_stack((
+            (source_semantics_right - sem_mean) / sem_std,
+            np.zeros((len(frames), len(GAP_PAIRS)), dtype=np.float64)))
+        right_output_weights = np.ones(right_target_outputs.shape[1], dtype=np.float64)
+        right_output_weights[3] = args.elbow_weight ** 2
+        smoothed_right, right_joint_outputs, right_joint_history = refine_latent_sequence_joint(
+            smoothed_right_initial, nearest_right,
+            lambda row: evaluate_sequence_row(row, right_gap_scales),
+            right_target_outputs, right_output_weights,
+            temporal_specs(source_semantics_right, args.sequence_gap_velocity_weight,
+                           args.sequence_gap_acceleration_weight),
+            lambda_native=args.sequence_native_weight,
+            lambda_velocity=args.sequence_velocity_weight,
+            lambda_acceleration=args.sequence_acceleration_weight,
+            iterations=args.sequence_joint_iterations)
         pca_pose_rows_right = [decode_context_poses(row, bones, target_rest)
                                for row in decode_features(smoothed_right, latent_std, pca)]
 
@@ -1070,6 +1125,12 @@ def main():
             v1_right_rmse = v1_report.get("right_source_target_semantic_rmse", v1_rmse)
         else:
             raise RuntimeError("v1 residual report is required for the improvement gate")
+        prior_left_rmse = prior_right_rmse = None
+        if args.comparison_report:
+            with open(args.comparison_report, "r", encoding="utf-8") as stream:
+                previous_fit_report = json.load(stream)
+            prior_left_rmse = previous_fit_report.get("source_target_semantic_rmse")
+            prior_right_rmse = previous_fit_report.get("right_source_target_semantic_rmse")
         current_rmse = {name: float(np.sqrt(np.mean(semantic_error[:, i] ** 2)))
                         for i, name in enumerate(SEMANTIC_NAMES)}
         current_rmse_right = {name: float(np.sqrt(np.mean(semantic_error_right[:, i] ** 2)))
@@ -1103,6 +1164,51 @@ def main():
             "per_feature_absolute_residual": {
                 name: float(abs(semantic_error_right[worst_right_index, i]))
                 for i, name in enumerate(SEMANTIC_NAMES)}}
+        diagnostic_frames = sorted(set(range(38, 45)) | set(range(47, 54)))
+        left_initial_outputs = np.asarray([
+            evaluate_sequence_row(row, left_gap_scales) for row in smoothed_initial])
+        right_initial_outputs = np.asarray([
+            evaluate_sequence_row(row, right_gap_scales) for row in smoothed_right_initial])
+
+        def sequence_window_records(side):
+            if side == "left":
+                initial_z, final_z, initial_y, source_rows = (
+                    smoothed_initial, smoothed, left_initial_outputs, source_semantics)
+                nearest_ids, distance_matrix = nearest_indices, train_distance
+                final_sem, gap_rows, scales = (np.asarray(semantic_target_rows),
+                                                combined_gaps, left_gap_scales)
+            else:
+                initial_z, final_z, initial_y, source_rows = (
+                    smoothed_right_initial, smoothed_right, right_initial_outputs,
+                    source_semantics_right)
+                nearest_ids, distance_matrix = nearest_indices_right, distance_right
+                final_sem, gap_rows, scales = (np.asarray(semantic_target_right_rows),
+                                                combined_gaps_right, right_gap_scales)
+            rows = []
+            for frame in diagnostic_frames:
+                i = frames.index(frame)
+                rows.append({
+                    "frame": frame,
+                    "nearest_native_action": train_sample_action_names[int(nearest_ids[i])],
+                    "nearest_semantic_distance": float(distance_matrix[int(nearest_ids[i]), i]),
+                    "source_elbow_radians": float(source_rows[i, 3]),
+                    "pre_joint_elbow_radians": float(initial_y[i, 3] * sem_std[3] + sem_mean[3]),
+                    "joint_fit_elbow_radians": float(final_sem[i, 3]),
+                    "joint_gaps_armature_units": {name: float(gap_rows[i][name])
+                                                  for name in gap_rows[i]},
+                    "initial_latent": initial_z[i].tolist(),
+                    "joint_latent": final_z[i].tolist(),
+                })
+            jumps = np.diff(final_sem[:, 3])
+            max_j = int(np.argmax(np.abs(jumps)))
+            return {"windows": rows,
+                "max_elbow_jump_radians": float(abs(jumps[max_j])),
+                "max_elbow_jump_interval": [int(frames[max_j]), int(frames[max_j + 1])],
+                "max_absolute_source_elbow_step_radians": float(np.max(np.abs(np.diff(source_rows[:, 3])))),
+                "joint_gap_scales": list(scales)}
+
+        left_sequence_diagnostics = sequence_window_records("left")
+        right_sequence_diagnostics = sequence_window_records("right")
         squared_vel = np.diff(smoothed, axis=0)
         squared_acc = np.diff(smoothed, n=2, axis=0)
         objective_terms = {
@@ -1173,6 +1279,13 @@ def main():
             "source_target_semantic_rmse": {name: float(np.sqrt(np.mean(semantic_error[:, i] ** 2)))
                                               for i, name in enumerate(SEMANTIC_NAMES)},
             "right_source_target_semantic_rmse": current_rmse_right,
+            "semantic_rmse_delta_vs_previous_fit": ({
+                "left": {name: current_rmse[name] - float(prior_left_rmse[name])
+                         for name in SEMANTIC_NAMES},
+                "right": {name: current_rmse_right[name] - float(prior_right_rmse[name])
+                          for name in SEMANTIC_NAMES},
+                "previous_report": os.path.abspath(args.comparison_report)}
+                if prior_left_rmse and prior_right_rmse else None),
             "right_worst_semantic_residual": worst_semantic_right,
             "right_elbow_curve_radians": [{"frame": int(frame),
                 "source": float(source_semantics_right[i, 3]),
@@ -1188,6 +1301,27 @@ def main():
                                                 for i, name in enumerate(SEMANTIC_NAMES)},
             "nearest_native_semantic_distance": {"mean": float(nearest_d.mean()),
                                                   "max": float(nearest_d.max())},
+            "sequence_joint_fit": {
+                "method": "joint nonlinear Gauss-Newton over every frame's PCA latent state; matrix-free preconditioned conjugate-gradient steps",
+                "nearest_native_action_by_frame": [
+                    {"frame": int(frame),
+                     "left": train_sample_action_names[int(nearest_indices[i])],
+                     "right": train_sample_action_names[int(nearest_indices_right[i])]}
+                    for i, frame in enumerate(frames)],
+                "left": left_sequence_diagnostics,
+                "right": right_sequence_diagnostics,
+                "left_objective_history": left_joint_history,
+                "right_objective_history": right_joint_history,
+                "temporal_weights": {
+                    "latent_native": args.sequence_native_weight,
+                    "latent_velocity": args.sequence_velocity_weight,
+                    "latent_acceleration": args.sequence_acceleration_weight,
+                    "elbow_velocity": args.sequence_elbow_velocity_weight,
+                    "elbow_acceleration": args.sequence_elbow_acceleration_weight,
+                    "branch_gap_velocity": args.sequence_gap_velocity_weight,
+                    "branch_gap_acceleration": args.sequence_gap_acceleration_weight,
+                    "joint_iterations": args.sequence_joint_iterations},
+                "target_gap_ranges_armature_units": native_gap_ranges},
             "target_model": {"type": "PCA latent context with direct semantic inverse; RBF ridge CV baseline",
                 "latent_dimensions": args.latent_dimensions, "feature_dimensions": int(x_train.shape[1]),
                 "source_schema": dataset["source_schema"],
@@ -1204,7 +1338,7 @@ def main():
                     "mean": float(np.mean(semantic_inverse_costs)),
                     "max": float(np.max(semantic_inverse_costs)),
                     "native_joint_gap_targets_armature_units": {name: float(native_gap_targets[i]) for i, name in enumerate(GAP_PAIRS)},
-                    "joint_gap_scales_armature_units": {name: value for name, value in zip(GAP_PAIRS, (0.01, 0.005, 0.005, 0.005))},
+                    "joint_gap_scales_armature_units": {name: value for name, value in zip(GAP_PAIRS, left_gap_scales)},
                     "native_weight": args.inverse_native_weight,
                     "iterations_max": args.inverse_iterations,
                     "initialization": "nearest native latent pose"},
@@ -1267,6 +1401,8 @@ def main():
         report["validation"] = {
             "fit_gate": "pass" if not mesh_finite_failures and max_pose_write_error < 2e-3 and
                          max_baked_replay_error < 1e-4 and
+                         left_sequence_diagnostics["max_elbow_jump_radians"] <= 0.15 and
+                         right_sequence_diagnostics["max_elbow_jump_radians"] <= 0.15 and
                          max_nonmodel_pose_error < 2e-3 and
                          max_right_finger_local_error < 2e-3 and
                          max_foot_baseline_error < 2e-4 and

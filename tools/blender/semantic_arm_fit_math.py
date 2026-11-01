@@ -294,3 +294,181 @@ def smooth_latent_sequence(proposal, native_prior, latent_scale,
     rhs = proposal + lambda_native * native_prior
     return np.linalg.solve(h, rhs)
 
+
+def refine_latent_sequence_joint(initial, native_prior, evaluate, target,
+                                 output_weights, temporal_specs=(),
+                                 lambda_native=0.01, lambda_velocity=0.002,
+                                 lambda_acceleration=0.01, iterations=8,
+                                 cg_iterations=80, damping=1e-4):
+    """Jointly optimize every frame's latent pose with feature-time penalties.
+
+    `evaluate(z_t)` returns a generic feature vector. Each temporal spec is a
+    mapping with `index`, `velocity_target`, `acceleration_target`, and their
+    respective weights. This keeps the solver target-profile agnostic while
+    supporting timing-aware semantic channels and branch-continuity features.
+    A matrix-free conjugate-gradient Gauss-Newton step avoids a dense
+    (frames*latent)^2 solve.
+    """
+    z = np.asarray(initial, dtype=np.float64).copy()
+    prior = np.asarray(native_prior, dtype=np.float64)
+    target = np.asarray(target, dtype=np.float64)
+    weights = np.asarray(output_weights, dtype=np.float64)
+    if z.ndim != 2 or prior.shape != z.shape:
+        raise ValueError("initial and native_prior must have matching frame x latent shapes")
+    if target.shape[0] != len(z) or weights.shape != (target.shape[1],):
+        raise ValueError("target/output_weights dimensions do not match sequence output")
+    if np.any(weights < 0) or not np.all(np.isfinite(z)):
+        raise ValueError("joint sequence inputs contain invalid values")
+    n, dim = z.shape
+    feature_count = target.shape[1]
+    specs = []
+    for spec in temporal_specs:
+        index = int(spec["index"])
+        if not 0 <= index < feature_count:
+            raise ValueError("temporal feature index is out of range")
+        vel_target = np.asarray(spec.get("velocity_target", np.zeros(n-1)), dtype=np.float64)
+        acc_target = np.asarray(spec.get("acceleration_target", np.zeros(n-2)), dtype=np.float64)
+        if vel_target.shape != (n-1,) or acc_target.shape != (n-2,):
+            raise ValueError("temporal targets must match first/second difference lengths")
+        specs.append((index, vel_target, acc_target,
+                      float(spec.get("velocity_weight", 0.0)),
+                      float(spec.get("acceleration_weight", 0.0))))
+
+    def outputs(sequence):
+        return np.asarray([evaluate(row) for row in sequence], dtype=np.float64)
+
+    def objective(sequence, values=None):
+        values = outputs(sequence) if values is None else values
+        residual = values - target
+        total = 0.5 * float(np.sum(residual * residual * weights[None, :]))
+        delta = sequence - prior
+        total += 0.5 * lambda_native * float(np.sum(delta * delta))
+        d1 = np.diff(sequence, axis=0)
+        d2 = np.diff(sequence, n=2, axis=0)
+        total += 0.5 * lambda_velocity * float(np.sum(d1 * d1))
+        total += 0.5 * lambda_acceleration * float(np.sum(d2 * d2))
+        for index, vel_target, acc_target, wv, wa in specs:
+            rv = np.diff(values[:, index]) - vel_target
+            ra = np.diff(values[:, index], n=2) - acc_target
+            total += 0.5 * wv * float(rv @ rv) + 0.5 * wa * float(ra @ ra)
+        return total, values
+
+    history = []
+    eps = 1e-4
+    for _iteration in range(iterations):
+        values = outputs(z)
+        jac = np.empty((n, feature_count, dim), dtype=np.float64)
+        for t in range(n):
+            shifted = z[t].copy()
+            for k in range(dim):
+                shifted[k] += eps
+                jac[t, :, k] = (np.asarray(evaluate(shifted)) - values[t]) / eps
+                shifted[k] -= eps
+        residual = values - target
+        gradient = np.einsum("tmd,tm,m->td", jac, residual, weights)
+        gradient += lambda_native * (z - prior)
+        d1 = np.diff(z, axis=0)
+        gradient[:-1] -= lambda_velocity * d1
+        gradient[1:] += lambda_velocity * d1
+        d2 = np.diff(z, n=2, axis=0)
+        gradient[:-2] += lambda_acceleration * d2
+        gradient[1:-1] -= 2.0 * lambda_acceleration * d2
+        gradient[2:] += lambda_acceleration * d2
+
+        temporal_jac = [(index, jac[:, index, :], vel_target, acc_target, wv, wa)
+                        for index, vel_target, acc_target, wv, wa in specs]
+        for index, feature_jac, vel_target, acc_target, wv, wa in temporal_jac:
+            rv = np.diff(values[:, index]) - vel_target
+            ra = np.diff(values[:, index], n=2) - acc_target
+            grad_feature = -wv * rv
+            grad_feature = np.r_[grad_feature, 0.0] + np.r_[0.0, wv * rv]
+            if n > 2:
+                grad_feature += np.r_[wa * ra, 0.0, 0.0]
+                grad_feature += np.r_[0.0, -2.0 * wa * ra, 0.0]
+                grad_feature += np.r_[0.0, 0.0, wa * ra]
+            gradient += feature_jac * grad_feature[:, None]
+
+        local_h = np.einsum("tmd,m,tme->tde", jac, weights, jac)
+        diagonal = np.diagonal(local_h, axis1=1, axis2=2).copy() + lambda_native + damping
+        diagonal[:-1] += lambda_velocity
+        diagonal[1:] += lambda_velocity
+        diagonal[:-2] += lambda_acceleration
+        diagonal[1:-1] += 4.0 * lambda_acceleration
+        diagonal[2:] += lambda_acceleration
+        for index, feature_jac, _vt, _at, wv, wa in temporal_jac:
+            square = feature_jac * feature_jac
+            if n > 1 and wv:
+                diagonal[:-1] += wv * square[:-1]
+                diagonal[1:] += wv * square[1:]
+            if n > 2 and wa:
+                diagonal[:-2] += wa * square[:-2]
+                diagonal[1:-1] += 4.0 * wa * square[1:-1]
+                diagonal[2:] += wa * square[2:]
+        diagonal = np.maximum(diagonal, 1e-8)
+
+        def hessian_product(value):
+            result = np.einsum("tde,te->td", local_h, value)
+            result += (lambda_native + damping) * value
+            dv = np.diff(value, axis=0)
+            result[:-1] -= lambda_velocity * dv
+            result[1:] += lambda_velocity * dv
+            da = np.diff(value, n=2, axis=0)
+            result[:-2] += lambda_acceleration * da
+            result[1:-1] -= 2.0 * lambda_acceleration * da
+            result[2:] += lambda_acceleration * da
+            for index, feature_jac, _vt, _at, wv, wa in temporal_jac:
+                u = np.einsum("td,td->t", feature_jac, value)
+                if wv:
+                    du = np.diff(u)
+                    bu = np.r_[-wv * du, 0.0] + np.r_[0.0, wv * du]
+                    result += feature_jac * bu[:, None]
+                if wa:
+                    ddu = np.diff(u, n=2)
+                    bu = np.r_[wa * ddu, 0.0, 0.0]
+                    bu += np.r_[0.0, -2.0 * wa * ddu, 0.0]
+                    bu += np.r_[0.0, 0.0, wa * ddu]
+                    result += feature_jac * bu[:, None]
+            return result
+
+        rhs = -gradient
+        step = np.zeros_like(z)
+        residual_cg = rhs.copy()
+        preconditioned = residual_cg / diagonal
+        direction = preconditioned.copy()
+        rz = float(np.sum(residual_cg * preconditioned))
+        initial_norm = math.sqrt(max(float(np.sum(rhs * rhs)), 0.0))
+        for _ in range(cg_iterations):
+            product = hessian_product(direction)
+            denom = float(np.sum(direction * product))
+            if denom <= 1e-20:
+                break
+            alpha = rz / denom
+            step += alpha * direction
+            residual_cg -= alpha * product
+            if math.sqrt(float(np.sum(residual_cg * residual_cg))) <= max(1e-8, initial_norm * 1e-5):
+                break
+            new_preconditioned = residual_cg / diagonal
+            new_rz = float(np.sum(residual_cg * new_preconditioned))
+            direction = new_preconditioned + (new_rz / max(rz, 1e-30)) * direction
+            preconditioned, rz = new_preconditioned, new_rz
+        step_norm = np.linalg.norm(step, axis=1)
+        over = step_norm > 2.0
+        step[over] *= (2.0 / step_norm[over])[:, None]
+        old_cost, _ = objective(z, values)
+        accepted = False
+        for fraction in (1.0, 0.5, 0.25, 0.125, 0.0625):
+            candidate = z + fraction * step
+            new_cost, new_values = objective(candidate)
+            if new_cost < old_cost:
+                z = candidate
+                history.append({"objective": new_cost, "step_fraction": fraction,
+                                "max_latent_step": float(np.max(np.linalg.norm(fraction*step, axis=1)))})
+                accepted = True
+                break
+        if not accepted:
+            history.append({"objective": old_cost, "step_fraction": 0.0,
+                            "max_latent_step": 0.0})
+            break
+    final_values = outputs(z)
+    return z, final_values, history
+

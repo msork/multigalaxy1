@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from semantic_arm_fit_math import (
     farthest_centers, predict_rbf, fit_rbf_ridge, semantic_features,
     smooth_latent_sequence, mirror_pose_across_sagittal,
+    refine_latent_sequence_joint,
 )
 
 
@@ -67,6 +68,23 @@ class SemanticArmFitMathTests(unittest.TestCase):
         self.assertLess(np.mean(np.diff(smooth[:, 0]) ** 2),
                         np.mean(np.diff(proposal[:, 0]) ** 2))
         self.assertTrue(np.isfinite(smooth).all())
+
+    def test_joint_sequence_solver_reduces_semantic_step_without_post_smoothing(self):
+        target = np.zeros((9, 1))
+        target[4:, 0] = 1.0
+        initial = target.copy()
+        prior = np.zeros_like(initial)
+        solved, values, history = refine_latent_sequence_joint(
+            initial, prior, lambda z: z.copy(), target, np.ones(1),
+            temporal_specs=[{"index": 0, "velocity_target": np.zeros(8),
+                "acceleration_target": np.zeros(7), "velocity_weight": 20.0,
+                "acceleration_weight": 5.0}],
+            lambda_native=0.01, lambda_velocity=0.01,
+            lambda_acceleration=0.01, iterations=8)
+        self.assertLess(np.max(np.abs(np.diff(values[:, 0]))), 0.8)
+        self.assertLess(history[-1]["objective"],
+                        0.5 * float(np.sum(target * target)))
+        self.assertTrue(np.isfinite(solved).all())
 
     def test_sagittal_mirror_maps_rest_pose_to_homologous_rest(self):
         torso = rest_matrix(0.0, 0.0, 0.0)

@@ -148,3 +148,5 @@ before attempting another fit.
 For the corrected save/reload matrix gate and remaining pre-bake elbow
 discontinuity, see
 [`semantic-walk-save-reload-fix.md`](../../docs/animation-retargeting/semantic-walk-save-reload-fix.md).
+The joint 0–60 semantic continuity fit and v11 preview validation are recorded
+in [`semantic-walk-joint-continuity.md`](../../docs/animation-retargeting/semantic-walk-joint-continuity.md).
