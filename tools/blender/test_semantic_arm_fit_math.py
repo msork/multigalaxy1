@@ -11,6 +11,7 @@ from semantic_arm_fit_math import (
     smooth_latent_sequence, mirror_pose_across_sagittal,
     refine_latent_sequence_joint,
 )
+from native_pose_graph import pose_pair_distance, solve_native_pose_path
 
 
 def rest_matrix(x, y, z):
@@ -144,6 +145,48 @@ class SemanticArmFitMathTests(unittest.TestCase):
             evaluate_with_index=True)
         np.testing.assert_allclose(solved, initial)
         np.testing.assert_allclose(values[:, 0], (1.0, 3.0, 5.0))
+
+    def test_native_pose_graph_uses_quaternion_sign_equivalence(self):
+        first = np.asarray([[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]])
+        opposite = first.copy()
+        opposite[:, 3:] *= -1.0
+        maximum, rms, per_bone = pose_pair_distance(first, opposite)
+        self.assertAlmostEqual(maximum, 0.0)
+        self.assertAlmostEqual(rms, 0.0)
+        self.assertAlmostEqual(float(per_bone[0]), 0.0)
+
+    def test_native_path_prefers_temporal_edges_and_obeys_jump_limit(self):
+        ids = [[0, 1], [1, 2], [2, 3]]
+        sem = [np.asarray([[0.0], [0.1]]),
+               np.asarray([[0.1], [0.2]]),
+               np.asarray([[0.2], [0.3]])]
+        descriptors = []
+        for row in ids:
+            descriptors.append(np.asarray([
+                [[float(node) * 0.05, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]]
+                for node in row]))
+        graph = {"temporal_next": {0: 1, 1: 2, 2: 3},
+                 "semantic_neighbors": [(1,), (0, 2), (1, 3), (2,)]}
+        result = solve_native_pose_path(
+            ids, [np.zeros(2) for _ in ids], sem, descriptors,
+            np.asarray([[0.0], [0.1], [0.2]]),
+            ["a", "a", "a", "a"], [0.0, 0.5, 1.0, 1.5], graph,
+            max_pose_jump=0.5)
+        self.assertEqual(result["node_ids"], [0, 1, 2])
+        self.assertEqual(result["temporal_transition_count"], 2)
+        self.assertEqual(result["action_switch_count"], 0)
+        self.assertLess(result["maximum_transition_jump"], 0.5)
+
+    def test_native_path_rejects_reverse_time_neighbor_edges(self):
+        pose = np.asarray([[[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]],
+                           [[0.01, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]]])
+        graph = {"temporal_next": {0: 1}, "semantic_neighbors": [(1,), (0,)]}
+        with self.assertRaisesRegex(RuntimeError, "no admissible native-pose path"):
+            solve_native_pose_path(
+                [[0], [1], [0]], [np.zeros(1)] * 3,
+                [np.zeros((1, 1))] * 3, [pose[[0]], pose[[1]], pose[[0]]],
+                np.zeros((3, 1)), ["same", "same"], [0.0, 1.0], graph,
+                max_pose_jump=0.5)
 
     def test_sagittal_mirror_maps_rest_pose_to_homologous_rest(self):
         torso = rest_matrix(0.0, 0.0, 0.0)

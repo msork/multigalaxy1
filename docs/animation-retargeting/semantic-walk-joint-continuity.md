@@ -154,3 +154,47 @@ Acceptance requires maximum adjacent composed-pose jump <0.5 normalized SE(3),
 glove gap <0.02 armature units, semantic residuals no worse than v11 unless
 needed to satisfy those continuity bounds, and all baseline/bake checks to
 pass. No post-bake smoothing is permitted.
+
+## Native-pose graph solver
+
+The continuous latent solver is retired for this walk. Graph states are exact
+raw-ANM training samples, each retaining its source action/time, semantic
+features, and complete production-basis profile pose. Per source frame, a
+bounded set of semantically close samples is composed through the same
+walk-baseline rebase, mirrored right arm, shoulder anchor, and finger rebuild
+used by the bake. State costs measure both Luigi semantic streams and the
+composed glove gaps. Temporal graph edges connect adjacent samples in one
+native action; semantic-neighbor edges connect native samples only when their
+full-pose distance is within the fixed continuity limit.
+
+A layered dynamic program selects a path through all 61 source frames. Edge
+cost combines composed full-pose transition distance, source-vs-native
+semantic velocity error, sample-time distortion, and a higher switching cost
+for neighbor edges than same-action temporal edges. A transition whose exact
+composed maximum per-bone SE(3) jump is >=0.5, or a state with glove gap >=0.02,
+is excluded. No free pose coordinates are created and no post-path smoothing is
+used. If no path exists, the run writes diagnostics only and does not emit a
+preview blend.
+
+The first raw-ANM graph run contains 4,116 training nodes, 3,998 temporal
+edges, and 14,066 bounded semantic-neighbor edges. Candidate layers include
+semantic seeds plus local temporal samples. Neighbor edges cannot reverse time
+within an action, and changing native actions carries an explicit cost.
+Semantic state and velocity distances use sums of squared standardized
+feature residuals so adding more semantic channels does not dilute their cost.
+
+The latest full 61-frame run fails the semantic-motion gate and emitted no
+preview. Its path stays at `Waluigi_6_Fielding_seq21` sample 9 for 57 frames,
+then advances three samples near the end. It has 3 temporal transitions, no
+neighbor/action switches, and 57 holds. The maximum composed jump is 0.4829
+normalized SE(3), at `bone_42`, frame 59->60; maximum glove gap is
+0.00000174 armature units. However, shoulder-Z and elbow excursions retain
+only 1.9% and 5.7% of the source ranges, respectively. Left/right elbow RMSE
+is 0.3146/0.2885 rad and forearm-roll RMSE is 1.2776/1.4346 rad. The worst
+semantic residual is forearm roll: 1.4737 at frame 60 on the left and 1.5312
+at frame 22 on the right. The graph's
+current semantic candidate/transition objective therefore produces a smooth,
+attached but near-static arm and is not acceptable for visual review. The
+next investigation should establish whether target action coverage and the
+semantic feature coordinate conventions admit a temporally advancing path;
+do not weaken the semantic-motion gate or emit this path as a preview.
