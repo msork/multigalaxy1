@@ -135,6 +135,16 @@ class SemanticArmFitMathTests(unittest.TestCase):
         self.assertLess(float(np.max(np.abs(np.diff(values[:, 0])))), 0.3)
         self.assertTrue(np.isfinite(solved).all())
 
+    def test_joint_evaluator_receives_frame_index_for_composed_context(self):
+        initial = np.asarray([[1.0], [2.0], [3.0]])
+        prior = np.zeros_like(initial)
+        solved, values, _history = refine_latent_sequence_joint(
+            initial, prior, lambda row, frame: row + frame,
+            np.zeros((3, 1)), np.zeros(1), iterations=0,
+            evaluate_with_index=True)
+        np.testing.assert_allclose(solved, initial)
+        np.testing.assert_allclose(values[:, 0], (1.0, 3.0, 5.0))
+
     def test_sagittal_mirror_maps_rest_pose_to_homologous_rest(self):
         torso = rest_matrix(0.0, 0.0, 0.0)
         left = rest_matrix(1.0, 2.0, 0.25)

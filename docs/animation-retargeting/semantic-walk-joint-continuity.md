@@ -122,22 +122,35 @@ degraded semantic residuals, including forearm-roll RMSE to 1.304 rad left
 and 1.249 rad right. Its preview is a failed diagnostic artifact, not a
 visual-review candidate.
 
-The remaining structural cause is that the optimizer's continuity features
-are evaluated on decoded PCA poses before the existing application
-composition, while the baked pose is subsequently rebased to validated-walk
-torso transforms, mirrored into the right rest basis, shoulder-anchored, and
-has right finger transforms rebuilt from the walk baseline. The gate measures
-the composed/baked pose, so the optimization and acceptance paths are not yet
-the same transform function. This explains why improving the decoded pose
-penalty has not removed the final bone_77 jump and why semantic residuals
-degrade before the post-application gate passes. The next implementation must
-evaluate the same baseline-rebase and right-side composition inside the joint
-objective before further tuning its weights.
+## Composition-in-the-loop implementation and v15 result
 
-## Acceptance
+The solver now exposes the frame index to its evaluator and uses one 61-frame
+latent sequence containing both semantic sides. For each frame,
+the evaluator will decode both canonical poses, apply the exact validated-walk
+torso rebase, mirror right-arm homologues, apply the shoulder anchor, rebuild
+right fingers in their validated parent-local transforms, and restore the
+walk torso context. That same pure matrix composition function will supply
+the matrices written by the bake loop.
 
-Require maximum adjacent full-context normalized SE(3) jump <= 0.75, glove
-gap within the validated native range plus 0.02 armature units, all previous
-baseline/binding and saved-action gates to pass, and visual review to show no
-snap, glove separation, or arm flailing over frames 0-60. Numerical gates do
-not substitute for viewport review.
+All temporal terms will be computed from this composed pose: left/right
+semantic targets and timing, every modeled arm/context bone's physical
+rest-relative SE(3), both branch-gap sets, explicit glove attachment, and
+weighted mesh-region centroids. Latent priors and jump limits remain on the
+joint left/right latent vector. Baseline matrices are sampled from a disposable
+evaluator rig carrying the validated walk action. The exact same matrix
+composition function supplies fit features and bake inputs. A smoke run
+verified zero pose-matrix difference between its sampled baseline and the
+bake rig baseline.
+
+The v15 full fit still fails. Its worst composed-pose jump decreased from
+4.9815 to 3.5778 at bone_77, 49->50 (rotation 1.1492 rad, translation 1.8415
+armature units). The requested windows contain jumps 2.8822 at 32->33 and
+2.7198 at 41->42. Maximum glove gap is 0.02278 armature units. Elbow RMSE is
+0.1048 left / 0.1071 right; forearm-roll RMSE is 1.2797 left / 1.2524 right.
+Elbow residuals are worse than v11. Because the numerical gate failed, the
+fitter wrote diagnostics only and emitted no `.blend` visual-review candidate.
+
+Acceptance requires maximum adjacent composed-pose jump <0.5 normalized SE(3),
+glove gap <0.02 armature units, semantic residuals no worse than v11 unless
+needed to satisfy those continuity bounds, and all baseline/bake checks to
+pass. No post-bake smoothing is permitted.

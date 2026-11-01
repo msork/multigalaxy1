@@ -302,7 +302,8 @@ def refine_latent_sequence_joint(initial, native_prior, evaluate, target,
                                  lambda_acceleration=0.01, iterations=8,
                                  cg_iterations=80, damping=1e-4,
                                  latent_jump_limit=None,
-                                 lambda_latent_jump=0.0):
+                                 lambda_latent_jump=0.0,
+                                 evaluate_with_index=False):
     """Jointly optimize every frame's latent pose with feature-time penalties.
 
     `evaluate(z_t)` returns a generic feature vector. Each temporal spec is a
@@ -374,8 +375,12 @@ def refine_latent_sequence_joint(initial, native_prior, evaluate, target,
         unit = diff / np.maximum(norms[:, None], 1e-12)
         return diff, norms, excess, unit
 
+    def evaluate_frame(row, frame_index):
+        return evaluate(row, frame_index) if evaluate_with_index else evaluate(row)
+
     def outputs(sequence):
-        return np.asarray([evaluate(row) for row in sequence], dtype=np.float64)
+        return np.asarray([evaluate_frame(row, i) for i, row in enumerate(sequence)],
+                          dtype=np.float64)
 
     def objective(sequence, values=None):
         values = outputs(sequence) if values is None else values
@@ -412,7 +417,7 @@ def refine_latent_sequence_joint(initial, native_prior, evaluate, target,
             shifted = z[t].copy()
             for k in range(dim):
                 shifted[k] += eps
-                jac[t, :, k] = (np.asarray(evaluate(shifted)) - values[t]) / eps
+                jac[t, :, k] = (np.asarray(evaluate_frame(shifted, t)) - values[t]) / eps
                 shifted[k] -= eps
         residual = values - target
         gradient = np.einsum("tmd,tm,m->td", jac, residual, weights)

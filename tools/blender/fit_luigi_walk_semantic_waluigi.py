@@ -242,69 +242,6 @@ def build_mesh_centroid_rest_cache(centers, rest, rest_all):
             for name in centers}
 
 
-def build_mirror_context_map(rest, rest_all):
-    torso_rest = numpy_matrix(rest_all[TARGET_PROFILE["torso"]]["rest_matrix"])
-    sagittal = np.diag((-1.0, 1.0, 1.0, 1.0))
-    result = {}
-    for left_name, right_name in LEFT_TO_RIGHT_BONES.items():
-        left_relative = np.linalg.inv(torso_rest) @ numpy_matrix(rest[left_name]["rest_matrix"])
-        right_relative = np.linalg.inv(torso_rest) @ numpy_matrix(rest_all[right_name]["rest_matrix"])
-        result[left_name] = np.linalg.inv(left_relative) @ sagittal @ right_relative
-    return result
-
-
-def weighted_arm_centroid_features(pose, rest, centers, side, scale,
-                                   rest_inverse, mirror_map):
-    """Evaluate region centroids from weighted mesh-group centers in torso space."""
-    if side == "left":
-        group_to_pose = {name: name for name in centers if name.startswith("bone_")}
-        current_pose = pose
-    else:
-        group_to_pose = {LEFT_TO_RIGHT_BONES[name]: name
-                         for name in LEFT_TO_RIGHT_BONES if name in pose}
-        current_pose = {}
-        torso = pose[TARGET_PROFILE["torso"]]
-        inv_torso = np.linalg.inv(numpy_matrix(torso))
-        sagittal = np.diag((-1.0, 1.0, 1.0, 1.0))
-        for right_name, left_name in group_to_pose.items():
-            correspondence = mirror_map[left_name]
-            current_pose[right_name] = (numpy_matrix(torso) @ sagittal @ inv_torso @
-                                        numpy_matrix(pose[left_name]) @ correspondence)
-
-    left_regions = {
-        "arm_union": [f"bone_{i}" for i in range(22, 52)],
-        "shoulder": ["bone_22", "bone_23"],
-        "upper_arm": ["bone_25"],
-        "elbow": ["bone_24", "bone_26", "bone_29"],
-        "forearm": ["bone_27"],
-        "glove_hand": [f"bone_{i}" for i in range(30, 52)],
-    }
-    torso = numpy_matrix(pose[TARGET_PROFILE["torso"]])
-    inv_torso = np.linalg.inv(torso)
-    result = []
-    for _label, left_names in left_regions.items():
-        if side == "right":
-            if _label == "arm_union":
-                left_names = [name for name in left_names if name in {
-                    "bone_22", "bone_23", "bone_24", "bone_25",
-                    "bone_26", "bone_27", "bone_29", "bone_30"}]
-            elif _label == "glove_hand":
-                left_names = ["bone_30"]
-        names = [LEFT_TO_RIGHT_BONES.get(name, name) for name in left_names] if side == "right" else left_names
-        total = np.zeros(3, dtype=np.float64)
-        total_weight = 0.0
-        for name in names:
-            row = centers.get(name)
-            if row is None or name not in current_pose:
-                continue
-            point = np.r_[np.asarray(row["center"], dtype=np.float64), 1.0]
-            deformed = numpy_matrix(current_pose[name]) @ rest_inverse[name] @ point
-            total += float(row["weight"]) * (inv_torso @ deformed)[:3]
-            total_weight += float(row["weight"])
-        result.extend((total / total_weight / scale).tolist() if total_weight > 0.0 else (0.0, 0.0, 0.0))
-    return np.asarray(result, dtype=np.float64)
-
-
 def pose_sequence_jump_report(pose_rows, bones, rest_bones, frames,
                               character_length, named_pairs=((31, 33), (40, 43), (48, 51))):
     """Measure adjacent full-context SE(3) motion, including requested windows."""
@@ -455,9 +392,9 @@ GAP_PAIRS = {"shoulder": ("bone_21", "tail", "bone_22", "head"),
              "wrist_glove": ("bone_27", "tail", "bone_30", "head")}
 
 
-def context_joint_gaps(pose, rest_bones):
+def context_joint_gaps(pose, rest_bones, gap_pairs=GAP_PAIRS):
     points = {}
-    for _label, (a, ea, b, eb) in GAP_PAIRS.items():
+    for _label, (a, ea, b, eb) in gap_pairs.items():
         for name, endpoint in ((a, ea), (b, eb)):
             key = (name, endpoint)
             if key in points:
@@ -466,11 +403,104 @@ def context_joint_gaps(pose, rest_bones):
             local_point = np.r_[rest_bones[name][endpoint], 1.0]
             points[key] = (_matrix_for_fit(pose[name]) @ np.linalg.inv(rest) @ local_point)[:3]
     return np.asarray([np.linalg.norm(points[(a, ea)] - points[(b, eb)])
-                       for a, ea, b, eb in GAP_PAIRS.values()], dtype=np.float64)
+                       for a, ea, b, eb in gap_pairs.values()], dtype=np.float64)
 
 
 def _matrix_for_fit(value):
     return np.asarray(value, dtype=np.float64).reshape(4, 4)
+
+
+def rotation_log(rotation):
+    """Stable SO(3) logarithm used by the final-pose continuity objective."""
+    r = np.asarray(rotation, dtype=np.float64).reshape(3, 3)
+    cosine = float(np.clip((np.trace(r) - 1.0) * 0.5, -1.0, 1.0))
+    angle = math.acos(cosine)
+    skew = np.asarray((r[2, 1] - r[1, 2], r[0, 2] - r[2, 0],
+                       r[1, 0] - r[0, 1]), dtype=np.float64)
+    if angle < 1e-7:
+        return 0.5 * skew
+    if math.pi - angle < 1e-5:
+        values, vectors = np.linalg.eigh((r + np.eye(3)) * 0.5)
+        axis = vectors[:, int(np.argmax(values))]
+        if np.dot(axis, skew) < 0:
+            axis = -axis
+        return angle * axis
+    return (angle / (2.0 * math.sin(angle))) * skew
+
+
+def final_pose_se3_features(pose, bone_names, rest_inverse, length_scale):
+    rows = []
+    for name in bone_names:
+        relative = rest_inverse[name] @ numpy_matrix(pose[name])
+        rows.extend((relative[:3, 3] / length_scale).tolist())
+        rows.extend(rotation_log(relative[:3, :3]).tolist())
+    return np.asarray(rows, dtype=np.float64)
+
+
+def compose_final_semantic_pose(base_pose, left_pose, right_pose, *,
+                                target_rest, target_rest_all, arm_bones,
+                                torso_context, semantic_arm_names,
+                                left_to_right, right_subtree,
+                                right_finger_names, parent_by_bone,
+                                right_root_name, torso_name):
+    """Compose exactly the pose used by the preview/bake path, in NumPy space."""
+    mixed = {name: numpy_matrix(matrix).copy() for name, matrix in base_pose.items()}
+    torso_from = numpy_matrix(left_pose[torso_name])
+    torso_to = numpy_matrix(base_pose[torso_name])
+    rebase = torso_to @ np.linalg.inv(torso_from)
+    for name in arm_bones:
+        mixed[name] = rebase @ numpy_matrix(left_pose[name])
+
+    torso_rest = numpy_matrix(target_rest[torso_name]["rest_matrix"])
+    for left_name in semantic_arm_names:
+        right_name = left_to_right[left_name]
+        mixed[right_name] = mirror_pose_across_sagittal(
+            rebase @ numpy_matrix(right_pose[left_name]), torso_to, torso_rest,
+            numpy_matrix(target_rest[left_name]["rest_matrix"]),
+            numpy_matrix(target_rest_all[right_name]["rest_matrix"]))
+
+    root_delta = (numpy_matrix(base_pose[right_root_name])[:3, 3] -
+                  mixed[right_root_name][:3, 3])
+    for name in right_subtree:
+        mixed[name] = mixed[name].copy()
+        mixed[name][:3, 3] += root_delta
+
+    def hierarchy_depth(name):
+        depth = 0
+        parent = parent_by_bone.get(name)
+        while parent is not None:
+            depth += 1
+            parent = parent_by_bone.get(parent)
+        return depth
+
+    for name in sorted(right_finger_names, key=hierarchy_depth):
+        parent_name = parent_by_bone[name]
+        relative = (np.linalg.inv(numpy_matrix(base_pose[parent_name])) @
+                    numpy_matrix(base_pose[name]))
+        mixed[name] = mixed[parent_name] @ relative
+    for name in torso_context:
+        mixed[name] = numpy_matrix(base_pose[name]).copy()
+    return mixed, float(np.linalg.norm(root_delta))
+
+
+def final_weighted_centroid_features(pose, centers, regions, rest_inverse,
+                                     torso_name, scale):
+    torso_inverse = np.linalg.inv(numpy_matrix(pose[torso_name]))
+    result = []
+    for names in regions:
+        weighted = np.zeros(3, dtype=np.float64)
+        total_weight = 0.0
+        for name in names:
+            row = centers.get(name)
+            if row is None or name not in pose:
+                continue
+            point = np.r_[np.asarray(row["center"], dtype=np.float64), 1.0]
+            deformed = numpy_matrix(pose[name]) @ rest_inverse[name] @ point
+            weighted += float(row["weight"]) * (torso_inverse @ deformed)[:3]
+            total_weight += float(row["weight"])
+        result.extend((weighted / total_weight / scale).tolist()
+                      if total_weight > 0 else (0.0, 0.0, 0.0))
+    return np.asarray(result, dtype=np.float64)
 
 
 def target_semantics_from_latent(z_normalized, latent_std, pca_model, bones,
@@ -887,6 +917,7 @@ def main():
     start, end = args.frames
     if (start, end) != (0, 60) or tuple(float(v) for v in source_action.frame_range) != (0.0, 60.0):
         raise RuntimeError("this prototype is limited to the Luigi walk's frames 0–60")
+    frames = list(range(start, end + 1))
 
     target_rest = target_rest_from_dataset(dataset)
     target_rest_all = source_rest_from_rig(target_original)
@@ -1014,7 +1045,32 @@ def main():
     armature_length_scale = max(float(upper_arm_length), 1e-6)
     mesh_centroid_rest_inverse = build_mesh_centroid_rest_cache(
         mesh_centers, target_rest, target_rest_all)
-    mesh_centroid_mirror_map = build_mirror_context_map(target_rest, target_rest_all)
+    if walk_action is None:
+        raise RuntimeError("joint composition fit requires the validated baked walk action")
+    baseline_eval = duplicate_rig(clean_original, "_MG1_FinalComposition_BaselineEval")
+    baseline_eval.matrix_world = baseline_root_matrix.copy()
+    baseline_eval.hide_viewport = False
+    baseline_eval.hide_render = False
+    baseline_eval.hide_set(False)
+    clear_constraints(baseline_eval)
+    baseline_eval.animation_data_create()
+    baseline_eval.animation_data.action = walk_action
+    baseline_eval.animation_data.action_slot = walk_slot
+    scene = bpy.context.scene
+    baseline_frame = scene.frame_current
+    baseline_subframe = scene.frame_subframe
+    baseline_pose_rows = []
+    try:
+        for frame in frames:
+            set_frame(scene, float(frame))
+            baseline_pose_rows.append({name: numpy_matrix(matrix)
+                for name, matrix in evaluated_bone_matrices(baseline_eval).items()})
+    finally:
+        scene.frame_set(baseline_frame, subframe=baseline_subframe)
+        baseline_armature_data = baseline_eval.data
+        bpy.data.objects.remove(baseline_eval, do_unlink=True)
+        if baseline_armature_data.users == 0:
+            bpy.data.armatures.remove(baseline_armature_data)
     old_frame, old_subframe = scene.frame_current, scene.frame_subframe
     old_objects = set(bpy.data.objects)
     old_actions = set(bpy.data.actions)
@@ -1058,7 +1114,6 @@ def main():
         source_semantics = []
         source_semantics_right = []
         source_pose_rows = []
-        frames = list(range(start, end + 1))
         for frame in frames:
             set_frame(scene, float(frame))
             pose, _basis = source_pose_from_curves(source_rig, source_action,
@@ -1100,112 +1155,7 @@ def main():
             lambda_velocity=args.sequence_velocity_weight,
             lambda_acceleration=args.sequence_acceleration_weight)
 
-        left_gap_scales = (0.001, 0.0015, 0.0015, 0.0015)
-        full_pose_start = 16
-        full_pose_count = len(bones) * 6
-        centroid_start = full_pose_start + full_pose_count
-        centroid_count = 18
-
-        def evaluate_sequence_row(z_row, gap_scales, side):
-            decoded = decode_features(z_row, latent_std, pca)
-            pose = decode_context_poses(decoded, bones, target_rest)
-            semantic = semantic_from_target_sample(target_rest, pose)
-            gaps = (context_joint_gaps(pose, target_rest) - native_gap_targets) / np.asarray(gap_scales)
-            # Keep the smoothness objective in the same rest-relative SE(3)
-            # coordinates as the acceptance metric: translation normalized by
-            # arm length, followed by rotation-vector radians for each bone.
-            se3_features = decoded.reshape(len(bones), 6).copy()
-            se3_features[:, :3] /= armature_length_scale
-            se3_features = se3_features.reshape(-1)
-            centroids = weighted_arm_centroid_features(
-                pose, target_rest, mesh_centers, side, armature_length_scale,
-                mesh_centroid_rest_inverse, mesh_centroid_mirror_map)
-            return np.r_[(semantic - sem_mean) / sem_std, gaps, gaps[3],
-                         se3_features, centroids]
-
-        def temporal_specs(source_values, gap_velocity_weight,
-                           gap_acceleration_weight):
-            standardized = (source_values - sem_mean) / sem_std
-            specs = [{"index": 3,
-                "velocity_target": np.diff(standardized[:, 3]),
-                "acceleration_target": np.diff(standardized[:, 3], n=2),
-                "velocity_weight": args.sequence_elbow_velocity_weight,
-                "acceleration_weight": args.sequence_elbow_acceleration_weight}]
-            for gap_index in range(4):
-                specs.append({"index": 11 + gap_index,
-                    "velocity_target": np.zeros(len(source_values) - 1),
-                    "acceleration_target": np.zeros(len(source_values) - 2),
-                    "velocity_weight": gap_velocity_weight,
-                    "acceleration_weight": gap_acceleration_weight})
-            specs.append({"index": 15,
-                "velocity_target": np.zeros(len(source_values) - 1),
-                "acceleration_target": np.zeros(len(source_values) - 2),
-                "velocity_weight": args.sequence_attachment_velocity_weight,
-                "acceleration_weight": args.sequence_attachment_acceleration_weight})
-            return specs
-
-        def temporal_blocks(source_values):
-            standardized = (source_values - sem_mean) / sem_std
-            return [
-                {"indices": np.arange(0, len(SEMANTIC_NAMES)),
-                 "velocity_target": np.diff(standardized, axis=0),
-                 "acceleration_target": np.diff(standardized, n=2, axis=0),
-                 "velocity_weights": args.sequence_semantic_velocity_weight,
-                 "acceleration_weights": args.sequence_semantic_acceleration_weight},
-                {"indices": np.arange(full_pose_start, centroid_start),
-                 "velocity_target": np.zeros((len(source_values) - 1, full_pose_count)),
-                 "acceleration_target": np.zeros((len(source_values) - 2, full_pose_count)),
-                 "velocity_weights": args.sequence_fullpose_velocity_weight,
-                 "acceleration_weights": args.sequence_fullpose_acceleration_weight,
-                 "velocity_limits": args.sequence_fullpose_velocity_limit,
-                 "velocity_limit_weights": args.sequence_fullpose_velocity_limit_weight},
-                {"indices": np.arange(centroid_start, centroid_start + centroid_count),
-                 "velocity_target": np.zeros((len(source_values) - 1, centroid_count)),
-                 "acceleration_target": np.zeros((len(source_values) - 2, centroid_count)),
-                 "velocity_weights": args.sequence_centroid_velocity_weight,
-                 "acceleration_weights": args.sequence_centroid_acceleration_weight},
-            ]
-
-        raw_native_latent_step_limit = native_latent_step_limit(
-            target_actions, x_by_action, latent_std, pca)
-        latent_step_limit = min(args.sequence_latent_jump_limit,
-                                max(0.25, raw_native_latent_step_limit))
-        native_pose_step_limit = native_context_pose_step_limit(
-            target_actions, x_by_action, bones, armature_length_scale)
-
-        def sequence_targets(source_values, gap_scales):
-            target = np.zeros((len(frames), centroid_start + centroid_count), dtype=np.float64)
-            target[:, :len(SEMANTIC_NAMES)] = (source_values - sem_mean) / sem_std
-            return target
-
-        sequence_output_weights = np.zeros(centroid_start + centroid_count, dtype=np.float64)
-        sequence_output_weights[:len(SEMANTIC_NAMES)] = 1.0
-        sequence_output_weights[3] = args.elbow_weight ** 2
-        sequence_output_weights[11:15] = 1.0
-        sequence_output_weights[15] = args.sequence_attachment_weight
-
-        left_target_outputs = sequence_targets(source_semantics, left_gap_scales)
-        smoothed, left_joint_outputs, left_joint_history = refine_latent_sequence_joint(
-            smoothed_initial, nearest_prior,
-            lambda row: evaluate_sequence_row(row, left_gap_scales, "left"),
-            left_target_outputs, sequence_output_weights,
-            temporal_specs(source_semantics, args.sequence_gap_velocity_weight,
-                           args.sequence_gap_acceleration_weight),
-            temporal_blocks=temporal_blocks(source_semantics),
-            lambda_native=args.sequence_native_weight,
-            lambda_velocity=args.sequence_velocity_weight,
-            lambda_acceleration=args.sequence_acceleration_weight,
-            iterations=args.sequence_joint_iterations,
-            latent_jump_limit=latent_step_limit,
-            lambda_latent_jump=args.sequence_latent_jump_weight)
-        pca_pose_rows = [decode_context_poses(decode_features(row, latent_std, pca),
-                                               bones, target_rest)
-                         for row in smoothed]
-
-        # Fit the right semantic stream independently through the same
-        # character-agnostic left-profile latent model. Convert its wrist
-        # semantic into the canonical model frame, then mirror the resulting
-        # per-bone transforms into Waluigi's distinct right rest basis.
+        left_gap_scales = right_gap_scales = (0.001, 0.0015, 0.0015, 0.0015)
         source_norm_right = (source_semantics_right - sem_mean) / sem_std
         distance_right = np.linalg.norm(
             sem_train_norm[:, None, :] - source_norm_right[None, :, :], axis=2)
@@ -1224,23 +1174,171 @@ def main():
             lambda_native=args.sequence_native_weight,
             lambda_velocity=args.sequence_velocity_weight,
             lambda_acceleration=args.sequence_acceleration_weight)
-        right_gap_scales = (0.001, 0.0015, 0.0015, 0.0015)
-        right_target_outputs = sequence_targets(source_semantics_right, right_gap_scales)
-        smoothed_right, right_joint_outputs, right_joint_history = refine_latent_sequence_joint(
-            smoothed_right_initial, nearest_right,
-            lambda row: evaluate_sequence_row(row, right_gap_scales, "right"),
-            right_target_outputs, sequence_output_weights,
-            temporal_specs(source_semantics_right, args.sequence_gap_velocity_weight,
-                           args.sequence_gap_acceleration_weight),
-            temporal_blocks=temporal_blocks(source_semantics_right),
+        right_proposal_costs = inverse_costs_right
+
+        # One evaluator, target and latent state cover both sides and every
+        # frame. All diagnostic outputs are computed after the exact pose
+        # composition used later for baking.
+        semantic_arm_names = {"bone_22", "bone_23", "bone_24", "bone_25",
+                              "bone_26", "bone_27", "bone_29", "bone_30"}
+        arm_bones = set(bones) - TORSO_CONTEXT
+        right_arm_bones = {LEFT_TO_RIGHT_BONES[name] for name in semantic_arm_names}
+        right_subtree = descendant_bone_names(target_original.data, "bone_57") | {"bone_57"}
+        right_finger_names = right_subtree - right_arm_bones - {"bone_57"}
+        parent_by_bone = {bone.name: bone.parent.name if bone.parent else None
+                          for bone in target_original.data.bones}
+        full_pose_bones = sorted(set(bones) | {
+            LEFT_TO_RIGHT_BONES[name] for name in bones if name in LEFT_TO_RIGHT_BONES})
+        full_pose_rest_inverse = {name: np.linalg.inv(
+            numpy_matrix(target_rest_all[name]["rest_matrix"])) for name in full_pose_bones}
+        left_regions = [
+            [f"bone_{i}" for i in range(22, 52)], ["bone_22", "bone_23"],
+            ["bone_25"], ["bone_24", "bone_26", "bone_29"], ["bone_27"],
+            [f"bone_{i}" for i in range(30, 52)]]
+        right_regions = [
+            [LEFT_TO_RIGHT_BONES[name] for name in (
+                "bone_22", "bone_23", "bone_24", "bone_25",
+                "bone_26", "bone_27", "bone_29", "bone_30")],
+            ["bone_57", "bone_58"], ["bone_60"], ["bone_59", "bone_61", "bone_64"],
+            ["bone_62"], ["bone_65"]]
+        sem_count = len(SEMANTIC_NAMES)
+        gap_left_start, gap_right_start = 2 * sem_count, 2 * sem_count + 4
+        attach_start = 2 * sem_count + 8
+        full_pose_start = attach_start + 2
+        full_pose_count = 6 * len(full_pose_bones)
+        centroid_start = full_pose_start + full_pose_count
+        centroid_count = 36
+        output_count = centroid_start + centroid_count
+
+        def compose_at(left_z, right_z, frame_index):
+            left_pose = decode_context_poses(
+                decode_features(left_z, latent_std, pca), bones, target_rest)
+            right_pose = decode_context_poses(
+                decode_features(right_z, latent_std, pca), bones, target_rest)
+            final_pose, root_delta = compose_final_semantic_pose(
+                baseline_pose_rows[frame_index], left_pose, right_pose,
+                target_rest=target_rest, target_rest_all=target_rest_all,
+                arm_bones=arm_bones, torso_context=TORSO_CONTEXT,
+                semantic_arm_names=semantic_arm_names,
+                left_to_right=LEFT_TO_RIGHT_BONES, right_subtree=right_subtree,
+                right_finger_names=right_finger_names, parent_by_bone=parent_by_bone,
+                right_root_name="bone_57", torso_name=TARGET_PROFILE["torso"])
+            return final_pose, root_delta
+
+        def evaluate_joint_row(z_row, frame_index):
+            left_z = z_row[:args.latent_dimensions]
+            right_z = z_row[args.latent_dimensions:]
+            final_pose, _root_delta = compose_at(left_z, right_z, frame_index)
+            left_sem = semantic_from_target_sample(
+                target_rest, {name: final_pose[name] for name in bones})
+            right_sem_native = semantic_from_target_sample(
+                target_rest_all, final_pose, TARGET_PROFILE_RIGHT, right_forearm_to_left)
+            right_sem = source_right_to_left_semantics(
+                right_sem_native, right_forearm_to_left, body_reflection)
+            left_gap = (context_joint_gaps(final_pose, target_rest, GAP_PAIRS) -
+                        native_gap_targets) / np.asarray(left_gap_scales)
+            right_gap = (context_joint_gaps(final_pose, target_rest_all, RIGHT_GAP_PAIRS) -
+                         native_gap_targets) / np.asarray(right_gap_scales)
+            all_gaps = np.r_[left_gap, right_gap]
+            attachment = np.asarray((left_gap[3], right_gap[3]))
+            full_pose = final_pose_se3_features(
+                final_pose, full_pose_bones, full_pose_rest_inverse,
+                armature_length_scale)
+            centroids = np.r_[
+                final_weighted_centroid_features(final_pose, mesh_centers, left_regions,
+                    mesh_centroid_rest_inverse, TARGET_PROFILE["torso"], armature_length_scale),
+                final_weighted_centroid_features(final_pose, mesh_centers, right_regions,
+                    mesh_centroid_rest_inverse, TARGET_PROFILE["torso"], armature_length_scale)]
+            return np.r_[((left_sem - sem_mean) / sem_std),
+                         ((right_sem - sem_mean) / sem_std), all_gaps,
+                         attachment, full_pose, centroids]
+
+        raw_native_latent_step_limit = native_latent_step_limit(
+            target_actions, x_by_action, latent_std, pca)
+        latent_step_limit = min(args.sequence_latent_jump_limit,
+                                max(0.25, raw_native_latent_step_limit))
+        native_pose_step_limit = native_context_pose_step_limit(
+            target_actions, x_by_action, bones, armature_length_scale)
+        combined_initial = np.c_[smoothed_initial, smoothed_right_initial]
+        combined_prior = np.c_[nearest_prior, nearest_right]
+        standardized_semantics = np.c_[
+            (source_semantics - sem_mean) / sem_std,
+            (source_semantics_right - sem_mean) / sem_std]
+        sequence_target = np.zeros((len(frames), output_count), dtype=np.float64)
+        sequence_target[:, :2 * sem_count] = standardized_semantics
+        sequence_weights = np.zeros(output_count, dtype=np.float64)
+        sequence_weights[:2 * sem_count] = 1.0
+        sequence_weights[3] = sequence_weights[sem_count + 3] = args.elbow_weight ** 2
+        sequence_weights[gap_left_start:gap_right_start + 4] = 1.0
+        sequence_weights[attach_start:full_pose_start] = args.sequence_attachment_weight
+
+        temporal_specs = []
+        for side_index in range(2):
+            side_offset = side_index * sem_count
+            elbow_index = side_offset + 3
+            temporal_specs.append({"index": elbow_index,
+                "velocity_target": np.diff(standardized_semantics[:, elbow_index]),
+                "acceleration_target": np.diff(standardized_semantics[:, elbow_index], n=2),
+                "velocity_weight": args.sequence_elbow_velocity_weight,
+                "acceleration_weight": args.sequence_elbow_acceleration_weight})
+            gap_start = gap_left_start + 4 * side_index
+            for gap_index in range(4):
+                temporal_specs.append({"index": gap_start + gap_index,
+                    "velocity_target": np.zeros(len(frames) - 1),
+                    "acceleration_target": np.zeros(len(frames) - 2),
+                    "velocity_weight": args.sequence_gap_velocity_weight,
+                    "acceleration_weight": args.sequence_gap_acceleration_weight})
+            attach_index = attach_start + side_index
+            temporal_specs.append({"index": attach_index,
+                "velocity_target": np.zeros(len(frames) - 1),
+                "acceleration_target": np.zeros(len(frames) - 2),
+                "velocity_weight": args.sequence_attachment_velocity_weight,
+                "acceleration_weight": args.sequence_attachment_acceleration_weight})
+        temporal_blocks = [
+            {"indices": np.arange(2 * sem_count),
+             "velocity_target": np.diff(standardized_semantics, axis=0),
+             "acceleration_target": np.diff(standardized_semantics, n=2, axis=0),
+             "velocity_weights": args.sequence_semantic_velocity_weight,
+             "acceleration_weights": args.sequence_semantic_acceleration_weight},
+            {"indices": np.arange(full_pose_start, centroid_start),
+             "velocity_target": np.zeros((len(frames) - 1, full_pose_count)),
+             "acceleration_target": np.zeros((len(frames) - 2, full_pose_count)),
+             "velocity_weights": args.sequence_fullpose_velocity_weight,
+             "acceleration_weights": args.sequence_fullpose_acceleration_weight,
+             "velocity_limits": args.sequence_fullpose_velocity_limit,
+             "velocity_limit_weights": args.sequence_fullpose_velocity_limit_weight},
+            {"indices": np.arange(centroid_start, output_count),
+             "velocity_target": np.zeros((len(frames) - 1, centroid_count)),
+             "acceleration_target": np.zeros((len(frames) - 2, centroid_count)),
+             "velocity_weights": args.sequence_centroid_velocity_weight,
+             "acceleration_weights": args.sequence_centroid_acceleration_weight}]
+
+        smoothed_joint, joint_outputs, joint_history = refine_latent_sequence_joint(
+            combined_initial, combined_prior,
+            evaluate_joint_row, sequence_target, sequence_weights, temporal_specs,
+            temporal_blocks=temporal_blocks,
             lambda_native=args.sequence_native_weight,
             lambda_velocity=args.sequence_velocity_weight,
             lambda_acceleration=args.sequence_acceleration_weight,
             iterations=args.sequence_joint_iterations,
             latent_jump_limit=latent_step_limit,
-            lambda_latent_jump=args.sequence_latent_jump_weight)
-        pca_pose_rows_right = [decode_context_poses(row, bones, target_rest)
-                               for row in decode_features(smoothed_right, latent_std, pca)]
+            lambda_latent_jump=args.sequence_latent_jump_weight,
+            evaluate_with_index=True)
+        smoothed = smoothed_joint[:, :args.latent_dimensions]
+        smoothed_right = smoothed_joint[:, args.latent_dimensions:]
+        left_joint_history = right_joint_history = joint_history
+        left_joint_outputs = joint_outputs[:, :sem_count]
+        right_joint_outputs = joint_outputs[:, sem_count:2 * sem_count]
+        pca_pose_rows = [decode_context_poses(decode_features(row, latent_std, pca),
+                                              bones, target_rest) for row in smoothed]
+        pca_pose_rows_right = [decode_context_poses(decode_features(row, latent_std, pca),
+                                                    bones, target_rest) for row in smoothed_right]
+        final_pose_rows, right_root_anchor_corrections = [], []
+        for frame_index in range(len(frames)):
+            final_pose, root_delta = compose_at(smoothed[frame_index],
+                                                smoothed_right[frame_index], frame_index)
+            final_pose_rows.append(final_pose)
+            right_root_anchor_corrections.append(root_delta)
 
         preview_collection = bpy.data.collections.new(args.preview_collection_name)
         bpy.context.scene.collection.children.link(preview_collection)
@@ -1324,12 +1422,9 @@ def main():
         semantic_target_right_rows = []
         mesh_finite_failures = []
         arm_bones = set(bones) - TORSO_CONTEXT
-        semantic_arm_names = {"bone_22", "bone_23", "bone_24", "bone_25",
-                              "bone_26", "bone_27", "bone_29", "bone_30"}
         right_arm_bones = {LEFT_TO_RIGHT_BONES[name] for name in semantic_arm_names}
         right_subtree = descendant_bone_names(target_copy.data, "bone_57") | {"bone_57"}
         written_arm_bones = arm_bones | right_subtree
-        right_root_anchor_corrections = []
         right_finger_names = right_subtree - right_arm_bones - {"bone_57"}
         max_right_finger_local_error = 0.0
         max_pose_write_error = 0.0
@@ -1338,58 +1433,17 @@ def main():
         max_foot_baseline_error = 0.0
         max_cap_baseline_error = 0.0
         max_nonmodel_pose_error = 0.0
+        max_composition_baseline_pose_error = 0.0
         for index, frame in enumerate(frames):
             set_frame(scene, float(frame))
             base_pose = walk_pose_rows[index]
             base_scales = walk_scale_rows[index]
-            pca_pose = pca_pose_rows[index]
-            torso_from = pca_pose[TARGET_PROFILE["torso"]]
-            torso_to = numpy_matrix(base_pose[TARGET_PROFILE["torso"]])
-            rebase = torso_to @ np.linalg.inv(torso_from)
-            mixed_pose = {name: matrix.copy() for name, matrix in base_pose.items()}
-            for name in arm_bones:
-                mixed_pose[name] = Matrix((rebase @ pca_pose[name]).tolist())
-            torso_rest_matrix = numpy_matrix(target_rest[TARGET_PROFILE["torso"]]["rest_matrix"])
-            right_profile_pose = pca_pose_rows_right[index]
-            for left_name in semantic_arm_names:
-                right_name = LEFT_TO_RIGHT_BONES[left_name]
-                left_matrix = rebase @ right_profile_pose[left_name]
-                right_matrix = mirror_pose_across_sagittal(
-                    left_matrix, torso_to, torso_rest_matrix,
-                    numpy_matrix(target_rest[left_name]["rest_matrix"]),
-                    numpy_matrix(target_rest_all[right_name]["rest_matrix"]))
-                mixed_pose[right_name] = Matrix(right_matrix.tolist())
-            # The right latent fit can infer a small translation on the
-            # unweighted clavicle/root bone. Anchor its head to the validated
-            # clean-walk shoulder and carry that translation through every
-            # descendant (including non-profile finger bones). This preserves
-            # all fitted relative arm/branch poses while preventing shoulder
-            # drift and keeping the fingers attached to the glove.
-            right_root_delta = (numpy_matrix(base_pose["bone_57"])[0:3, 3] -
-                                numpy_matrix(mixed_pose["bone_57"])[0:3, 3])
-            right_root_anchor_corrections.append(float(np.linalg.norm(right_root_delta)))
-            for name in right_subtree:
-                shifted = numpy_matrix(mixed_pose[name]).copy()
-                shifted[:3, 3] += right_root_delta
-                mixed_pose[name] = Matrix(shifted.tolist())
-            # Keep right thumb/finger/helper transforms in their validated
-            # baseline parent-local pose while following the new hand and
-            # forearm. Rebuild them parent-first so they remain attached.
-            def hierarchy_depth(name):
-                depth, bone = 0, target_copy.data.bones[name]
-                while bone.parent is not None:
-                    depth += 1
-                    bone = bone.parent
-                return depth
-            for name in sorted(right_finger_names, key=hierarchy_depth):
-                parent_name = target_copy.data.bones[name].parent.name
-                relative = (np.linalg.inv(numpy_matrix(base_pose[parent_name])) @
-                            numpy_matrix(base_pose[name]))
-                mixed_pose[name] = Matrix((numpy_matrix(mixed_pose[parent_name]) @
-                                           relative).tolist())
-            for name in TORSO_CONTEXT:
-                # Keep the validated target walk root/torso channels.
-                mixed_pose[name] = base_pose[name].copy()
+            max_composition_baseline_pose_error = max(
+                max_composition_baseline_pose_error,
+                max(matrix_error(base_pose[name], baseline_pose_rows[index][name])
+                    for name in base_pose))
+            mixed_pose = {name: Matrix(matrix.tolist())
+                          for name, matrix in final_pose_rows[index].items()}
             bases = assign_pose_matrices_hierarchical(target_copy, mixed_pose)
             actual = evaluated_bone_matrices(target_copy)
             for finger_name in right_finger_names:
@@ -1571,22 +1625,20 @@ def main():
                 name: float(abs(semantic_error_right[worst_right_index, i]))
                 for i, name in enumerate(SEMANTIC_NAMES)}}
         diagnostic_frames = sorted(set(range(38, 45)) | set(range(47, 54)))
-        left_initial_outputs = np.asarray([
-            evaluate_sequence_row(row, left_gap_scales, "left") for row in smoothed_initial])
-        right_initial_outputs = np.asarray([
-            evaluate_sequence_row(row, right_gap_scales, "right") for row in smoothed_right_initial])
+        initial_joint_outputs = np.asarray([
+            evaluate_joint_row(combined_initial[i], i) for i in range(len(frames))])
 
         def sequence_window_records(side):
             if side == "left":
-                initial_z, final_z, initial_y, source_rows = (
-                    smoothed_initial, smoothed, left_initial_outputs, source_semantics)
+                initial_z, final_z, semantic_offset, gap_offset, source_rows = (
+                    smoothed_initial, smoothed, 0, gap_left_start, source_semantics)
                 nearest_ids, distance_matrix = nearest_indices, train_distance
                 final_sem, gap_rows, scales = (np.asarray(semantic_target_rows),
                                                 combined_gaps, left_gap_scales)
             else:
-                initial_z, final_z, initial_y, source_rows = (
-                    smoothed_right_initial, smoothed_right, right_initial_outputs,
-                    source_semantics_right)
+                initial_z, final_z, semantic_offset, gap_offset, source_rows = (
+                    smoothed_right_initial, smoothed_right, sem_count,
+                    gap_right_start, source_semantics_right)
                 nearest_ids, distance_matrix = nearest_indices_right, distance_right
                 final_sem, gap_rows, scales = (np.asarray(semantic_target_right_rows),
                                                 combined_gaps_right, right_gap_scales)
@@ -1598,10 +1650,15 @@ def main():
                     "nearest_native_action": train_sample_action_names[int(nearest_ids[i])],
                     "nearest_semantic_distance": float(distance_matrix[int(nearest_ids[i]), i]),
                     "source_elbow_radians": float(source_rows[i, 3]),
-                    "pre_joint_elbow_radians": float(initial_y[i, 3] * sem_std[3] + sem_mean[3]),
+                    "pre_joint_elbow_radians": float(
+                        initial_joint_outputs[i, semantic_offset + 3] * sem_std[3] + sem_mean[3]),
                     "joint_fit_elbow_radians": float(final_sem[i, 3]),
                     "joint_gaps_armature_units": {name: float(gap_rows[i][name])
                                                   for name in gap_rows[i]},
+                    "pre_joint_gaps_armature_units": {
+                        name: float(initial_joint_outputs[i, gap_offset + gap_index] * scales[gap_index] +
+                                    native_gap_targets[gap_index])
+                        for gap_index, name in enumerate(GAP_PAIRS)},
                     "initial_latent": initial_z[i].tolist(),
                     "joint_latent": final_z[i].tolist(),
                 })
@@ -1814,6 +1871,7 @@ def main():
                     key=lambda row: row["error"], reverse=True)[:12],
                 "max_pose_scale_delta_vs_validated_walk": max_pose_scale_delta_vs_walk,
                 "max_nonmodeled_bone_pose_matrix_error_vs_walk": max_nonmodel_pose_error,
+                "max_composition_baseline_pose_matrix_error": max_composition_baseline_pose_error,
                 "max_foot_tail_error_vs_walk": max_foot_baseline_error,
                 "max_head_cap_centroid_error_vs_walk": max_cap_baseline_error,
                 "max_baked_action_replay_matrix_error": max_baked_replay_error,
@@ -1843,12 +1901,13 @@ def main():
                          left_sequence_diagnostics["max_elbow_jump_radians"] <= 0.15 and
                          right_sequence_diagnostics["max_elbow_jump_radians"] <= 0.15 and
                          max_nonmodel_pose_error < 2e-3 and
+                         max_composition_baseline_pose_error < 1e-5 and
                          max_right_finger_local_error < 2e-3 and
                          max_foot_baseline_error < 2e-4 and
                          max_cap_baseline_error < 2e-4 and
-                         full_pose_continuity_after["max_adjacent"]["normalized_se3"] <=
-                             0.75 and
-                         glove_gap_max <= glove_gap_limit and
+                         full_pose_continuity_after["max_adjacent"]["normalized_se3"] <
+                             0.5 and
+                         glove_gap_max < 0.02 and
                          all(value < 0.02 for value in native_gap_outside_range.values()) and
                          all(value < 0.02 for value in native_gap_outside_range_right.values()) else "fail",
             "semantic_fit_gate": "not_applied_new_native_model",
@@ -1860,9 +1919,24 @@ def main():
             "max_nonmodeled_pose_error_tolerance": 2e-3,
             "max_foot_cap_baseline_error_tolerance": 2e-4,
             "max_joint_gap_outside_native_range_tolerance_armature_units": 0.02,
+            "max_final_pose_jump_strict_tolerance_normalized_se3": 0.5,
+            "max_glove_gap_strict_tolerance_armature_units": 0.02,
             "finite_pose_mesh_values": "pass" if not mesh_finite_failures else "fail"}
 
         os.makedirs(os.path.dirname(os.path.abspath(args.report)), exist_ok=True)
+        if report["validation"]["fit_gate"] != "pass":
+            report["preview"]["candidate_path"] = report["preview"]["file"]
+            report["preview"]["file"] = None
+            report["preview"]["visual_review_candidate"] = False
+            with open(args.report, "w", encoding="utf-8") as stream:
+                json.dump(report, stream, indent=2, allow_nan=False)
+                stream.write("\n")
+            print("MG1_SEMANTIC_WALK_FIT=" + json.dumps({
+                "preview": None, "candidate_path": report["preview"]["candidate_path"],
+                "action": baked_action.name, "validation": report["validation"],
+                "semantic_rmse": report["preview"]["semantic_feature_rmse_after_solve"]}))
+            raise RuntimeError("semantic walk fit failed numerical gate; no visual preview emitted")
+        report["preview"]["visual_review_candidate"] = True
         with open(args.report, "w", encoding="utf-8") as stream:
             json.dump(report, stream, indent=2, allow_nan=False)
             stream.write("\n")
@@ -1902,8 +1976,6 @@ def main():
             "validation": report["validation"],
             "semantic_rmse": report["preview"]["semantic_feature_rmse_after_solve"],
             "selected_rbf": {"width": selected["width_factor"], "alpha": selected["ridge_alpha"]}}))
-        if report["validation"]["fit_gate"] != "pass":
-            raise RuntimeError("semantic walk preview failed numerical bake validation")
     finally:
         scene.frame_set(old_frame, subframe=old_subframe)
         # Preserve the saved preview file, but clean temporary data from this
