@@ -1,0 +1,1219 @@
+{
+  "schema": "mg1.raw-sluggies-native-calibration.v1",
+  "model_sha256": "d9e82dc01425e72b22702a54ea4dfb84d8ab9df1441504dc29b208cb0d45f5ae",
+  "rest_signature_sha256": "339b5a1a51ca6a3bf3160ae26259ee3345546dc1158e24c70eb3afa299c8a9cf",
+  "bone_count": 92,
+  "bank_count": 9,
+  "banks": [
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_10_Catcher.anm",
+      "file": "Waluigi_10_Catcher.anm",
+      "sha256": "07b3077957ffd36df6dbe4fc9efbb67027ac6f998ba474f9015323c5af020f31",
+      "size_bytes": 49356,
+      "bank_index": 10,
+      "sequence_count": 4,
+      "raw_magic": 20070619,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_11_Reactions.anm",
+      "file": "Waluigi_11_Reactions.anm",
+      "sha256": "6bda73c6bb84e10d97cc92ba441eb88b55eda45bf494948d779371b47da8eb64",
+      "size_bytes": 314748,
+      "bank_index": 11,
+      "sequence_count": 9,
+      "raw_magic": 20060925,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_12_Various.anm",
+      "file": "Waluigi_12_Various.anm",
+      "sha256": "d5d02685c964f32fca28ab7a076fb5992eb350f29f78d6aaefbe3de04dbaba0c",
+      "size_bytes": 340040,
+      "bank_index": 12,
+      "sequence_count": 24,
+      "raw_magic": 20070619,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_13_Skate.anm",
+      "file": "Waluigi_13_Skate.anm",
+      "sha256": "5ba42c1603a637fa01a112685c5172554fe3f28df2b10087db2bc68858a11672",
+      "size_bytes": 22508,
+      "bank_index": 13,
+      "sequence_count": 2,
+      "raw_magic": 20060925,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_14_Entrance.anm",
+      "file": "Waluigi_14_Entrance.anm",
+      "sha256": "8f3b0a53c401af2aae310f9fcb83327c9ee40b1d325fd2eefa724477fe5d45ed",
+      "size_bytes": 107814,
+      "bank_index": 14,
+      "sequence_count": 5,
+      "raw_magic": 20070619,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_6_Fielding.anm",
+      "file": "Waluigi_6_Fielding.anm",
+      "sha256": "c8c46c60ec01878a09b9c4ed9bdc1973d11b3154e61ceaa81f6cde426e04c45e",
+      "size_bytes": 656902,
+      "bank_index": 6,
+      "sequence_count": 44,
+      "raw_magic": 20060925,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_7_Batting.anm",
+      "file": "Waluigi_7_Batting.anm",
+      "sha256": "53e129d720cfd77e982b42c4ed53b165de0a36ebf4cb0a16cd1609ad4280d77c",
+      "size_bytes": 933352,
+      "bank_index": 7,
+      "sequence_count": 28,
+      "raw_magic": 20060925,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_8_Running.anm",
+      "file": "Waluigi_8_Running.anm",
+      "sha256": "7b194e53d785254f82648c189e8c4dcc17f934e2d3181c74956bbe65e6e07f51",
+      "size_bytes": 364590,
+      "bank_index": 8,
+      "sequence_count": 17,
+      "raw_magic": 20060925,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_9_Pitching.anm",
+      "file": "Waluigi_9_Pitching.anm",
+      "sha256": "9fcfdf52d90c91ac6bd197622dc9bb6dd8a576ae95fe1873022110505c9beeaa",
+      "size_bytes": 371914,
+      "bank_index": 9,
+      "sequence_count": 12,
+      "raw_magic": 20070619,
+      "raw_bank_id": 0
+    }
+  ],
+  "action_count": 145,
+  "training_action_count": 118,
+  "holdout_action_count": 27,
+  "sample_count": 5284,
+  "identity_replay": {
+    "sample_count": 5284,
+    "max_pose_matrix_error": 7.62939453125e-06,
+    "max_mesh_vertex_error_world": 0.00010705073851223231
+  },
+  "legacy_action_mapping": {
+    "source_dataset": "tools\\blender\\reports\\native_waluigi_arm_context_production_basis.json.gz",
+    "mapping": "legacy sequence index i -> Waluigi_7_Batting_seq<i>; raw time = legacy time * action duration ratio (expected 6)",
+    "matched_action_count": 28,
+    "unmatched_action_count": 0,
+    "max_pose_matrix_error": 0.4312431737780571,
+    "max_arm_pose_matrix_error": 0.24088527634739876,
+    "action_results": [
+      {
+        "legacy_action": "sequence_0.004",
+        "raw_action": "Waluigi_7_Batting_seq0",
+        "sequence_index": 0,
+        "duration_ratio": 5.999999713897719,
+        "samples_compared": 41,
+        "max_profile_pose_matrix_error": 0.012085139751434326,
+        "max_arm_pose_matrix_error": 0.008558273315429688,
+        "max_weighted_centroid_error_world": 0.43299735675657747,
+        "max_arm_region_vertex_error_world": 0.5253661925240158,
+        "worst_profile_bones": [
+          [
+            "bone_36",
+            0.012085139751434326
+          ],
+          [
+            "bone_37",
+            0.01205107569694519
+          ],
+          [
+            "bone_35",
+            0.011646658182144165
+          ],
+          [
+            "bone_40",
+            0.011526733636856079
+          ],
+          [
+            "bone_38",
+            0.01145714521408081
+          ],
+          [
+            "bone_39",
+            0.01124534010887146
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_1.004",
+        "raw_action": "Waluigi_7_Batting_seq1",
+        "sequence_index": 1,
+        "duration_ratio": 5.999999713897719,
+        "samples_compared": 6,
+        "max_profile_pose_matrix_error": 0.15552370995283127,
+        "max_arm_pose_matrix_error": 4.805624485015869e-06,
+        "max_weighted_centroid_error_world": 0.011694075640248316,
+        "max_arm_region_vertex_error_world": 0.42390025574393375,
+        "worst_profile_bones": [
+          [
+            "bone_35",
+            0.15552370995283127
+          ],
+          [
+            "bone_37",
+            0.1509808599948883
+          ],
+          [
+            "bone_38",
+            0.1509808599948883
+          ],
+          [
+            "bone_39",
+            0.14353656768798828
+          ],
+          [
+            "bone_40",
+            0.1380547136068344
+          ],
+          [
+            "bone_36",
+            0.12263309955596924
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_10.003",
+        "raw_action": "Waluigi_7_Batting_seq10",
+        "sequence_index": 10,
+        "duration_ratio": 5.999999860437908,
+        "samples_compared": 83,
+        "max_profile_pose_matrix_error": 0.17597705125808716,
+        "max_arm_pose_matrix_error": 0.02273494005203247,
+        "max_weighted_centroid_error_world": 0.8572167018550095,
+        "max_arm_region_vertex_error_world": 0.9951284986307968,
+        "worst_profile_bones": [
+          [
+            "bone_41",
+            0.17597705125808716
+          ],
+          [
+            "bone_42",
+            0.17597702145576477
+          ],
+          [
+            "bone_46",
+            0.1748136579990387
+          ],
+          [
+            "bone_45",
+            0.1748136281967163
+          ],
+          [
+            "bone_39",
+            0.16431912407279015
+          ],
+          [
+            "bone_43",
+            0.1613091081380844
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_11.003",
+        "raw_action": "Waluigi_7_Batting_seq11",
+        "sequence_index": 11,
+        "duration_ratio": 5.999999713897719,
+        "samples_compared": 41,
+        "max_profile_pose_matrix_error": 0.3120906800031662,
+        "max_arm_pose_matrix_error": 0.24088527634739876,
+        "max_weighted_centroid_error_world": 12.064976628811875,
+        "max_arm_region_vertex_error_world": 13.653777954724182,
+        "worst_profile_bones": [
+          [
+            "bone_37",
+            0.3120906800031662
+          ],
+          [
+            "bone_36",
+            0.3091838210821152
+          ],
+          [
+            "bone_40",
+            0.30872427951544523
+          ],
+          [
+            "bone_44",
+            0.30619605630636215
+          ],
+          [
+            "bone_34",
+            0.3034745678305626
+          ],
+          [
+            "bone_41",
+            0.30305638164281845
+          ]
+        ],
+        "split_preserved": "holdout"
+      },
+      {
+        "legacy_action": "sequence_12.003",
+        "raw_action": "Waluigi_7_Batting_seq12",
+        "sequence_index": 12,
+        "duration_ratio": 5.999999713897719,
+        "samples_compared": 6,
+        "max_profile_pose_matrix_error": 0.08005452156066895,
+        "max_arm_pose_matrix_error": 4.4405460357666016e-06,
+        "max_weighted_centroid_error_world": 0.0035472895307087707,
+        "max_arm_region_vertex_error_world": 0.13872312405530488,
+        "worst_profile_bones": [
+          [
+            "bone_46",
+            0.08005452156066895
+          ],
+          [
+            "bone_45",
+            0.08005446195602417
+          ],
+          [
+            "bone_41",
+            0.07493644952774048
+          ],
+          [
+            "bone_42",
+            0.07493644952774048
+          ],
+          [
+            "bone_49",
+            0.07120972871780396
+          ],
+          [
+            "bone_50",
+            0.07120966911315918
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_13.003",
+        "raw_action": "Waluigi_7_Batting_seq13",
+        "sequence_index": 13,
+        "duration_ratio": 5.999999713897719,
+        "samples_compared": 39,
+        "max_profile_pose_matrix_error": 0.023199379444122314,
+        "max_arm_pose_matrix_error": 0.020961076021194458,
+        "max_weighted_centroid_error_world": 1.2101922910875518,
+        "max_arm_region_vertex_error_world": 1.4526040055895042,
+        "worst_profile_bones": [
+          [
+            "bone_31",
+            0.023199379444122314
+          ],
+          [
+            "bone_35",
+            0.022956252098083496
+          ],
+          [
+            "bone_36",
+            0.02280879020690918
+          ],
+          [
+            "bone_37",
+            0.0225449800491333
+          ],
+          [
+            "bone_40",
+            0.02250039577484131
+          ],
+          [
+            "bone_38",
+            0.022406578063964844
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_14.003",
+        "raw_action": "Waluigi_7_Batting_seq14",
+        "sequence_index": 14,
+        "duration_ratio": 5.999999779921319,
+        "samples_compared": 14,
+        "max_profile_pose_matrix_error": 0.05684006214141846,
+        "max_arm_pose_matrix_error": 0.025141984224319458,
+        "max_weighted_centroid_error_world": 0.24957955944235605,
+        "max_arm_region_vertex_error_world": 0.40115851293669824,
+        "worst_profile_bones": [
+          [
+            "bone_52",
+            0.05684006214141846
+          ],
+          [
+            "bone_49",
+            0.052419111132621765
+          ],
+          [
+            "bone_50",
+            0.05241909623146057
+          ],
+          [
+            "bone_42",
+            0.04784241318702698
+          ],
+          [
+            "bone_41",
+            0.04784238338470459
+          ],
+          [
+            "bone_45",
+            0.04720976948738098
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_15.003",
+        "raw_action": "Waluigi_7_Batting_seq15",
+        "sequence_index": 15,
+        "duration_ratio": 6.0,
+        "samples_compared": 31,
+        "max_profile_pose_matrix_error": 0.19395516067743301,
+        "max_arm_pose_matrix_error": 0.027093179523944855,
+        "max_weighted_centroid_error_world": 0.9481702692827213,
+        "max_arm_region_vertex_error_world": 1.1985362037294185,
+        "worst_profile_bones": [
+          [
+            "bone_37",
+            0.19395516067743301
+          ],
+          [
+            "bone_38",
+            0.19395516067743301
+          ],
+          [
+            "bone_41",
+            0.17046253383159637
+          ],
+          [
+            "bone_42",
+            0.1704624742269516
+          ],
+          [
+            "bone_45",
+            0.16537410020828247
+          ],
+          [
+            "bone_46",
+            0.16537410020828247
+          ]
+        ],
+        "split_preserved": "holdout"
+      },
+      {
+        "legacy_action": "sequence_16.003",
+        "raw_action": "Waluigi_7_Batting_seq16",
+        "sequence_index": 16,
+        "duration_ratio": 6.000000215926268,
+        "samples_compared": 54,
+        "max_profile_pose_matrix_error": 0.29641151428222656,
+        "max_arm_pose_matrix_error": 0.012603342533111572,
+        "max_weighted_centroid_error_world": 0.4453532677109141,
+        "max_arm_region_vertex_error_world": 0.5881369730463404,
+        "worst_profile_bones": [
+          [
+            "bone_37",
+            0.29641151428222656
+          ],
+          [
+            "bone_38",
+            0.29641151428222656
+          ],
+          [
+            "bone_41",
+            0.2493395358324051
+          ],
+          [
+            "bone_42",
+            0.2493395358324051
+          ],
+          [
+            "bone_46",
+            0.2441285289824009
+          ],
+          [
+            "bone_45",
+            0.2441284991800785
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_17.001",
+        "raw_action": "Waluigi_7_Batting_seq17",
+        "sequence_index": 17,
+        "duration_ratio": 6.000000326974069,
+        "samples_compared": 70,
+        "max_profile_pose_matrix_error": 0.3064660280942917,
+        "max_arm_pose_matrix_error": 0.015055596828460693,
+        "max_weighted_centroid_error_world": 0.7892216885386825,
+        "max_arm_region_vertex_error_world": 0.9844895610298268,
+        "worst_profile_bones": [
+          [
+            "bone_37",
+            0.3064660280942917
+          ],
+          [
+            "bone_38",
+            0.3064660131931305
+          ],
+          [
+            "bone_34",
+            0.270610086619854
+          ],
+          [
+            "bone_33",
+            0.2706100791692734
+          ],
+          [
+            "bone_32",
+            0.25854795798659325
+          ],
+          [
+            "bone_41",
+            0.25348881632089615
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_18.001",
+        "raw_action": "Waluigi_7_Batting_seq18",
+        "sequence_index": 18,
+        "duration_ratio": 6.000000161184396,
+        "samples_compared": 72,
+        "max_profile_pose_matrix_error": 0.21826499700546265,
+        "max_arm_pose_matrix_error": 0.027260303497314453,
+        "max_weighted_centroid_error_world": 1.182461731519058,
+        "max_arm_region_vertex_error_world": 1.209193216067019,
+        "worst_profile_bones": [
+          [
+            "bone_37",
+            0.21826499700546265
+          ],
+          [
+            "bone_38",
+            0.21826499700546265
+          ],
+          [
+            "bone_45",
+            0.19159826636314392
+          ],
+          [
+            "bone_46",
+            0.19159823656082153
+          ],
+          [
+            "bone_42",
+            0.19100022315979004
+          ],
+          [
+            "bone_41",
+            0.19100016355514526
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_19.001",
+        "raw_action": "Waluigi_7_Batting_seq19",
+        "sequence_index": 19,
+        "duration_ratio": 6.000000326974069,
+        "samples_compared": 71,
+        "max_profile_pose_matrix_error": 0.23324577510356903,
+        "max_arm_pose_matrix_error": 0.03270386904478073,
+        "max_weighted_centroid_error_world": 0.6978241509382291,
+        "max_arm_region_vertex_error_world": 1.0252965069049031,
+        "worst_profile_bones": [
+          [
+            "bone_37",
+            0.23324577510356903
+          ],
+          [
+            "bone_38",
+            0.23324568569660187
+          ],
+          [
+            "bone_41",
+            0.2020445317029953
+          ],
+          [
+            "bone_42",
+            0.2020445317029953
+          ],
+          [
+            "bone_46",
+            0.20056245476007462
+          ],
+          [
+            "bone_45",
+            0.20056244730949402
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_2.004",
+        "raw_action": "Waluigi_7_Batting_seq2",
+        "sequence_index": 2,
+        "duration_ratio": 6.0,
+        "samples_compared": 16,
+        "max_profile_pose_matrix_error": 0.05218994617462158,
+        "max_arm_pose_matrix_error": 0.009189818985760212,
+        "max_weighted_centroid_error_world": 0.26374472388814035,
+        "max_arm_region_vertex_error_world": 0.36479230381196326,
+        "worst_profile_bones": [
+          [
+            "bone_43",
+            0.05218994617462158
+          ],
+          [
+            "bone_39",
+            0.047743141651153564
+          ],
+          [
+            "bone_47",
+            0.04764604568481445
+          ],
+          [
+            "bone_48",
+            0.04689739644527435
+          ],
+          [
+            "bone_49",
+            0.04479077458381653
+          ],
+          [
+            "bone_50",
+            0.04479077458381653
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_20.001",
+        "raw_action": "Waluigi_7_Batting_seq20",
+        "sequence_index": 20,
+        "duration_ratio": 6.0,
+        "samples_compared": 61,
+        "max_profile_pose_matrix_error": 0.37449808418750763,
+        "max_arm_pose_matrix_error": 0.013152748346328735,
+        "max_weighted_centroid_error_world": 0.3507267634591087,
+        "max_arm_region_vertex_error_world": 0.7520962572732002,
+        "worst_profile_bones": [
+          [
+            "bone_37",
+            0.37449808418750763
+          ],
+          [
+            "bone_38",
+            0.37449805438518524
+          ],
+          [
+            "bone_45",
+            0.37420816347002983
+          ],
+          [
+            "bone_46",
+            0.37420813366770744
+          ],
+          [
+            "bone_42",
+            0.3722642511129379
+          ],
+          [
+            "bone_41",
+            0.37226422131061554
+          ]
+        ],
+        "split_preserved": "holdout"
+      },
+      {
+        "legacy_action": "sequence_21.001",
+        "raw_action": "Waluigi_7_Batting_seq21",
+        "sequence_index": 21,
+        "duration_ratio": 6.0,
+        "samples_compared": 34,
+        "max_profile_pose_matrix_error": 0.022089391946792603,
+        "max_arm_pose_matrix_error": 0.022089391946792603,
+        "max_weighted_centroid_error_world": 0.3109350680648226,
+        "max_arm_region_vertex_error_world": 0.67565558965844,
+        "worst_profile_bones": [
+          [
+            "bone_29",
+            0.022089391946792603
+          ],
+          [
+            "bone_52",
+            0.008978188037872314
+          ],
+          [
+            "bone_42",
+            0.007871747016906738
+          ],
+          [
+            "bone_38",
+            0.007823467254638672
+          ],
+          [
+            "bone_46",
+            0.0076558589935302734
+          ],
+          [
+            "bone_41",
+            0.0076329708099365234
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_22.001",
+        "raw_action": "Waluigi_7_Batting_seq22",
+        "sequence_index": 22,
+        "duration_ratio": 6.0,
+        "samples_compared": 16,
+        "max_profile_pose_matrix_error": 0.1672106385231018,
+        "max_arm_pose_matrix_error": 0.0074665844440460205,
+        "max_weighted_centroid_error_world": 0.28924796328254754,
+        "max_arm_region_vertex_error_world": 0.40493576620850613,
+        "worst_profile_bones": [
+          [
+            "bone_37",
+            0.1672106385231018
+          ],
+          [
+            "bone_38",
+            0.1672106385231018
+          ],
+          [
+            "bone_36",
+            0.16627073287963867
+          ],
+          [
+            "bone_35",
+            0.14884354174137115
+          ],
+          [
+            "bone_45",
+            0.148458331823349
+          ],
+          [
+            "bone_46",
+            0.14845821261405945
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_23.001",
+        "raw_action": "Waluigi_7_Batting_seq23",
+        "sequence_index": 23,
+        "duration_ratio": 5.999999713897719,
+        "samples_compared": 36,
+        "max_profile_pose_matrix_error": 0.014830797910690308,
+        "max_arm_pose_matrix_error": 0.010062366724014282,
+        "max_weighted_centroid_error_world": 0.49818426777915986,
+        "max_arm_region_vertex_error_world": 0.5847005240579085,
+        "worst_profile_bones": [
+          [
+            "bone_46",
+            0.014830797910690308
+          ],
+          [
+            "bone_42",
+            0.01468399167060852
+          ],
+          [
+            "bone_50",
+            0.014578722417354584
+          ],
+          [
+            "bone_49",
+            0.014234073460102081
+          ],
+          [
+            "bone_45",
+            0.01412096619606018
+          ],
+          [
+            "bone_38",
+            0.013828068971633911
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_24",
+        "raw_action": "Waluigi_7_Batting_seq24",
+        "sequence_index": 24,
+        "duration_ratio": 6.000000184582132,
+        "samples_compared": 63,
+        "max_profile_pose_matrix_error": 0.1783600151538849,
+        "max_arm_pose_matrix_error": 0.02186363935470581,
+        "max_weighted_centroid_error_world": 0.7402387759800028,
+        "max_arm_region_vertex_error_world": 0.8903972105914137,
+        "worst_profile_bones": [
+          [
+            "bone_42",
+            0.1783600151538849
+          ],
+          [
+            "bone_41",
+            0.1783600077033043
+          ],
+          [
+            "bone_45",
+            0.17291922867298126
+          ],
+          [
+            "bone_46",
+            0.17291922867298126
+          ],
+          [
+            "bone_33",
+            0.16446304321289062
+          ],
+          [
+            "bone_34",
+            0.16446304321289062
+          ]
+        ],
+        "split_preserved": "holdout"
+      },
+      {
+        "legacy_action": "sequence_25",
+        "raw_action": "Waluigi_7_Batting_seq25",
+        "sequence_index": 25,
+        "duration_ratio": 6.0,
+        "samples_compared": 61,
+        "max_profile_pose_matrix_error": 0.4312431737780571,
+        "max_arm_pose_matrix_error": 0.030621498823165894,
+        "max_weighted_centroid_error_world": 1.3442670248875055,
+        "max_arm_region_vertex_error_world": 1.7600933112800268,
+        "worst_profile_bones": [
+          [
+            "bone_38",
+            0.4312431737780571
+          ],
+          [
+            "bone_37",
+            0.4312431141734123
+          ],
+          [
+            "bone_42",
+            0.37856612354516983
+          ],
+          [
+            "bone_41",
+            0.37856609374284744
+          ],
+          [
+            "bone_45",
+            0.3760422170162201
+          ],
+          [
+            "bone_46",
+            0.3760422170162201
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_26",
+        "raw_action": "Waluigi_7_Batting_seq26",
+        "sequence_index": 26,
+        "duration_ratio": 5.9999996478741195,
+        "samples_compared": 66,
+        "max_profile_pose_matrix_error": 0.3441605269908905,
+        "max_arm_pose_matrix_error": 0.027484193444252014,
+        "max_weighted_centroid_error_world": 1.4940320243511886,
+        "max_arm_region_vertex_error_world": 1.848898536539022,
+        "worst_profile_bones": [
+          [
+            "bone_42",
+            0.3441605269908905
+          ],
+          [
+            "bone_41",
+            0.3441605195403099
+          ],
+          [
+            "bone_49",
+            0.3361418917775154
+          ],
+          [
+            "bone_50",
+            0.33614183962345123
+          ],
+          [
+            "bone_45",
+            0.3332131877541542
+          ],
+          [
+            "bone_46",
+            0.3332131430506706
+          ]
+        ],
+        "split_preserved": "holdout"
+      },
+      {
+        "legacy_action": "sequence_27",
+        "raw_action": "Waluigi_7_Batting_seq27",
+        "sequence_index": 27,
+        "duration_ratio": 6.0,
+        "samples_compared": 61,
+        "max_profile_pose_matrix_error": 0.2386462762951851,
+        "max_arm_pose_matrix_error": 0.02362474799156189,
+        "max_weighted_centroid_error_world": 1.054432889440782,
+        "max_arm_region_vertex_error_world": 1.2257026236865776,
+        "worst_profile_bones": [
+          [
+            "bone_41",
+            0.2386462762951851
+          ],
+          [
+            "bone_42",
+            0.2386462613940239
+          ],
+          [
+            "bone_45",
+            0.2386123239994049
+          ],
+          [
+            "bone_46",
+            0.2386123239994049
+          ],
+          [
+            "bone_49",
+            0.19946806132793427
+          ],
+          [
+            "bone_50",
+            0.19946806132793427
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_3.004",
+        "raw_action": "Waluigi_7_Batting_seq3",
+        "sequence_index": 3,
+        "duration_ratio": 5.999999713897719,
+        "samples_compared": 21,
+        "max_profile_pose_matrix_error": 0.4187711700797081,
+        "max_arm_pose_matrix_error": 0.004444122314453125,
+        "max_weighted_centroid_error_world": 0.14658049052735672,
+        "max_arm_region_vertex_error_world": 0.9196084170830313,
+        "worst_profile_bones": [
+          [
+            "bone_45",
+            0.4187711700797081
+          ],
+          [
+            "bone_46",
+            0.4187711328268051
+          ],
+          [
+            "bone_41",
+            0.40986263006925583
+          ],
+          [
+            "bone_42",
+            0.40986263006925583
+          ],
+          [
+            "bone_49",
+            0.4007027898915112
+          ],
+          [
+            "bone_50",
+            0.40070275915786624
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_4.004",
+        "raw_action": "Waluigi_7_Batting_seq4",
+        "sequence_index": 4,
+        "duration_ratio": 6.0,
+        "samples_compared": 31,
+        "max_profile_pose_matrix_error": 0.011150631820783019,
+        "max_arm_pose_matrix_error": 0.01112985610961914,
+        "max_weighted_centroid_error_world": 0.4078529900514076,
+        "max_arm_region_vertex_error_world": 0.5265480962079353,
+        "worst_profile_bones": [
+          [
+            "bone_42",
+            0.011150631820783019
+          ],
+          [
+            "bone_41",
+            0.011150610633194447
+          ],
+          [
+            "bone_36",
+            0.011142268776893616
+          ],
+          [
+            "bone_30",
+            0.01112985610961914
+          ],
+          [
+            "bone_51",
+            0.011129834689199924
+          ],
+          [
+            "bone_45",
+            0.011129116173833609
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_5.004",
+        "raw_action": "Waluigi_7_Batting_seq5",
+        "sequence_index": 5,
+        "duration_ratio": 6.0,
+        "samples_compared": 30,
+        "max_profile_pose_matrix_error": 0.01043815165758133,
+        "max_arm_pose_matrix_error": 0.01009194552898407,
+        "max_weighted_centroid_error_world": 0.3502926291047229,
+        "max_arm_region_vertex_error_world": 0.4618996184179532,
+        "worst_profile_bones": [
+          [
+            "bone_38",
+            0.01043815165758133
+          ],
+          [
+            "bone_37",
+            0.010438144207000732
+          ],
+          [
+            "bone_43",
+            0.010365888476371765
+          ],
+          [
+            "bone_39",
+            0.010351493954658508
+          ],
+          [
+            "bone_49",
+            0.010347738862037659
+          ],
+          [
+            "bone_50",
+            0.010347723960876465
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_6.004",
+        "raw_action": "Waluigi_7_Batting_seq6",
+        "sequence_index": 6,
+        "duration_ratio": 5.999999713897719,
+        "samples_compared": 21,
+        "max_profile_pose_matrix_error": 0.00923946499824524,
+        "max_arm_pose_matrix_error": 0.008437812328338623,
+        "max_weighted_centroid_error_world": 0.20379721157824446,
+        "max_arm_region_vertex_error_world": 0.241729715138037,
+        "worst_profile_bones": [
+          [
+            "bone_52",
+            0.00923946499824524
+          ],
+          [
+            "bone_29",
+            0.008437812328338623
+          ],
+          [
+            "bone_48",
+            0.0047566890716552734
+          ],
+          [
+            "bone_44",
+            0.004663228988647461
+          ],
+          [
+            "bone_47",
+            0.004660606384277344
+          ],
+          [
+            "bone_49",
+            0.004651308059692383
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_7.004",
+        "raw_action": "Waluigi_7_Batting_seq7",
+        "sequence_index": 7,
+        "duration_ratio": 5.999999713897719,
+        "samples_compared": 6,
+        "max_profile_pose_matrix_error": 8.106231689453125e-06,
+        "max_arm_pose_matrix_error": 5.185604095458984e-06,
+        "max_weighted_centroid_error_world": 0.00025078552114705813,
+        "max_arm_region_vertex_error_world": 0.00029154371344429774,
+        "worst_profile_bones": [
+          [
+            "bone_46",
+            8.106231689453125e-06
+          ],
+          [
+            "bone_45",
+            8.07642936706543e-06
+          ],
+          [
+            "bone_38",
+            7.063150405883789e-06
+          ],
+          [
+            "bone_37",
+            6.854534149169922e-06
+          ],
+          [
+            "bone_49",
+            6.67572021484375e-06
+          ],
+          [
+            "bone_50",
+            6.67572021484375e-06
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_8.004",
+        "raw_action": "Waluigi_7_Batting_seq8",
+        "sequence_index": 8,
+        "duration_ratio": 6.000000168295473,
+        "samples_compared": 35,
+        "max_profile_pose_matrix_error": 0.07289201021194458,
+        "max_arm_pose_matrix_error": 0.008592039346694946,
+        "max_weighted_centroid_error_world": 0.2319947734251227,
+        "max_arm_region_vertex_error_world": 0.30071816396275225,
+        "worst_profile_bones": [
+          [
+            "bone_34",
+            0.07289201021194458
+          ],
+          [
+            "bone_33",
+            0.07289199531078339
+          ],
+          [
+            "bone_38",
+            0.06756305694580078
+          ],
+          [
+            "bone_37",
+            0.0675630271434784
+          ],
+          [
+            "bone_43",
+            0.06380754709243774
+          ],
+          [
+            "bone_39",
+            0.06192222237586975
+          ]
+        ],
+        "split_preserved": "train"
+      },
+      {
+        "legacy_action": "sequence_9.003",
+        "raw_action": "Waluigi_7_Batting_seq9",
+        "sequence_index": 9,
+        "duration_ratio": 5.999999713897719,
+        "samples_compared": 21,
+        "max_profile_pose_matrix_error": 0.2347819283604622,
+        "max_arm_pose_matrix_error": 0.01133919507265091,
+        "max_weighted_centroid_error_world": 0.3670628773232953,
+        "max_arm_region_vertex_error_world": 0.5804428132655953,
+        "worst_profile_bones": [
+          [
+            "bone_41",
+            0.2347819283604622
+          ],
+          [
+            "bone_42",
+            0.2347819283604622
+          ],
+          [
+            "bone_46",
+            0.23130870144814253
+          ],
+          [
+            "bone_45",
+            0.23130867164582014
+          ],
+          [
+            "bone_37",
+            0.21592575311660767
+          ],
+          [
+            "bone_38",
+            0.21592575311660767
+          ]
+        ],
+        "split_preserved": "train"
+      }
+    ]
+  },
+  "texture_inventory": [
+    {
+      "name": "tex1_1024x128_2dea43f386b17ea6_14.png",
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\123475520_waluigi.gpl\\tex\\tex1_1024x128_2dea43f386b17ea6_14.png",
+      "exists": true,
+      "size": [
+        1024,
+        128
+      ],
+      "packed": false,
+      "users": 2
+    },
+    {
+      "name": "tex1_256x128_3de451c2184e1ca4_14.png",
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\123475520_waluigi.gpl\\tex\\tex1_256x128_3de451c2184e1ca4_14.png",
+      "exists": true,
+      "size": [
+        256,
+        128
+      ],
+      "packed": false,
+      "users": 2
+    },
+    {
+      "name": "tex1_512x512_971d7f722f9c1033_14.png",
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\123475520_waluigi.gpl\\tex\\tex1_512x512_971d7f722f9c1033_14.png",
+      "exists": true,
+      "size": [
+        512,
+        512
+      ],
+      "packed": false,
+      "users": 5
+    }
+  ],
+  "preview": "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\raw_native_waluigi_batting_preview.blend",
+  "dataset": "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_waluigi_raw_anm_calibration.json.gz"
+}

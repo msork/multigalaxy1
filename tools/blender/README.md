@@ -108,3 +108,23 @@ python tools/blender/audit_native_action_basis.py --source-blend-report tools/bl
 ```
 
 The report includes only derived comparison values, action-slot provenance, and channel norms/angles; it omits raw action key values and full rest matrices. `inspect.armature` also reports object transforms, action/slot binding, bone inheritance settings, pose rotation modes/channels/basis matrices, and constraints. The original Waluigi GLB contains a 92-joint skin but no animation clips. No surviving workfile contains the `.004` action owner, so the action source basis cannot currently be proven.
+
+## Raw Waluigi Sluggers calibration
+
+Use the original `.sluggie` model and nine `.anm` banks through the installed
+Sluggies IO add-on. This supersedes orphaned `sequence_*` actions as the native
+calibration source. From the repository root with Blender 5.2.3:
+
+```powershell
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background --disable-autoexec --python tools/blender/extract_raw_sluggies_calibration.py
+```
+
+The extractor reads `C:\MultiGalaxy1-Assets\Working\MSS\Waluigi\`, imports
+into a fresh background scene, and writes a local gzip dataset, validation
+JSON, and packed-texture preview under `tools/blender/reports/`. It does not
+modify a production rig or action. The validated production object matrix is
+assigned to this temporary import without applying its intentional scale.
+Run `python tools/blender/test_raw_anm_calibration.py` for the policy/metadata
+unit tests. See
+[`docs/animation-retargeting/raw-native-waluigi-calibration.md`](../../docs/animation-retargeting/raw-native-waluigi-calibration.md)
+for action provenance, dataset checks, and legacy-action comparison results.
