@@ -124,12 +124,12 @@ Do not fit a pose manifold from `.004` yet. The autosave supports a direct repla
 
 ## Native action provenance stop gate
 
-The orphaned `sequence_*` Blender actions are excluded from all fitting,
-training, and retarget work pending source recovery. See
-[`native-action-source-recovery.md`](native-action-source-recovery.md) for the
-autosave evidence, owner ambiguity, `.anm` importer semantics, and the safe
-preview recipe. The decisive issue is that `OBArmature.004` is a reusable
-Blender 5.x object-target slot identifier, while the surviving scene assigns
-it to multiple rigs with different rest signatures; the generic sequence
-actions have no source-bank or track metadata. Numerical replay on a duplicate
-therefore cannot establish the intended native basis.
+The generic `sequence_*` Blender actions still lack raw-bank and TrackId
+provenance, so they remain excluded from manifold fitting and training. The
+saved `Armature.001` has now been accepted as a candidate source basis for
+deterministic native-action conversion onto disposable production-basis rigs.
+That conversion uses the measured object-space transform and a constant rest
+correction per bone; it is numerically and visually validated on three native
+actions. See [`native-action-source-recovery.md`](native-action-source-recovery.md)
+for action-owner caveats and the conversion report. `OBArmature.004` remains a
+reusable Blender 5.x object-target slot identifier, not proof of ownership.
