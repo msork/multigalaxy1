@@ -396,14 +396,36 @@ def write_preview(filepath, action_name, clean, baseline, baseline_rows,
                                                  for name in intended))
         if replay_error > 2e-4:
             raise RuntimeError(f"saved scaffold action replay error {replay_error:.6g} exceeds tolerance")
+        fit.enable_preview_collection(scene, bpy.context.view_layer, collection)
+        keep_visible = {target, *rig_meshes}
+        for obj in scene.objects:
+            if obj in keep_visible:
+                continue
+            # This is a diagnostic copy of the workfile. Hide the source,
+            # baseline, and reference character sets in the saved preview so
+            # no second armature can appear to contribute another pair of arms.
+            obj.hide_set(True)
+            obj.hide_viewport = True
+            obj.hide_render = True
+        set_visible(target)
         for obj in rig_meshes:
             set_visible(obj)
         scene.frame_set(0)
         bpy.context.view_layer.update()
+        visible_armatures = [obj.name for obj in scene.objects
+            if obj.type == "ARMATURE" and obj.visible_get(view_layer=bpy.context.view_layer)]
+        visible_meshes = [obj.name for obj in scene.objects
+            if obj.type == "MESH" and obj.visible_get(view_layer=bpy.context.view_layer)]
+        if visible_armatures != [target.name] or set(visible_meshes) != {
+                obj.name for obj in rig_meshes}:
+            raise RuntimeError("preview visibility gate expected exactly one rig and its two meshes")
         bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(filepath))
         return {"path": os.path.abspath(filepath), "action": baked.name,
                 "rig": target.name, "meshes": [obj.name for obj in rig_meshes],
                 "replay_matrix_error": replay_error,
+                "visible_armatures": visible_armatures,
+                "visible_meshes": visible_meshes,
+                "hidden_reference_object_count": len(scene.objects) - 3,
                 "runtime_constraints": sum(len(pb.constraints) for pb in target.pose.bones)}
     finally:
         scene.frame_set(old_frame, subframe=old_sub)

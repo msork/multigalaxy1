@@ -27,7 +27,21 @@ def main():
                   for mod in obj.modifiers)]
     if not meshes:
         raise RuntimeError("no preview meshes are bound to the preview rig")
+    visible_armatures = [obj for obj in bpy.context.scene.objects
+        if obj.type == "ARMATURE" and obj.visible_get(view_layer=bpy.context.view_layer)]
+    visible_meshes = [obj for obj in bpy.context.scene.objects
+        if obj.type == "MESH" and obj.visible_get(view_layer=bpy.context.view_layer)]
+    bound_mesh_names = sorted(obj.name for obj in meshes)
+    visible_armature_names = sorted(obj.name for obj in visible_armatures)
+    visible_mesh_names = sorted(obj.name for obj in visible_meshes)
     failures = []
+    if visible_armature_names != [rig.name]:
+        failures.append({"problem": "visible character armatures are not exactly the preview rig",
+                         "visible_armatures": visible_armature_names})
+    if visible_mesh_names != bound_mesh_names:
+        failures.append({"problem": "visible character meshes are not exactly the two bound preview meshes",
+                         "visible_meshes": visible_mesh_names,
+                         "expected_meshes": bound_mesh_names})
     scales = []
     vertex_counts = {obj.name: len(obj.data.vertices) for obj in meshes}
     for frame in range(61):
@@ -64,6 +78,13 @@ def main():
         "rig": rig.name,
         "action": rig.animation_data.action.name,
         "mesh_objects": [obj.name for obj in meshes],
+        "visible_character_body_count": int(
+            visible_armature_names == [rig.name] and visible_mesh_names == bound_mesh_names),
+        "visible_armatures": visible_armature_names,
+        "visible_meshes": visible_mesh_names,
+        "hidden_reference_object_count": sum(
+            not obj.visible_get(view_layer=bpy.context.view_layer)
+            for obj in bpy.context.scene.objects),
         "vertex_counts": vertex_counts,
         "runtime_constraints": sum(len(pb.constraints) for pb in rig.pose.bones),
         "object_scale": [float(v) for v in rig.scale],

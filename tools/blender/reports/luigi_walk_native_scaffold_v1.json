@@ -1646,6 +1646,14 @@
       "ScaffoldWalk_Waluigi_ARMTEST_29_0x75c1640_submesh1"
     ],
     "replay_matrix_error": 3.860202464123219e-05,
+    "visible_armatures": [
+      "ScaffoldWalk_Waluigi_Rig"
+    ],
+    "visible_meshes": [
+      "ScaffoldWalk_Waluigi_ARMTEST_29_0x75c1640_submesh0",
+      "ScaffoldWalk_Waluigi_ARMTEST_29_0x75c1640_submesh1"
+    ],
+    "hidden_reference_object_count": 36,
     "runtime_constraints": 0
   }
 }

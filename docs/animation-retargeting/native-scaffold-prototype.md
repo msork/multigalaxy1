@@ -44,6 +44,10 @@ The source Waluigi, source actions, and raw calibration dataset are read-only.
 The tool does not modify or assign actions on them. Any preview rig, copied
 meshes, and output action have disposable names; output is saved to a new file.
 The intentional 43.437 object transform is checked and never applied.
+Before save, only the final preview rig and its bound meshes remain visible;
+source, production, and baseline scene objects are hidden in the output copy.
+Reopen validation requires exactly one visible armature and exactly its two
+bound meshes.
 
 Before preview generation, report both semantic residuals and source-motion
 retention, the full modeled-context normalized SE(3) step, branch joint gaps,

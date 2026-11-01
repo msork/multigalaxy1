@@ -7,6 +7,15 @@
     "ScaffoldWalk_Waluigi_ARMTEST_29_0x75c1640_submesh0",
     "ScaffoldWalk_Waluigi_ARMTEST_29_0x75c1640_submesh1"
   ],
+  "visible_character_body_count": 1,
+  "visible_armatures": [
+    "ScaffoldWalk_Waluigi_Rig"
+  ],
+  "visible_meshes": [
+    "ScaffoldWalk_Waluigi_ARMTEST_29_0x75c1640_submesh0",
+    "ScaffoldWalk_Waluigi_ARMTEST_29_0x75c1640_submesh1"
+  ],
+  "hidden_reference_object_count": 36,
   "vertex_counts": {
     "ScaffoldWalk_Waluigi_ARMTEST_29_0x75c1640_submesh0": 2866,
     "ScaffoldWalk_Waluigi_ARMTEST_29_0x75c1640_submesh1": 154
