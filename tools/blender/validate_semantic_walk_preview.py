@@ -6,6 +6,7 @@ import os
 import sys
 
 import bpy
+import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -75,6 +76,8 @@ def main():
     # are the requested 0..60 interval before evaluating the saved action.
     frames = fit_report["source_frames"]
     target_semantics, source_semantics = [], []
+    elbow_curve = []
+    elbow_branches = {"main": [], "overlap": []}
     max_replay = {"error": 0.0}
     max_vertex_finite = 0
     max_basis_scale_error = 0.0
@@ -89,6 +92,27 @@ def main():
         target_sem = fit.semantic_from_target_sample(rest,
             {name: fit.numpy_matrix(pose[name]) for name in bones})
         target_semantics.append(target_sem)
+        elbow_curve.append({"frame": int(frame), "source_raw": float(src_sem[3]),
+                            "target": float(target_sem[3])})
+        # Measure each Waluigi elbow branch geometrically. The context feature
+        # uses their midpoint; separate curves reveal whether that average
+        # hides motion or one branch lacks leverage.
+        def moved_point(bone_name, endpoint):
+            rest_matrix = fit.numpy_matrix(rest[bone_name]["rest_matrix"])
+            local = np.r_[rest[bone_name][endpoint], 1.0]
+            return (fit.numpy_matrix(pose[bone_name]) @
+                    np.linalg.inv(rest_matrix) @ local)[:3]
+        shoulder = moved_point("bone_23", "head")
+        wrist = moved_point("bone_27", "tail")
+        elbow_main = moved_point("bone_26", "head")
+        elbow_overlap = moved_point("bone_29", "head")
+        def bend(elbow):
+            upper = elbow - shoulder
+            lower = wrist - elbow
+            return math.atan2(float(np.linalg.norm(np.cross(upper, lower))),
+                              float(np.dot(upper, lower)))
+        elbow_branches["main"].append({"frame": int(frame), "angle": bend(elbow_main)})
+        elbow_branches["overlap"].append({"frame": int(frame), "angle": bend(elbow_overlap)})
         evaluated = []
         for mesh in meshes:
             ev = mesh.evaluated_get(bpy.context.evaluated_depsgraph_get())
@@ -104,8 +128,13 @@ def main():
         for pb in rig.pose.bones:
             for value in pb.scale:
                 max_basis_scale_error = max(max_basis_scale_error, abs(float(value) - 1.0))
-    import numpy as np
-    residual = np.asarray(target_semantics) - np.asarray(source_semantics)
+    source_semantics = np.asarray(source_semantics)
+    elbow_reference = fit_report["elbow_source_mapping"]["frame_0_reference_radians"]
+    source_semantics[:, 3] -= elbow_reference
+    source_semantics[:, 3] *= fit_report["elbow_source_mapping"].get("excursion_gain", 1.0)
+    for row, mapped in zip(elbow_curve, source_semantics[:, 3]):
+        row["source"] = float(mapped)
+    residual = np.asarray(target_semantics) - source_semantics
     rmse = {name: float(np.sqrt(np.mean(residual[:, i] ** 2)))
             for i, name in enumerate(fit.SEMANTIC_NAMES)}
     fitted_rmse = fit_report["preview"]["semantic_feature_rmse_after_solve"]
@@ -122,6 +151,20 @@ def main():
         "runtime_constraints": constraints,
         "object_scale": [float(v) for v in rig.scale],
         "semantic_rmse_from_saved_evaluation": rmse,
+        "elbow_curve_radians": elbow_curve,
+        "elbow_curve_ranges_radians": {
+            "source_raw": fit_report["elbow_source_mapping"]["raw_source_range_radians"],
+            "source_mapped": [float(min(row["source"] for row in elbow_curve)),
+                              float(max(row["source"] for row in elbow_curve))],
+            "target": [float(min(row["target"] for row in elbow_curve)),
+                       float(max(row["target"] for row in elbow_curve))],
+            "native_training": fit_report["native_training_semantic_range"]["elbow_flexion"],
+            "target_main_branch_angle": [float(min(row["angle"] for row in elbow_branches["main"])),
+                                          float(max(row["angle"] for row in elbow_branches["main"]))],
+            "target_overlap_branch_angle": [float(min(row["angle"] for row in elbow_branches["overlap"])),
+                                             float(max(row["angle"] for row in elbow_branches["overlap"]))],
+        },
+        "target_branch_elbow_angles_radians": elbow_branches,
         "max_semantic_rmse_delta_vs_fit_report": max(abs(rmse[k] - fitted_rmse[k]) for k in rmse),
         "max_bone_scale_deviation": max_basis_scale_error,
         "fit_gates": fit_report["validation"],

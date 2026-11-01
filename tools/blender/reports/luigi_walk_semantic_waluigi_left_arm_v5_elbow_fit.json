@@ -1,0 +1,757 @@
+{
+  "schema": "mg1.semantic-luigi-walk-to-waluigi-left-arm.v1",
+  "source_rig": "luigi.001_armature",
+  "source_action": "luigi.001_armature_walk",
+  "source_slot": "OBluigi.001_armature",
+  "source_frames": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60
+  ],
+  "target_rig": "123475520_waluigi.gpl",
+  "target_walk_action": "Waluigi_GalaxyWalk_Legs_Baked",
+  "target_walk_source_slot": "OB123475520_waluigi.gpl",
+  "target_walk_duplicate_slot": "OBSemanticWalk_Waluigi_Target_Rig",
+  "target_walk_curves_imported_from_live_bridge": false,
+  "target_bones": [
+    "bone_1",
+    "bone_2",
+    "bone_3",
+    "bone_5",
+    "bone_6",
+    "bone_19",
+    "bone_20",
+    "bone_21",
+    "bone_22",
+    "bone_23",
+    "bone_24",
+    "bone_25",
+    "bone_26",
+    "bone_27",
+    "bone_29",
+    "bone_30",
+    "bone_31",
+    "bone_32",
+    "bone_33",
+    "bone_34",
+    "bone_35",
+    "bone_36",
+    "bone_37",
+    "bone_38",
+    "bone_39",
+    "bone_40",
+    "bone_41",
+    "bone_42",
+    "bone_43",
+    "bone_44",
+    "bone_45",
+    "bone_46",
+    "bone_47",
+    "bone_48",
+    "bone_49",
+    "bone_50",
+    "bone_51",
+    "bone_52"
+  ],
+  "semantic_feature_names": [
+    "shoulder_rot_x",
+    "shoulder_rot_y",
+    "shoulder_rot_z",
+    "elbow_flexion",
+    "forearm_roll",
+    "wrist_rot_x",
+    "wrist_rot_y",
+    "wrist_rot_z",
+    "hand_delta_x",
+    "hand_delta_y",
+    "hand_delta_z"
+  ],
+  "elbow_source_mapping": {
+    "definition": "source flexion excursion relative to frame 0; target rest-relative neutral is zero",
+    "raw_source_range_radians": [
+      -0.5862873995969423,
+      -0.0832635348536378
+    ],
+    "frame_0_reference_radians": -0.5311314765859687,
+    "excursion_gain": 1.5,
+    "mapped_source_range_radians": [
+      -0.08273388451646041,
+      0.6718019125984964
+    ],
+    "standardized_residual_weight": 16.0,
+    "target_native_training_range_radians": [
+      -0.00011397002125422724,
+      2.5066120519876343
+    ]
+  },
+  "source_target_semantic_rmse": {
+    "shoulder_rot_x": 0.5079313285494024,
+    "shoulder_rot_y": 0.28619632316623084,
+    "shoulder_rot_z": 0.8351220272222154,
+    "elbow_flexion": 0.2333082045215537,
+    "forearm_roll": 1.0851556713107906,
+    "wrist_rot_x": 0.2730561040318009,
+    "wrist_rot_y": 0.14731071789965808,
+    "wrist_rot_z": 0.036757956106196574,
+    "hand_delta_x": 0.2419217149327325,
+    "hand_delta_y": 0.33441893386422783,
+    "hand_delta_z": 0.6019313790990054
+  },
+  "residual_comparison_to_v1": {
+    "v1_rmse": {
+      "shoulder_rot_x": 0.8399220203896193,
+      "shoulder_rot_y": 0.9268352692555554,
+      "shoulder_rot_z": 0.7649252695731473,
+      "elbow_flexion": 1.1910619076793818,
+      "forearm_roll": 1.8270219129540881,
+      "wrist_rot_x": 0.6778418804609642,
+      "wrist_rot_y": 0.4213858765757929,
+      "wrist_rot_z": 0.16546173672874614,
+      "hand_delta_x": 0.6151115156555593,
+      "hand_delta_y": 0.34872692464034755,
+      "hand_delta_z": 0.7732876150160221
+    },
+    "current_rmse": {
+      "shoulder_rot_x": 0.5079313285494024,
+      "shoulder_rot_y": 0.28619632316623084,
+      "shoulder_rot_z": 0.8351220272222154,
+      "elbow_flexion": 0.2333082045215537,
+      "forearm_roll": 1.0851556713107906,
+      "wrist_rot_x": 0.2730561040318009,
+      "wrist_rot_y": 0.14731071789965808,
+      "wrist_rot_z": 0.036757956106196574,
+      "hand_delta_x": 0.2419217149327325,
+      "hand_delta_y": 0.33441893386422783,
+      "hand_delta_z": 0.6019313790990054
+    },
+    "semantic_group_rmse": {
+      "shoulder_orientation": {
+        "v1_rmse": 0.8464835664289748,
+        "current_rmse": 0.5880281655010451,
+        "relative_improvement": 0.3053283148995613
+      },
+      "elbow_flexion": {
+        "v1_rmse": 1.1910619076793818,
+        "current_rmse": 0.2333082045215537,
+        "relative_improvement": 0.8041174828803632
+      },
+      "forearm_roll": {
+        "v1_rmse": 1.8270219129540881,
+        "current_rmse": 1.0851556713107906,
+        "relative_improvement": 0.40605218601006465
+      },
+      "wrist_orientation": {
+        "v1_rmse": 0.47060714621493593,
+        "current_rmse": 0.1803803674592881,
+        "relative_improvement": 0.6167071220442014
+      },
+      "hand_position": {
+        "v1_rmse": 0.6049645665101281,
+        "current_rmse": 0.42138008362479257,
+        "relative_improvement": 0.30346319941411315
+      }
+    },
+    "worst_frame": {
+      "frame": 23,
+      "feature": "forearm_roll",
+      "absolute_residual": 1.2408026202263835,
+      "per_feature_absolute_residual": {
+        "shoulder_rot_x": 0.7447573575968939,
+        "shoulder_rot_y": 0.4873776322058867,
+        "shoulder_rot_z": 0.37781197225658014,
+        "elbow_flexion": 0.20293321716910273,
+        "forearm_roll": 1.2408026202263835,
+        "wrist_rot_x": 0.30298582805279284,
+        "wrist_rot_y": 0.019421070936633793,
+        "wrist_rot_z": 0.06529878995543202,
+        "hand_delta_x": 0.27634279150760266,
+        "hand_delta_y": 0.5304624437864327,
+        "hand_delta_z": 0.8350623570961366
+      }
+    }
+  },
+  "source_semantic_range": {
+    "shoulder_rot_x": [
+      0.7504794392985746,
+      0.7664637142029933
+    ],
+    "shoulder_rot_y": [
+      -0.26601320777367216,
+      0.26107093102755896
+    ],
+    "shoulder_rot_z": [
+      -0.6066879951606728,
+      0.590176351984402
+    ],
+    "elbow_flexion": [
+      -0.08273388451646041,
+      0.6718019125984964
+    ],
+    "forearm_roll": [
+      0.7305414044737706,
+      0.8924506308744533
+    ],
+    "wrist_rot_x": [
+      -0.28014015230121336,
+      0.42871283114816766
+    ],
+    "wrist_rot_y": [
+      -0.020719728263790014,
+      -0.014722761656768167
+    ],
+    "wrist_rot_z": [
+      0.01298016871556143,
+      0.024037640829417693
+    ],
+    "hand_delta_x": [
+      -0.36847440112791313,
+      -0.15924887475625907
+    ],
+    "hand_delta_y": [
+      -0.4881514321592665,
+      -0.3590723763966456
+    ],
+    "hand_delta_z": [
+      -0.40310145502746886,
+      0.4381047018153805
+    ]
+  },
+  "native_training_semantic_range": {
+    "shoulder_rot_x": [
+      -1.064704356859147,
+      2.1882625866183067
+    ],
+    "shoulder_rot_y": [
+      -2.473626172026363,
+      0.3145742952172999
+    ],
+    "shoulder_rot_z": [
+      -1.8645506223997008,
+      0.6501706343980336
+    ],
+    "elbow_flexion": [
+      -0.00011397002125422724,
+      2.5066120519876343
+    ],
+    "forearm_roll": [
+      -3.1256830705845164,
+      3.0244407464199368
+    ],
+    "wrist_rot_x": [
+      -0.8976705890861367,
+      1.2186312271707094
+    ],
+    "wrist_rot_y": [
+      -0.9857412333189286,
+      0.3173670981233153
+    ],
+    "wrist_rot_z": [
+      -0.5393358951550906,
+      0.9791865023685837
+    ],
+    "hand_delta_x": [
+      -2.265446437939546,
+      -0.2443599477270686
+    ],
+    "hand_delta_y": [
+      -1.0911821770895216,
+      1.1225877154960626
+    ],
+    "hand_delta_z": [
+      -0.32566645068660555,
+      1.245257931320072
+    ]
+  },
+  "nearest_native_semantic_distance": {
+    "mean": 3.4192738585199076,
+    "max": 4.221417454368766
+  },
+  "target_model": {
+    "type": "PCA latent context with direct semantic inverse; RBF ridge CV baseline",
+    "latent_dimensions": 192,
+    "feature_dimensions": 228,
+    "training_actions": [
+      "sequence_0.004",
+      "sequence_1.004",
+      "sequence_10.003",
+      "sequence_12.003",
+      "sequence_13.003",
+      "sequence_14.003",
+      "sequence_16.003",
+      "sequence_17.001",
+      "sequence_18.001",
+      "sequence_19.001",
+      "sequence_2.004",
+      "sequence_21.001",
+      "sequence_22.001",
+      "sequence_23.001",
+      "sequence_25",
+      "sequence_27",
+      "sequence_3.004",
+      "sequence_4.004",
+      "sequence_5.004",
+      "sequence_6.004",
+      "sequence_7.004",
+      "sequence_8.004",
+      "sequence_9.003"
+    ],
+    "training_samples": 845,
+    "holdout_actions_validation_only": [
+      "sequence_11.003",
+      "sequence_15.003",
+      "sequence_20.001",
+      "sequence_24",
+      "sequence_26"
+    ],
+    "holdout_samples": 262,
+    "rbf_centers": 72,
+    "selected_width_factor": 0.5,
+    "selected_ridge_alpha": 0.1,
+    "sigma_median": 4.556864753201683,
+    "grouped_cv": [
+      {
+        "width_factor": 0.5,
+        "ridge_alpha": 0.001,
+        "fold_feature_rmse": [
+          0.74161452459329,
+          0.8196669899073624,
+          0.657263802811774,
+          2.00230810890496,
+          0.8667544405141266
+        ],
+        "mean_feature_rmse": 1.0175215733463028
+      },
+      {
+        "width_factor": 0.5,
+        "ridge_alpha": 0.01,
+        "fold_feature_rmse": [
+          0.7398017628514775,
+          0.8187517346752924,
+          0.6565056892255967,
+          1.999512095842583,
+          0.8620874589556867
+        ],
+        "mean_feature_rmse": 1.0153317483101272
+      },
+      {
+        "width_factor": 0.5,
+        "ridge_alpha": 0.1,
+        "fold_feature_rmse": [
+          0.7335726475485553,
+          0.8254710519908975,
+          0.6569478665913066,
+          1.9911895757542721,
+          0.8472418818591486
+        ],
+        "mean_feature_rmse": 1.0108846047488362
+      },
+      {
+        "width_factor": 1.0,
+        "ridge_alpha": 0.001,
+        "fold_feature_rmse": [
+          0.9215269540620139,
+          0.8887659879180354,
+          0.699813871616716,
+          2.0504319630165786,
+          0.9923047893355886
+        ],
+        "mean_feature_rmse": 1.1105687131897866
+      },
+      {
+        "width_factor": 1.0,
+        "ridge_alpha": 0.01,
+        "fold_feature_rmse": [
+          0.8543355756700958,
+          0.9358066443608004,
+          0.7020112871869358,
+          2.0373357466144366,
+          0.9317356484436764
+        ],
+        "mean_feature_rmse": 1.092244980455189
+      },
+      {
+        "width_factor": 1.0,
+        "ridge_alpha": 0.1,
+        "fold_feature_rmse": [
+          0.8387364962803738,
+          0.9480210189348022,
+          0.699902644078565,
+          2.0071696657493794,
+          0.8999340014242511
+        ],
+        "mean_feature_rmse": 1.078752765293474
+      },
+      {
+        "width_factor": 2.0,
+        "ridge_alpha": 0.001,
+        "fold_feature_rmse": [
+          0.8974253344002286,
+          0.9840478329755843,
+          0.7103012023627326,
+          2.0021240045953075,
+          0.959512463323733
+        ],
+        "mean_feature_rmse": 1.1106821675315173
+      },
+      {
+        "width_factor": 2.0,
+        "ridge_alpha": 0.01,
+        "fold_feature_rmse": [
+          0.868562824469172,
+          0.9750523101782242,
+          0.7244247502607936,
+          1.9701025547109545,
+          0.8996393047486153
+        ],
+        "mean_feature_rmse": 1.087556348873552
+      },
+      {
+        "width_factor": 2.0,
+        "ridge_alpha": 0.1,
+        "fold_feature_rmse": [
+          0.8728146635860543,
+          1.0081377611159343,
+          0.7427894179910007,
+          1.9697198890925334,
+          0.873053895543174
+        ],
+        "mean_feature_rmse": 1.0933031254657393
+      }
+    ],
+    "native_holdout_validation": [
+      {
+        "action": "sequence_11.003",
+        "sample_count": 41,
+        "feature_rmse_standardized": 0.40265230822781756,
+        "latent_rmse_standardized": 1.268224877283754
+      },
+      {
+        "action": "sequence_15.003",
+        "sample_count": 31,
+        "feature_rmse_standardized": 1.9729710670028435,
+        "latent_rmse_standardized": 4.337466817836374
+      },
+      {
+        "action": "sequence_20.001",
+        "sample_count": 61,
+        "feature_rmse_standardized": 1.2710538122019202,
+        "latent_rmse_standardized": 7.375330957976162
+      },
+      {
+        "action": "sequence_24",
+        "sample_count": 63,
+        "feature_rmse_standardized": 0.9860120104143985,
+        "latent_rmse_standardized": 9.822899114607845
+      },
+      {
+        "action": "sequence_26",
+        "sample_count": 66,
+        "feature_rmse_standardized": 0.8865508143510301,
+        "latent_rmse_standardized": 4.841409093616167
+      }
+    ]
+  },
+  "optimization": {
+    "objective_terms": {
+      "semantic_anchor_mse": 0.005903235461118008,
+      "native_pose_prior_mse": 0.005903235461118008,
+      "velocity_mse": 0.07283402709687226,
+      "acceleration_mse": 0.08386887660377476,
+      "lambdas": {
+        "native": 0.005,
+        "velocity": 0.01,
+        "acceleration": 0.1
+      }
+    },
+    "per_frame_semantic_inverse_objective": {
+      "form": "||normalized semantic residual||^2 + ||native joint-gap residual / tolerance||^2 + lambda_native||z-nearest_native||^2",
+      "mean": 97.57018917043837,
+      "max": 284.0894939306543,
+      "native_joint_gap_targets_armature_units": {
+        "shoulder": 0.14131614495354405,
+        "elbow_main": 9.158919145282324e-07,
+        "elbow_overlap": 7.368555307834139e-07,
+        "wrist_glove": 1.2361600974249303e-06
+      },
+      "joint_gap_scales_armature_units": {
+        "shoulder": 0.01,
+        "elbow_main": 0.005,
+        "elbow_overlap": 0.005,
+        "wrist_glove": 0.005
+      },
+      "native_weight": 0.002,
+      "iterations_max": 48,
+      "initialization": "nearest native latent pose"
+    },
+    "rbf_baseline_proposal_rms_from_inverse": 0.8808882127651894,
+    "latent_coefficients_normalized": {
+      "min": -6.275857756253102,
+      "max": 3.8655872810652876,
+      "rms": 0.9229951687392913
+    },
+    "max_nearest_native_prior_distance": 2.6136996336841216,
+    "max_step": 12.382707915680443,
+    "max_acceleration": 9.44423252293512
+  },
+  "preview": {
+    "file": "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\luigi_walk_semantic_waluigi_left_arm_v5_elbow.blend",
+    "collection": "SemanticWalk_Waluigi_LeftArm_Preview",
+    "root": null,
+    "rig": "SemanticWalk_Waluigi_Target_Rig",
+    "action": "Waluigi_LuigiWalk_SemanticLeftArm_Elbow_v1",
+    "mesh_objects": [
+      "SemanticWalk_Waluigi_ARMTEST_29_0x75c1640_submesh0",
+      "SemanticWalk_Waluigi_ARMTEST_29_0x75c1640_submesh1"
+    ],
+    "object_scale_unchanged": [
+      43.4370002746582,
+      43.4370002746582,
+      43.4370002746582
+    ],
+    "rig_world_matrix": [
+      [
+        43.4370002746582,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        3.27940233546542e-06,
+        -43.4370002746582,
+        0.0
+      ],
+      [
+        0.0,
+        43.4370002746582,
+        3.27940233546542e-06,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "constraints_removed_from_duplicate": [],
+    "runtime_constraints_remaining": 0,
+    "max_pose_write_matrix_error": 7.152557373046875e-07,
+    "max_pose_write_divergence": {
+      "frame": 2,
+      "bone": "bone_52",
+      "expected": [
+        [
+          0.8887654542922974,
+          -0.003622195916250348,
+          -0.45834794640541077,
+          -0.0027974513359367847
+        ],
+        [
+          0.020416323095560074,
+          0.9992891550064087,
+          0.031691454350948334,
+          2.7553951740264893
+        ],
+        [
+          0.45790770649909973,
+          -0.03752408176660538,
+          0.8882083296775818,
+          -0.013597005978226662
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "actual": [
+        [
+          0.8887655735015869,
+          -0.0036221742630004883,
+          -0.4583480656147003,
+          -0.0027973679825663567
+        ],
+        [
+          0.020416343584656715,
+          0.9992891550064087,
+          0.03169149160385132,
+          2.755394458770752
+        ],
+        [
+          0.4579077661037445,
+          -0.037524059414863586,
+          0.8882083892822266,
+          -0.013597181998193264
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ]
+    },
+    "max_pose_scale_delta_vs_validated_walk": 8.344650268554688e-07,
+    "max_nonmodeled_bone_pose_matrix_error_vs_walk": 7.152557373046875e-07,
+    "max_foot_tail_error_vs_walk": 1.635210819195008e-05,
+    "max_head_cap_centroid_error_vs_walk": 1.633123759226199e-05,
+    "max_baked_action_replay_matrix_error": 7.152557373046875e-07,
+    "walk_root_world_matrix": [
+      [
+        43.4370002746582,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        3.27940233546542e-06,
+        -43.4370002746582,
+        0.0
+      ],
+      [
+        0.0,
+        43.4370002746582,
+        3.27940233546542e-06,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "max_joint_gap_change_vs_validated_walk": {
+      "shoulder": 7.613474076612059e-05,
+      "elbow_main": 0.0012249958194981091,
+      "elbow_overlap": 0.00244703296958306,
+      "wrist_glove": 0.0009246640962848379
+    },
+    "native_training_joint_gap_ranges_armature_units": {
+      "shoulder": {
+        "min": 0.14131509094557151,
+        "max": 0.14131754798986096,
+        "median": 0.1413162654882257
+      },
+      "elbow_main": {
+        "min": 1.8189185285171422e-07,
+        "max": 3.2027445369739914e-06,
+        "median": 1.4779135605707356e-06
+      },
+      "elbow_overlap": {
+        "min": 2.9802322387695312e-08,
+        "max": 2.640923427865046e-06,
+        "median": 1.3591950238932823e-06
+      },
+      "wrist_glove": {
+        "min": 3.371747880871523e-07,
+        "max": 3.7531999329164423e-06,
+        "median": 1.7350896993310765e-06
+      }
+    },
+    "max_joint_gap_outside_native_range_armature_units": {
+      "shoulder": 7.476750560805878e-05,
+      "elbow_main": 0.001221793074961135,
+      "elbow_overlap": 0.002444392046155195,
+      "wrist_glove": 0.0009209108963519214
+    },
+    "semantic_feature_rmse_after_solve": {
+      "shoulder_rot_x": 0.5079313285494024,
+      "shoulder_rot_y": 0.28619632316623084,
+      "shoulder_rot_z": 0.8351220272222154,
+      "elbow_flexion": 0.2333082045215537,
+      "forearm_roll": 1.0851556713107906,
+      "wrist_rot_x": 0.2730561040318009,
+      "wrist_rot_y": 0.14731071789965808,
+      "wrist_rot_z": 0.036757956106196574,
+      "hand_delta_x": 0.2419217149327325,
+      "hand_delta_y": 0.33441893386422783,
+      "hand_delta_z": 0.6019313790990054
+    },
+    "finite_value_failures": [],
+    "sampled_frames_for_visual_review": [
+      0,
+      15,
+      30,
+      45,
+      60
+    ]
+  },
+  "safety": {
+    "production_objects_mutated": false,
+    "production_actions_mutated": false,
+    "source_action_assigned_to_duplicate": false,
+    "target_latent_action_is_new": true
+  },
+  "validation": {
+    "fit_gate": "pass",
+    "semantic_fit_gate": "pass",
+    "max_pose_write_matrix_tolerance": 0.002,
+    "max_baked_action_replay_matrix_tolerance": 0.0001,
+    "max_nonmodeled_pose_error_tolerance": 0.002,
+    "max_foot_cap_baseline_error_tolerance": 0.0002,
+    "max_joint_gap_outside_native_range_tolerance_armature_units": 0.02,
+    "finite_pose_mesh_values": "pass"
+  }
+}

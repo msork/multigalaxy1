@@ -78,7 +78,11 @@ def args_parse():
     parser.add_argument("--frames", nargs=2, type=int, default=(0, 60))
     parser.add_argument("--latent-dimensions", type=int, default=192)
     parser.add_argument("--inverse-native-weight", type=float, default=0.01)
-    parser.add_argument("--inverse-iterations", type=int, default=24)
+    parser.add_argument("--inverse-iterations", type=int, default=48)
+    parser.add_argument("--elbow-weight", type=float, default=16.0,
+                        help="extra multiplier on standardized elbow-flexion residual")
+    parser.add_argument("--elbow-gain", type=float, default=1.5,
+                        help="scale source frame-relative flexion excursion for target profile")
     parser.add_argument("--sequence-native-weight", type=float, default=0.01)
     parser.add_argument("--sequence-velocity-weight", type=float, default=0.002)
     parser.add_argument("--sequence-acceleration-weight", type=float, default=0.01)
@@ -221,7 +225,7 @@ def target_semantics_from_latent(z_normalized, latent_std, pca_model, bones,
 def solve_semantic_latents(source_semantics, native_prior, latent_std, pca_model,
                            bones, rest_bones, sem_mean, sem_std,
                            native_gap_targets, native_weight=0.01, iterations=24,
-                           initial_proposal=None):
+                           initial_proposal=None, elbow_weight=1.0):
     """Invert the PCA pose manifold for semantic targets, regularized to native poses."""
     targets = np.c_[(np.asarray(source_semantics, dtype=np.float64) - sem_mean) / sem_std,
                      np.zeros((len(source_semantics), len(GAP_PAIRS)), dtype=np.float64)]
@@ -233,9 +237,11 @@ def solve_semantic_latents(source_semantics, native_prior, latent_std, pca_model
     for index, (target, prior) in enumerate(zip(targets, priors)):
 
         def residual(value):
-            return target_semantics_from_latent(value, latent_std, pca_model,
+            result = target_semantics_from_latent(value, latent_std, pca_model,
                 bones, rest_bones, sem_mean, sem_std, native_gap_targets,
                 np.asarray((0.01, 0.005, 0.005, 0.005))) - target
+            result[3] *= elbow_weight
+            return result
 
         candidates = [prior.copy()]
         if starts is not None:
@@ -264,6 +270,9 @@ def solve_semantic_latents(source_semantics, native_prior, latent_std, pca_model
                 step *= 2.0 / norm
             old_cost = float(r @ r + native_weight * np.sum((z - prior) ** 2))
             accepted = False
+            # Strong semantic channels (notably elbow flexion) can have a
+            # narrow useful step around the curved PCA manifold. Backtrack
+            # further before declaring the local solve stuck.
             for fraction in (1.0, 0.5, 0.25, 0.125):
                 candidate = z - fraction * step
                 rc = residual(candidate)
@@ -622,6 +631,14 @@ def main():
             source_semantics.append(semantic_from_source_sample(source_rest, pose_np,
                                                                   body_map, forearm_map))
         source_semantics = np.asarray(source_semantics, dtype=np.float64)
+        raw_source_semantics = source_semantics.copy()
+        # Flexion is an excursion from the source walk's starting bend, not an
+        # absolute angle relative to unlike Luigi/Waluigi rest poses. This
+        # preserves the walk's signed per-frame bend while aligning its neutral
+        # frame with the target rest-relative zero.
+        source_elbow_reference = float(source_semantics[0, 3])
+        source_semantics[:, 3] -= source_elbow_reference
+        source_semantics[:, 3] *= args.elbow_gain
         source_norm = (source_semantics - sem_mean) / sem_std
         train_distance = np.linalg.norm(sem_train_norm[:, None, :] - source_norm[None, :, :], axis=2)
         nearest_indices = np.argmin(train_distance, axis=0)
@@ -631,7 +648,8 @@ def main():
             source_semantics, nearest_prior, latent_std, pca, bones, target_rest,
             sem_mean, sem_std, native_gap_targets,
             native_weight=args.inverse_native_weight,
-            iterations=args.inverse_iterations, initial_proposal=rbf_proposal)
+            iterations=args.inverse_iterations, initial_proposal=rbf_proposal,
+            elbow_weight=args.elbow_weight)
         smoothed = smooth_latent_sequence(proposal, nearest_prior,
             np.ones(args.latent_dimensions),
             lambda_native=args.sequence_native_weight,
@@ -745,7 +763,7 @@ def main():
                                                      "vertex": vertex_index})
             basis_samples.append((float(frame), bases))
 
-        action_name = "Waluigi_LuigiWalk_SemanticLeftArm_CleanWalk_v2"
+        action_name = "Waluigi_LuigiWalk_SemanticLeftArm_Elbow_v1"
         if bpy.data.actions.get(action_name):
             action_name += "_Prototype"
         baked_action = make_action(target_copy, action_name, basis_samples)
@@ -842,6 +860,17 @@ def main():
                 "target_walk_curves_imported_from_live_bridge": walk_curve_payload is not None,
                 "target_bones": bones,
             "semantic_feature_names": list(SEMANTIC_NAMES),
+            "elbow_source_mapping": {
+                "definition": "source flexion excursion relative to frame 0; target rest-relative neutral is zero",
+                "raw_source_range_radians": [float(raw_source_semantics[:, 3].min()),
+                                             float(raw_source_semantics[:, 3].max())],
+                "frame_0_reference_radians": source_elbow_reference,
+                "excursion_gain": float(args.elbow_gain),
+                "mapped_source_range_radians": [float(source_semantics[:, 3].min()),
+                                                float(source_semantics[:, 3].max())],
+                "standardized_residual_weight": float(args.elbow_weight),
+                "target_native_training_range_radians": [float(sem_train[:, 3].min()),
+                                                          float(sem_train[:, 3].max())]},
             "source_target_semantic_rmse": {name: float(np.sqrt(np.mean(semantic_error[:, i] ** 2)))
                                               for i, name in enumerate(SEMANTIC_NAMES)},
             "residual_comparison_to_v1": {"v1_rmse": v1_rmse,

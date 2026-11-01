@@ -106,3 +106,24 @@ The weakest improvement is hand position, though it passes the gate. The largest
 Baseline preservation checks passed: maximum nonmodeled pose matrix error 7.15e-7, foot-tail error 1.64e-5, head/cap centroid error 3.15e-5, preserved scale delta 8.35e-7, and baked replay matrix error 8.05e-7. Runtime constraints: zero. Fresh-process saved-preview validation also passed.
 
 Preview: `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v2.blend` (ignored local artifact). The reproducible fit and saved-file validation summaries are `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v2_fit.json` and `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v2_saved_validation.json`. Inspect frames 0, 15, 30, 45, 51, and 60; frame 51 is the worst residual.
+
+## Elbow semantic correction (left arm)
+
+Source elbow extraction is a geometric bend measure from Luigi's `ArmL1.tail` through `ArmL2.head` to `ArmL2.tail`, computed from evaluated action transforms over frames 0–60 and expressed relative to the source rest angle. The raw curve ranges from -0.5863 to -0.0833 rad (frame 6 minimum, frame 36 maximum). The v2 fitter compared that absolute value directly with the Waluigi model's rest-relative training range, -0.0001 to 2.5066 rad. This gave the two rigs different semantic zeros and put the whole Luigi curve below the target training range.
+
+The elbow feature is now rebased to Luigi frame 0 and given a 1.5 excursion gain; the standardized elbow residual has weight 16 while the other semantic residual weights remain unchanged. The fitted preview keeps the existing clean walk baseline and action baking pipeline. The target model still imposes the native joint-gap terms for both overlapping elbow branches. A fresh-process saved-preview replay passes with max semantic report delta 5.64e-8, zero constraints, and the existing 43.437 scale preserved.
+
+| Elbow measure | v2 (recomputed with same 1.5 gain) | Elbow v1 |
+|---|---:|---:|
+| Mapped-source semantic RMSE | 0.2385 rad | 0.2333 rad |
+| Main branch geometric angle range | 0.1735–0.4796 rad | 0.2166–0.5911 rad |
+| Overlap branch geometric angle range | 0.1736–0.4797 rad | 0.2166–0.5912 rad |
+| Source/target elbow curve correlation | 0.423 | 0.553 |
+
+The target's maximum main-branch bend is at frame 31; the overlap branch maximum is at frame 23, differing by less than 0.0002 rad in branch angle. The branch geometry uses bone_23 as the shoulder, bone_26 through the bone_24 main-chain context, bone_29 through the bone_25 overlap context, and bone_27 for the wrist endpoint. This confirms the two deformation branches bend together in the evaluated preview. The measured angle excursion grows from about 17.5° in v2 to 21.5° here.
+
+Increasing only the elbow residual weight from 4 to 16 did not change the solved elbow curve, so the earlier underweight was not the only limitation: the PCA latent fit has limited elbow leverage around the current solutions. The 1.5 gain changed the branch excursion but only slightly reduced RMSE versus v2 evaluated with the same mapping. Therefore this is a focused improvement, not proof that the visually perceived elbow issue is fully resolved. Inspect the complete preview at frames 6 (least bend), 23 and 31 (maximum branch bend), 36 (source maximum), and 51. Do not extend to the right arm until the elbow is visually confirmed.
+
+Fit report: `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v5_elbow_fit.json`.
+Saved-file validation and full elbow curves: `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v5_elbow_validation.json`.
+Local preview (ignored by Git): `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v5_elbow.blend`, rig `SemanticWalk_Waluigi_Target_Rig`, action `Waluigi_LuigiWalk_SemanticLeftArm_Elbow_v1`.

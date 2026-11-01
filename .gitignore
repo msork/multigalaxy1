@@ -36,3 +36,4 @@ dist/
 /tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_fit.json
 /tools/blender/reports/waluigi_walk_action_curves.json
 /tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_noop.blend
+/tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v*_elbow.blend
