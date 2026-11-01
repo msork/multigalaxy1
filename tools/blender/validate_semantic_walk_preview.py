@@ -13,6 +13,7 @@ sys.path.insert(0, HERE)
 import fit_luigi_walk_semantic_waluigi as fit
 from analyze_native_arm_context import source_pose_from_curves
 from convert_native_owner_actions import evaluated_bone_matrices, set_frame
+from context_dataset import normalize_context_dataset
 
 
 def parse_args():
@@ -29,7 +30,7 @@ def main():
     with open(args.fit_report, "r", encoding="utf-8") as stream:
         fit_report = json.load(stream)
     with __import__("gzip").open(args.dataset, "rt", encoding="utf-8") as stream:
-        dataset = json.load(stream)
+        dataset = normalize_context_dataset(json.load(stream))
     bones = dataset["bones"]
     rest = dataset["rest_bones"]
     scene = bpy.context.scene

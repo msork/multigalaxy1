@@ -1,0 +1,69 @@
+{
+  "schema": "mg1.raw-anm-context-refit-summary.v1",
+  "native_source": "raw Sluggies .anm banks 6-14 on matching .sluggie skeleton",
+  "legacy_policy": {
+    "inferred_sequence_004": "comparison diagnostics only; rejected by training loader",
+    "training_source": "native_waluigi_raw_anm_calibration.json.gz"
+  },
+  "target_model": {
+    "context_bones": 38,
+    "feature_dimensions": 228,
+    "latent_dimensions": 224,
+    "training_actions": 118,
+    "training_samples": 4116,
+    "holdout_actions": 27,
+    "holdout_samples": 1168,
+    "selection": "five-fold action-grouped training-only cross-validation, one-standard-error rule",
+    "same_raw_holdout_standardized_feature_rmse": {
+      "192_dimensions": 1.72629e-8,
+      "224_dimensions": 1.96251e-15
+    }
+  },
+  "identity_and_pca_validation": {
+    "gate": "pass",
+    "max_native_vs_dataset_context_matrix_error": 2.5655605996877107e-6,
+    "max_pca_context_matrix_error": 5.7220458984375e-6,
+    "max_full_character_overlay_vertex_error_world": 0.00040146857046273406,
+    "holdout_overlay_tolerance_world": 0.01,
+    "holdout_previews_passed": 27
+  },
+  "semantic_walk_refit": {
+    "source_action": "luigi.001_armature_walk",
+    "frames": [0, 60],
+    "preview": "tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_raw_anm_v4.blend",
+    "preview_rig": "SemanticWalk_Waluigi_RawANM_v1_Target_Rig",
+    "preview_action": "Waluigi_LuigiWalk_SemanticBothArms_RawANM_v1",
+    "runtime_constraints": 0,
+    "gate": "fail",
+    "max_fit_report_vs_saved_semantic_rmse_delta": 0.46696728958807343,
+    "max_right_fit_report_vs_saved_semantic_rmse_delta": 0.4607980575138166,
+    "saved_evaluation_rmse_left": {
+      "shoulder_rot_x": 0.7223116725894091,
+      "shoulder_rot_y": 0.20989315260916627,
+      "shoulder_rot_z": 0.4648266343550653,
+      "elbow_flexion": 0.21976346207188707,
+      "forearm_roll": 1.2794079510612777,
+      "wrist_rot_x": 0.2122635188348681,
+      "wrist_rot_y": 0.09200229215364428,
+      "wrist_rot_z": 0.09797677921610647,
+      "hand_delta_x": 0.18402362190312244,
+      "hand_delta_y": 0.2529459903524878,
+      "hand_delta_z": 0.22155260739784066
+    },
+    "saved_evaluation_rmse_right": {
+      "shoulder_rot_x": 0.9588842904704729,
+      "shoulder_rot_y": 0.23914017701698514,
+      "shoulder_rot_z": 0.7246933077273059,
+      "elbow_flexion": 0.19133727147340662,
+      "forearm_roll": 1.2520607838772877,
+      "wrist_rot_x": 0.14751255683301684,
+      "wrist_rot_y": 0.11532310069698005,
+      "wrist_rot_z": 0.13684530633990225,
+      "hand_delta_x": 0.29082333721870746,
+      "hand_delta_y": 0.30200532669992847,
+      "hand_delta_z": 0.7655997446566261
+    },
+    "baseline": "validated v7 two-arm walk; no production rigs/actions modified"
+  },
+  "visual_inspection_frames": [0, 5, 6, 7, 8, 15, 23, 30, 31, 33, 34, 35, 36, 40, 41, 42, 43, 44, 50, 51, 52, 60]
+}

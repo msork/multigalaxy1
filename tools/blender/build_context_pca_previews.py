@@ -22,6 +22,7 @@ from convert_native_owner_actions import (
 )
 from analyze_native_arm_context import source_pose_from_curves
 from fit_native_context_pca import fit as fit_pca, predict as pca_predict
+from context_dataset import normalize_context_dataset
 
 DEFAULT_ARM_REGION = {f"bone_{n}" for n in (22, 23, 24, 25, 26, 27, 29, 30)}
 
@@ -35,6 +36,8 @@ def args_parse():
     p.add_argument("--source-rig", default="Armature.001")
     p.add_argument("--target-rig", default="123475520_waluigi.gpl")
     p.add_argument("--slot-id", default="OBArmature.004")
+    p.add_argument("--raw-anm-source", action="store_true",
+                   help="evaluate official imported Sluggies actions directly on the matching .sluggie rig")
     p.add_argument("--max-overlay-error", type=float, default=0.01)
     p.add_argument("--latent-dimensions", type=int, default=192)
     p.add_argument("--action", help="optional single holdout for focused diagnostics")
@@ -201,6 +204,20 @@ def fit_training_pca(dataset, latent_dimensions):
     return fit_pca(features, latent_dimensions)
 
 
+def bound_action_slot(action, requested_id=None):
+    slots = [slot for layer in action.layers for strip in layer.strips
+             for bag in getattr(strip, "channelbags", []) for slot in (bag.slot,)]
+    unique = {slot.identifier: slot for slot in slots}
+    if requested_id:
+        slot = unique.get(requested_id)
+        if slot is None:
+            raise RuntimeError(f"{action.name}: channelbag slot {requested_id!r} is absent")
+        return slot
+    if len(unique) != 1:
+        raise RuntimeError(f"{action.name}: expected one raw action slot, found {sorted(unique)}")
+    return next(iter(unique.values()))
+
+
 def encode_sample_for_fit(sample, bones):
     """Match the training feature encoder: translation plus sign-invariant SO(3) log."""
     import math
@@ -273,9 +290,13 @@ def clean_preview_ids(objects, actions, collections):
 def main():
     args = args_parse()
     with gzip.open(args.dataset, "rt", encoding="utf-8") as stream:
-        dataset = json.load(stream)
-    source_original = bpy.data.objects[args.source_rig]
-    target_original = bpy.data.objects[args.target_rig]
+        dataset = normalize_context_dataset(json.load(stream))
+    source_original = bpy.data.objects.get(args.source_rig)
+    target_original = bpy.data.objects.get(args.target_rig)
+    if source_original is None or target_original is None:
+        raise RuntimeError("source/target rigs are missing from the input .blend")
+    if args.raw_anm_source and source_original != target_original:
+        raise RuntimeError("raw .anm evaluation requires the matching source and target .sluggie rig")
     source_objects = associated_objects(target_original)
     mesh_sources = [obj for obj in source_objects if obj.type == "MESH"]
     profile_bones = list(dataset["bones"])
@@ -293,11 +314,11 @@ def main():
     try:
         for action_row in holdouts:
             name = action_row["action"]
-            source_action = actions_by_name[name]
-            slots = [slot for slot in source_action.slots if slot.identifier == args.slot_id]
-            if len(slots) != 1:
-                raise RuntimeError(f"{name}: expected one {args.slot_id} action slot")
-            source_slot = slots[0]
+            source_action = actions_by_name.get(name)
+            if source_action is None:
+                raise RuntimeError(f"action {name!r} is missing from the preview source .blend")
+            source_slot = bound_action_slot(source_action,
+                None if args.raw_anm_source else args.slot_id)
             data_rows = action_row["samples"]
             source_times = all_action_times(source_action, source_slot)
 
@@ -340,15 +361,21 @@ def main():
             per_sample = []
             for time in source_times:
                 set_frame(bpy.context.scene, time)
-                # These orphaned layered actions do not reliably evaluate when
-                # rebound to a duplicate object. Read the selected slot's raw
-                # FCurves, normalize quaternion channels, and compose the
-                # candidate-owner hierarchy explicitly. This is the same
-                # source-space path used by the calibration analysis.
-                source_pose, _source_basis = source_pose_from_curves(
-                    source_original, source_action, source_slot, time)
-                native_poses = converted_matrices(source_original, target_original,
-                                                  source_pose, conversion)
+                if args.raw_anm_source:
+                    source_original.animation_data_create()
+                    source_original.animation_data.action = source_action
+                    source_original.animation_data.action_slot = source_slot
+                    source_original.animation_data.action_influence = 1.0
+                    source_original.animation_data.action_blend_type = "REPLACE"
+                    bpy.context.view_layer.update()
+                    native_poses = evaluated_bone_matrices(source_original)
+                else:
+                    # Legacy converted-action comparison mode. Training itself
+                    # is still restricted to raw .anm datasets by the loader.
+                    source_pose, _source_basis = source_pose_from_curves(
+                        source_original, source_action, source_slot, time)
+                    native_poses = converted_matrices(source_original, target_original,
+                                                      source_pose, conversion)
                 native_basis = set_pose_matrices(native_rig, native_poses)
                 evaluated_native = evaluated_bone_matrices(native_rig)
                 native_error = max(max(abs(float(evaluated_native[bone][r][c]) - float(native_poses[bone][r][c]))
@@ -457,8 +484,11 @@ def main():
             "overlay_error_tolerance_world": args.max_overlay_error,
             "preview_policy": "one standalone file per holdout; native and PCA root empties preserve the exact source object transform and intentional scale; non-profile bones retain full native converted transforms; all rigged meshes and parented accessories are duplicated",
             "model": {"type": "training-only PCA orthogonal projection",
-                "training_action_count": 23, "latent_dimensions": args.latent_dimensions,
-                "input": "full native holdout context transforms at each native action key/subframe; only projected context bones replace native pose"},
+                "training_action_count": len(dataset["training_actions"]),
+                "holdout_action_count": len(dataset["holdout_actions"]),
+                "latent_dimensions": args.latent_dimensions,
+                "source_schema": dataset["source_schema"],
+                "input": "full native holdout context transforms at exact action keys/subframes; only projected context bones replace native pose"},
             "production_mutated": False}
         os.makedirs(os.path.dirname(os.path.abspath(args.report)), exist_ok=True)
         with open(args.report, "w", encoding="utf-8") as stream:

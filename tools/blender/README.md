@@ -128,3 +128,20 @@ Run `python tools/blender/test_raw_anm_calibration.py` for the policy/metadata
 unit tests. See
 [`docs/animation-retargeting/raw-native-waluigi-calibration.md`](../../docs/animation-retargeting/raw-native-waluigi-calibration.md)
 for action provenance, dataset checks, and legacy-action comparison results.
+
+### Raw-native context PCA and Luigi walk refit
+
+Fit the reusable target context model from the raw `.anm` dataset (never the
+inferred `.004` bundle):
+
+```powershell
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background --factory-startup --python tools/blender/fit_native_context_pca.py -- --dataset tools/blender/reports/native_waluigi_raw_anm_calibration.json.gz --predictions tools/blender/reports/native_waluigi_raw_anm_context_pca_predictions.npz --report tools/blender/reports/native_waluigi_raw_anm_context_pca.json --compare-dimensions 192
+```
+
+The complete 27-action holdout identity/PCA previews can be rebuilt from the
+raw-import preview blend with `build_context_pca_previews.py --raw-anm-source`.
+The Luigi walk semantic fitter uses `context_dataset.py` to enforce the raw
+source schema and action splits. Its current raw-model run is diagnostic only:
+the saved-action semantic residuals fail consistency with the fit report. See
+[`raw-anm-luigi-walk-refit.md`](../../docs/animation-retargeting/raw-anm-luigi-walk-refit.md)
+before attempting another fit.

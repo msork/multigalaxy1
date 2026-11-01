@@ -10,6 +10,44 @@ disposable background scene through the locally installed Sluggies IO add-on.
 The production workfiles and the successful Luigi walk preview remain
 read-only.
 
+## Raw-native context model rebuild (2026-11-01)
+
+The production-basis context model now trains only from
+`native_waluigi_raw_anm_calibration.json.gz`. The inferred `.004` bundle is
+rejected by the shared dataset loader and remains available only for explicit
+comparison diagnostics. All nine banks (6–14) contribute their appropriate
+actions; the extractor's action-level split is 118 training actions / 27
+holdouts, 4,116 / 1,168 exact-time samples. The split is at the action level,
+so no samples from a holdout action enter fitting or cross-validation.
+
+The context profile has 38 bones and 228 pose features (six values per bone:
+translation plus rotation vector). Five-fold action-grouped training-only CV
+selected 224 latent dimensions by the one-standard-error rule. This is a
+near-identity representation rather than a compact compression: the 228-D
+feature space is poorly reduced by this linear model. On the same raw data and
+holdouts, 192 dimensions give aggregate standardized feature RMSE
+`1.7263e-8`; 224 dimensions give `1.9625e-15`. These figures should not be
+compared directly with the former inferred-data model's 192-D result because
+its training source and split differ.
+
+Identity replay across the full profile agrees with fresh native evaluation:
+maximum native-vs-dataset context matrix error `2.57e-6`; maximum PCA context
+matrix error `5.72e-6`; maximum whole-character overlay vertex error
+`4.02e-4` world units (gate `0.01`). All 27 holdout previews passed. The raw
+source remains the only training authority; `.004` actions are diagnostic
+comparisons only. The compact run result is in
+[`raw-anm-context-model-results.json`](raw-anm-context-model-results.json).
+
+The Luigi walk solver was rerun against the 224-D raw model and generated a
+disposable complete preview, but the semantic refit **failed** its fresh-file
+consistency gate (maximum fit-report vs saved-evaluation semantic RMSE delta
+`0.467`, right-side delta `0.461`). The in-memory fit report therefore is not
+an authoritative residual report, and the saved preview is diagnostic only.
+No claim of semantic improvement or visual acceptance is made. The independent
+raw-model identity/PCA validation remains passed. Do not begin other Luigi
+animations until the saved-action mismatch is resolved and the walk receives
+visual sign-off.
+
 ## Verified importer semantics
 
 Use the Sluggies IO add-on's own `.sluggie` and `.anm` import operators. The

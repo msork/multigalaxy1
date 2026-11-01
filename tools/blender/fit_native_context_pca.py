@@ -1,6 +1,6 @@
 """Fit and evaluate a PCA-only native arm context pose baseline.
 
-Five whole actions remain validation-only. No nonlinear decoder is fit here.
+Whole raw Sluggies actions remain validation-only. No nonlinear decoder is fit here.
 Run with Blender's bundled Python or another NumPy-equipped Python.
 """
 import argparse
@@ -12,6 +12,11 @@ import sys
 
 import numpy as np
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+from context_dataset import normalize_context_dataset
+
 
 def args_parse():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else None
@@ -20,6 +25,8 @@ def args_parse():
     p.add_argument("--predictions", required=True)
     p.add_argument("--report", required=True)
     p.add_argument("--folds", type=int, default=5)
+    p.add_argument("--compare-dimensions", type=int, nargs="*", default=[192],
+                   help="report same-raw-data PCA baselines at these latent widths")
     return p.parse_args(argv)
 
 
@@ -102,15 +109,15 @@ def action_metrics(action, pred, bones, training_scale):
 def main():
     args = args_parse()
     with gzip.open(args.dataset, "rt", encoding="utf-8") as f:
-        data = json.load(f)
+        data = normalize_context_dataset(json.load(f))
     bones = list(data["bones"])
     train, holdout = [], []
     for row in data["actions"]:
         action = {"name": row["action"], "split": row["split"], "samples": row["samples"]}
         action["x"] = np.asarray([encode_sample(s, bones) for s in row["samples"]])
         (holdout if row["split"] == "holdout" else train).append(action)
-    if len(train) != 23 or len(holdout) != 5:
-        raise ValueError(f"expected 23 train/5 holdout actions, got {len(train)}/{len(holdout)}")
+    if len(train) != data["training_action_count"] or len(holdout) != data["holdout_action_count"]:
+        raise ValueError("raw dataset action-level split counts are inconsistent")
     action_folds = folds(train, args.folds)
     dims_candidates = [2, 4, 6, 8, 12, 16, 24, 32, 40, 48, 64, 80,
                        96, 128, 160, 192, 224]
@@ -141,9 +148,32 @@ def main():
         pred = predict(action["x"], (mean, scale, comp))
         pred_rows[action["name"]] = action_metrics(action, pred, bones, scale)
         arrays[action["name"]] = pred.astype(np.float32)
+    dimensional_comparisons = {}
+    xholdout = np.concatenate([a["x"] for a in holdout])
+    for comparison_dims in sorted(set(args.compare_dimensions)):
+        if comparison_dims <= 0 or comparison_dims >= min(xtrain.shape):
+            raise ValueError(f"comparison latent dimension {comparison_dims} is out of range")
+        comparison_model = fit(xtrain, comparison_dims)
+        comparison_rows = {}
+        for action in holdout:
+            prediction = predict(action["x"], comparison_model)
+            comparison_rows[action["name"]] = action_metrics(
+                action, prediction, bones, comparison_model[1])
+        dimensional_comparisons[str(comparison_dims)] = {
+            "source": "raw .anm training actions; same-dimension baseline",
+            "aggregate_holdout_feature_rmse_standardized": float(math.sqrt(sum(
+                comparison_rows[a["name"]]["feature_rmse_standardized"] ** 2 * len(a["x"])
+                for a in holdout) / sum(len(a["x"]) for a in holdout))),
+            "bank7_legacy_overlap": {name: comparison_rows[name]
+                for name in ("Waluigi_7_Batting_seq11", "Waluigi_7_Batting_seq15",
+                             "Waluigi_7_Batting_seq20", "Waluigi_7_Batting_seq24",
+                             "Waluigi_7_Batting_seq26") if name in comparison_rows},
+            "per_action": comparison_rows,
+        }
     np.savez_compressed(args.predictions, **arrays)
     report = {"schema": "mg1.native-arm-context-pca-report.v1",
-        "dataset": os.path.basename(args.dataset), "bones": bones,
+        "dataset": os.path.basename(args.dataset), "source_schema": data["source_schema"],
+        "source_authority": data["source_authority"], "bones": bones,
         "bone_count": len(bones), "feature_dimensions": len(bones)*6,
         "split": {"training_actions": sorted(a["name"] for a in train),
                   "holdout_actions": sorted(a["name"] for a in holdout),
@@ -159,7 +189,13 @@ def main():
             "holdout": {"action_count": len(holdout),
             "sample_count": sum(len(a["x"]) for a in holdout),
             "feature_rmse_standardized": float(math.sqrt(sum(pred_rows[a["name"]]["feature_rmse_standardized"]**2 * len(a["x"]) for a in holdout) / sum(len(a["x"]) for a in holdout))),
-            "per_action": {a["name"]: pred_rows[a["name"]] for a in holdout}}}}
+            "bank7_legacy_overlap": {a["name"]: pred_rows[a["name"]]
+                for a in holdout if a["name"] in {
+                    "Waluigi_7_Batting_seq11", "Waluigi_7_Batting_seq15",
+                    "Waluigi_7_Batting_seq20", "Waluigi_7_Batting_seq24",
+                    "Waluigi_7_Batting_seq26"}},
+            "per_action": {a["name"]: pred_rows[a["name"]] for a in holdout}}},
+        "same_raw_data_dimension_comparisons": dimensional_comparisons}
     os.makedirs(os.path.dirname(os.path.abspath(args.report)), exist_ok=True)
     with open(args.report, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, allow_nan=False)

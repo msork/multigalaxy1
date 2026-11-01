@@ -40,3 +40,12 @@ dist/
 /tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_*.blend
 /tools/blender/reports/native_waluigi_raw_anm_calibration.json.gz
 /tools/blender/reports/raw_native_waluigi_batting_preview.blend
+/tools/blender/reports/native_waluigi_raw_anm_context_pca_predictions.npz
+/tools/blender/reports/native_waluigi_raw_anm_context_pca_holdouts/
+/tools/blender/reports/native_waluigi_raw_anm_context_pca.json
+/tools/blender/reports/native_waluigi_raw_anm_context_pca_validation.json
+/tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_raw_anm_v1.blend
+/tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_raw_anm_v1_fit.json
+/tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_raw_anm_v*.blend
+/tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_raw_anm_v*_fit.json
+/tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_raw_anm_v*_saved_validation.json
