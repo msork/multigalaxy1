@@ -86,3 +86,23 @@ the disposable rig before saving. The existing preview file was repaired and
 saved with those visibility settings. Reopening it in Blender confirmed both
 mesh objects and the rig are visible in the active scene/view layer, at frame
 0, with the intended armature modifiers.
+
+## Corrected baseline semantic fit (v2)
+
+The v1 semantic residuals were dominated by a mismatched full-body baseline. The v2 builder starts from `Waluigi_Arm_Clean_Backup`, assigns a duplicate-owned copy of `Waluigi_GalaxyWalk_Legs_Baked` to retain the validated legs/torso walk, and binds the complete `ARMTEST_` preview meshes to that duplicate. Its 43.437 object scale is preserved. The fitted action is new and baked; the production rig and production actions are not modified. Only the 38-bone context model supplies semantic pose changes; nonmodeled pose channels, root, cap, and legs remain at the validated walk/clean context.
+
+The objective retains native-pose regularization and temporal smoothness. For this run: inverse native prior weight 0.002 with 32 iterations; sequence native weight 0.005, velocity weight 0.01, acceleration weight 0.1. The gate requires at least 25% improvement in each semantic feature group over v1.
+
+| Feature group | v1 RMSE | v2 RMSE | Improvement |
+|---|---:|---:|---:|
+| Shoulder orientation | 0.84648 rad | 0.53069 rad | 37.3% |
+| Elbow flexion | 1.19106 rad | 0.65608 rad | 44.9% |
+| Forearm roll | 1.82702 rad | 1.01731 rad | 44.3% |
+| Wrist orientation | 0.47061 rad | 0.18354 rad | 61.0% |
+| Hand position | 0.60496 | 0.43442 | 28.2% |
+
+The weakest improvement is hand position, though it passes the gate. The largest individual semantic component residual is shoulder Z rotation at frame 51 (1.18087 rad, bone_23 semantic shoulder component). This remains a prototype with meaningful residual error; visual review is required before expanding scope.
+
+Baseline preservation checks passed: maximum nonmodeled pose matrix error 7.15e-7, foot-tail error 1.64e-5, head/cap centroid error 3.15e-5, preserved scale delta 8.35e-7, and baked replay matrix error 8.05e-7. Runtime constraints: zero. Fresh-process saved-preview validation also passed.
+
+Preview: `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v2.blend` (ignored local artifact). The reproducible fit and saved-file validation summaries are `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v2_fit.json` and `tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_v2_saved_validation.json`. Inspect frames 0, 15, 30, 45, 51, and 60; frame 51 is the worst residual.

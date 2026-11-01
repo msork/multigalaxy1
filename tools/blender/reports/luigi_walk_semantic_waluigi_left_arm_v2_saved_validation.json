@@ -1,0 +1,49 @@
+{
+  "schema": "mg1.semantic-walk-saved-preview-validation.v1",
+  "file": "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\luigi_walk_semantic_waluigi_left_arm_v2.blend",
+  "frame_count": 61,
+  "frame_range": [
+    0,
+    60
+  ],
+  "rig": "SemanticWalk_Waluigi_Target_Rig",
+  "action": "Waluigi_LuigiWalk_SemanticLeftArm_CleanWalk_v2",
+  "action_slot": "OBSemanticWalk_Waluigi_Target_Rig",
+  "mesh_objects": [
+    "SemanticWalk_Waluigi_ARMTEST_29_0x75c1640_submesh0",
+    "SemanticWalk_Waluigi_ARMTEST_29_0x75c1640_submesh1"
+  ],
+  "mesh_vertex_samples": 184220,
+  "runtime_constraints": 0,
+  "object_scale": [
+    43.4370002746582,
+    43.4370002746582,
+    43.4370002746582
+  ],
+  "semantic_rmse_from_saved_evaluation": {
+    "shoulder_rot_x": 0.4017242265603759,
+    "shoulder_rot_y": 0.28979664180415626,
+    "shoulder_rot_z": 0.7742964532186976,
+    "elbow_flexion": 0.6560819116776652,
+    "forearm_roll": 1.0173093855183812,
+    "wrist_rot_x": 0.2649812101154056,
+    "wrist_rot_y": 0.17348550584473446,
+    "wrist_rot_z": 0.027450056281025183,
+    "hand_delta_x": 0.21947822374268505,
+    "hand_delta_y": 0.26979876665293323,
+    "hand_delta_z": 0.6672255530777477
+  },
+  "max_semantic_rmse_delta_vs_fit_report": 8.647694837993214e-08,
+  "max_bone_scale_deviation": 1.3709068298339844e-06,
+  "fit_gates": {
+    "fit_gate": "pass",
+    "semantic_fit_gate": "pass",
+    "max_pose_write_matrix_tolerance": 0.002,
+    "max_baked_action_replay_matrix_tolerance": 0.0001,
+    "max_nonmodeled_pose_error_tolerance": 0.002,
+    "max_foot_cap_baseline_error_tolerance": 0.0002,
+    "max_joint_gap_outside_native_range_tolerance_armature_units": 0.02,
+    "finite_pose_mesh_values": "pass"
+  },
+  "gate": "pass"
+}

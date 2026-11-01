@@ -1,0 +1,141 @@
+"""Fresh-process saved-file validator for the semantic walk preview."""
+import argparse
+import json
+import math
+import os
+import sys
+
+import bpy
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import fit_luigi_walk_semantic_waluigi as fit
+from analyze_native_arm_context import source_pose_from_curves
+from convert_native_owner_actions import evaluated_bone_matrices, set_frame
+
+
+def parse_args():
+    argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", required=True)
+    parser.add_argument("--fit-report", required=True)
+    parser.add_argument("--report", required=True)
+    return parser.parse_args(argv)
+
+
+def main():
+    args = parse_args()
+    with open(args.fit_report, "r", encoding="utf-8") as stream:
+        fit_report = json.load(stream)
+    with __import__("gzip").open(args.dataset, "rt", encoding="utf-8") as stream:
+        dataset = json.load(stream)
+    bones = dataset["bones"]
+    rest = dataset["rest_bones"]
+    scene = bpy.context.scene
+    rig_name = fit_report["preview"]["rig"]
+    rig = bpy.data.objects.get(rig_name)
+    source = bpy.data.objects.get(fit_report["source_rig"])
+    source_action = bpy.data.actions.get(fit_report["source_action"])
+    target_action = bpy.data.actions.get(fit_report["preview"]["action"])
+    collection = bpy.data.collections.get(fit_report["preview"]["collection"])
+    if not rig or not source or not source_action or not target_action or not collection:
+        raise RuntimeError("saved preview is missing its rig, source, actions, or collection")
+    if rig.animation_data is None or rig.animation_data.action != target_action:
+        raise RuntimeError("baked target action is not assigned to preview rig")
+    if rig.animation_data.action_slot is None or rig.animation_data.action_slot.identifier != target_action.slots[0].identifier:
+        raise RuntimeError("baked preview action slot is not assigned to target owner")
+    if (collection.hide_viewport or collection.hide_render or rig.hide_viewport or
+        rig.hide_render or rig.hide_get()):
+        raise RuntimeError("preview rig or collection is hidden")
+    meshes = [bpy.data.objects.get(name) for name in fit_report["preview"]["mesh_objects"]]
+    if not meshes or any(mesh is None for mesh in meshes):
+        raise RuntimeError("complete target mesh set is missing")
+    for mesh in meshes:
+        if mesh.hide_viewport or mesh.hide_render or mesh.hide_get():
+            raise RuntimeError(f"preview mesh is hidden: {mesh.name}")
+        arm_mods = [m for m in mesh.modifiers if m.type == "ARMATURE"]
+        if not arm_mods or any(m.object != rig for m in arm_mods):
+            raise RuntimeError(f"preview mesh armature binding is invalid: {mesh.name}")
+    constraints = sum(len(rig.constraints) + sum(len(pb.constraints) for pb in rig.pose.bones)
+                      for _ in (0,))
+    if constraints:
+        raise RuntimeError("baked preview rig retains runtime constraints")
+
+    source_slot_id = fit_report["source_slot"]
+    source_slots = [slot for slot in source_action.slots if slot.identifier == source_slot_id]
+    if len(source_slots) != 1:
+        raise RuntimeError("source action slot is missing/ambiguous in saved scene")
+    source_slot = source_slots[0]
+    src_rest = fit.source_rest_from_rig(source)
+    body_map = fit.frame_map(source, src_rest, fit.SOURCE_PROFILE["torso"],
+                             rig, rest, fit.TARGET_PROFILE["torso"])
+    forearm_map = fit.frame_map(source, src_rest, fit.SOURCE_PROFILE["forearm"],
+                                rig, rest, fit.TARGET_PROFILE["forearm"])
+    # The report currently carries explicit frame numbers; validate that they
+    # are the requested 0..60 interval before evaluating the saved action.
+    frames = fit_report["source_frames"]
+    target_semantics, source_semantics = [], []
+    max_replay = {"error": 0.0}
+    max_vertex_finite = 0
+    max_basis_scale_error = 0.0
+    for frame in frames:
+        set_frame(scene, float(frame))
+        source_pose, _ = source_pose_from_curves(source, source_action, source_slot, float(frame))
+        src_sem = fit.semantic_from_source_sample(src_rest,
+            {name: fit.numpy_matrix(matrix) for name, matrix in source_pose.items()},
+            body_map, forearm_map)
+        source_semantics.append(src_sem)
+        pose = evaluated_bone_matrices(rig)
+        target_sem = fit.semantic_from_target_sample(rest,
+            {name: fit.numpy_matrix(pose[name]) for name in bones})
+        target_semantics.append(target_sem)
+        evaluated = []
+        for mesh in meshes:
+            ev = mesh.evaluated_get(bpy.context.evaluated_depsgraph_get())
+            me = ev.to_mesh()
+            try:
+                for vertex in me.vertices:
+                    point = ev.matrix_world @ vertex.co
+                    if not all(math.isfinite(float(v)) for v in point):
+                        raise RuntimeError(f"non-finite saved mesh vertex: {mesh.name} frame {frame}")
+                    max_vertex_finite += 1
+            finally:
+                ev.to_mesh_clear()
+        for pb in rig.pose.bones:
+            for value in pb.scale:
+                max_basis_scale_error = max(max_basis_scale_error, abs(float(value) - 1.0))
+    import numpy as np
+    residual = np.asarray(target_semantics) - np.asarray(source_semantics)
+    rmse = {name: float(np.sqrt(np.mean(residual[:, i] ** 2)))
+            for i, name in enumerate(fit.SEMANTIC_NAMES)}
+    fitted_rmse = fit_report["preview"]["semantic_feature_rmse_after_solve"]
+    report = {
+        "schema": "mg1.semantic-walk-saved-preview-validation.v1",
+        "file": bpy.data.filepath,
+        "frame_count": len(frames),
+        "frame_range": [frames[0], frames[-1]],
+        "rig": rig.name,
+        "action": target_action.name,
+        "action_slot": rig.animation_data.action_slot.identifier,
+        "mesh_objects": [mesh.name for mesh in meshes],
+        "mesh_vertex_samples": max_vertex_finite,
+        "runtime_constraints": constraints,
+        "object_scale": [float(v) for v in rig.scale],
+        "semantic_rmse_from_saved_evaluation": rmse,
+        "max_semantic_rmse_delta_vs_fit_report": max(abs(rmse[k] - fitted_rmse[k]) for k in rmse),
+        "max_bone_scale_deviation": max_basis_scale_error,
+        "fit_gates": fit_report["validation"],
+        "gate": "pass" if max(abs(rmse[k] - fitted_rmse[k]) for k in rmse) < 1e-5 and
+            constraints == 0 and len(meshes) == 2 and all(float(v) > 0 for v in rig.scale) else "fail",
+    }
+    os.makedirs(os.path.dirname(os.path.abspath(args.report)), exist_ok=True)
+    with open(args.report, "w", encoding="utf-8") as stream:
+        json.dump(report, stream, indent=2, allow_nan=False)
+        stream.write("\n")
+    print("MG1_SEMANTIC_SAVED_VALIDATION=" + json.dumps(report))
+    if report["gate"] != "pass":
+        raise RuntimeError("saved semantic preview failed fresh-process validation")
+
+
+if __name__ == "__main__":
+    main()

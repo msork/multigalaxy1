@@ -18,13 +18,12 @@ from mathutils import Matrix, Vector
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from analyze_native_arm_context import source_pose_from_curves
-from build_context_pca_previews import (
-    associated_objects, duplicate_character_objects, make_transform_root,
-    move_to_collection, parent_rig_to_transform_root,
-)
+from build_context_pca_previews import move_to_collection
 from convert_native_owner_actions import (
     basis_from_pose, duplicate_rig, evaluated_bone_matrices, make_action, set_frame,
 )
+from test_semantic_preview_noop import copy_action_slot, duplicate_mesh
+from test_semantic_preview_noop import foot_positions, weighted_group_centroid
 from fit_native_context_pca import fit as fit_pca
 from semantic_arm_fit_math import (
     encode_context_sample, farthest_centers, fit_rbf_ridge,
@@ -69,16 +68,25 @@ def args_parse():
     parser.add_argument("--source-action", default="luigi.001_armature_walk")
     parser.add_argument("--source-slot", default="OBluigi.001_armature")
     parser.add_argument("--target-rig", default="123475520_waluigi.gpl")
+    parser.add_argument("--baseline-rig", default="Waluigi_Arm_Test")
+    parser.add_argument("--clean-rig", default="Waluigi_Arm_Clean_Backup")
+    parser.add_argument("--baseline-mesh-prefix", default="ARMTEST_")
     parser.add_argument("--walk-action", default="Waluigi_GalaxyWalk_Legs_Baked")
     parser.add_argument("--walk-slot", default="", help="optional explicit target walk action slot")
     parser.add_argument("--walk-curves-json", default="",
                         help="read-only curve export for a live walk action absent from the input .blend")
     parser.add_argument("--frames", nargs=2, type=int, default=(0, 60))
     parser.add_argument("--latent-dimensions", type=int, default=192)
+    parser.add_argument("--inverse-native-weight", type=float, default=0.01)
+    parser.add_argument("--inverse-iterations", type=int, default=24)
+    parser.add_argument("--sequence-native-weight", type=float, default=0.01)
+    parser.add_argument("--sequence-velocity-weight", type=float, default=0.002)
+    parser.add_argument("--sequence-acceleration-weight", type=float, default=0.01)
     parser.add_argument("--rbf-centers", type=int, default=72)
     parser.add_argument("--cv-folds", type=int, default=5)
     parser.add_argument("--preview", required=True)
     parser.add_argument("--report", required=True)
+    parser.add_argument("--v1-report", default="tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_fit.json")
     return parser.parse_args(argv)
 
 
@@ -212,21 +220,29 @@ def target_semantics_from_latent(z_normalized, latent_std, pca_model, bones,
 
 def solve_semantic_latents(source_semantics, native_prior, latent_std, pca_model,
                            bones, rest_bones, sem_mean, sem_std,
-                           native_gap_targets, native_weight=0.2, iterations=6):
+                           native_gap_targets, native_weight=0.01, iterations=24,
+                           initial_proposal=None):
     """Invert the PCA pose manifold for semantic targets, regularized to native poses."""
     targets = np.c_[(np.asarray(source_semantics, dtype=np.float64) - sem_mean) / sem_std,
                      np.zeros((len(source_semantics), len(GAP_PAIRS)), dtype=np.float64)]
     priors = np.asarray(native_prior, dtype=np.float64)
     solutions, costs = [], []
     dim = priors.shape[1]
-    for target, prior in zip(targets, priors):
-        z = prior.copy()
+    starts = (None if initial_proposal is None else
+              np.asarray(initial_proposal, dtype=np.float64))
+    for index, (target, prior) in enumerate(zip(targets, priors)):
 
         def residual(value):
             return target_semantics_from_latent(value, latent_std, pca_model,
                 bones, rest_bones, sem_mean, sem_std, native_gap_targets,
                 np.asarray((0.01, 0.005, 0.005, 0.005))) - target
 
+        candidates = [prior.copy()]
+        if starts is not None:
+            candidates.append(starts[index].copy())
+        z = min(candidates, key=lambda value: float(
+            residual(value) @ residual(value) +
+            native_weight * np.sum((value - prior) ** 2)))
         for _ in range(iterations):
             r = residual(z)
             jac = np.empty((len(r), dim), dtype=np.float64)
@@ -433,6 +449,8 @@ def main():
         raise RuntimeError("target profile/split is not the validated 38-bone, 23/5 dataset")
     source_rig = bpy.data.objects.get(args.source_rig)
     target_original = bpy.data.objects.get(args.target_rig)
+    baseline_original = bpy.data.objects.get(args.baseline_rig)
+    clean_original = bpy.data.objects.get(args.clean_rig)
     source_action = bpy.data.actions.get(args.source_action)
     walk_action = bpy.data.actions.get(args.walk_action)
     walk_curve_payload = None
@@ -441,8 +459,11 @@ def main():
             walk_curve_payload = json.load(stream)
         if walk_curve_payload.get("action") != args.walk_action:
             raise RuntimeError("walk curve export action name differs from requested action")
-    if not source_rig or source_rig.type != "ARMATURE" or not target_original or target_original.type != "ARMATURE":
-        raise RuntimeError("source Luigi or target Waluigi armature is missing")
+    if (not source_rig or source_rig.type != "ARMATURE" or
+        not target_original or target_original.type != "ARMATURE" or
+        not baseline_original or baseline_original.type != "ARMATURE" or
+        not clean_original or clean_original.type != "ARMATURE"):
+        raise RuntimeError("source Luigi, production Waluigi, validated walk rig, or clean rig is missing")
     if source_action is None:
         raise RuntimeError("source walk action is missing: " + args.source_action)
     if walk_action is None and walk_curve_payload is None:
@@ -462,6 +483,14 @@ def main():
         raise RuntimeError("target Waluigi is missing context profile bones")
     if abs(float(target_original.scale[0]) - 43.437) > 0.01:
         raise RuntimeError("production Waluigi scale changed; refusing to proceed")
+    if abs(float(baseline_original.matrix_world.to_scale()[0]) - 43.437) > 0.01:
+        raise RuntimeError("validated walk rig does not preserve the intentional 43.437 transform")
+    if set(clean_original.data.bones.keys()) != set(target_original.data.bones.keys()):
+        raise RuntimeError("clean pose rig and production target have different bone sets")
+    for bone in target_original.data.bones:
+        if matrix_error(clean_original.data.bones[bone.name].matrix_local,
+                        target_original.data.bones[bone.name].matrix_local) > 1e-6:
+            raise RuntimeError("clean pose rig rest matrix differs from production: " + bone.name)
     start, end = args.frames
     if (start, end) != (0, 60) or tuple(float(v) for v in source_action.frame_range) != (0.0, 60.0):
         raise RuntimeError("this prototype is limited to the Luigi walk's frames 0–60")
@@ -561,11 +590,14 @@ def main():
     old_actions = set(bpy.data.actions)
     old_collections = set(bpy.data.collections)
     old_obj_visibility = {obj: obj.hide_get() for obj in old_objects}
+    old_obj_hide_viewport = {obj: obj.hide_viewport for obj in old_objects}
+    old_obj_hide_render = {obj: obj.hide_render for obj in old_objects}
     created_objects, created_meshes, created_actions = [], [], []
     target_copy = None
     collections = []
     try:
-        target_copy = duplicate_rig(target_original, "SemanticWalk_Waluigi_Target_Rig")
+        target_copy = duplicate_rig(clean_original, "SemanticWalk_Waluigi_Target_Rig")
+        target_copy.matrix_world = baseline_original.matrix_world.copy()
         created_objects.append(target_copy)
         cleared_constraints = clear_constraints(target_copy)
         if walk_action is None:
@@ -574,6 +606,12 @@ def main():
         elif walk_slot is None:
             walk_slot = select_walk_slot(walk_action, args.walk_slot,
                                          target_original.data.bones.keys())
+        walk_source_action, walk_source_slot = walk_action, walk_slot
+        walk_action = copy_action_slot(walk_source_action, walk_source_slot,
+            target_copy, "_MG1_ValidatedWalk_CleanBasis")
+        walk_action.name = "_MG1_ValidatedWalk_CleanBasis"
+        walk_slot = walk_action.slots[0]
+        created_actions.append(walk_action)
         source_semantics = []
         frames = list(range(start, end + 1))
         for frame in frames:
@@ -591,31 +629,30 @@ def main():
         rbf_proposal = predict_rbf(source_norm, regressor)
         proposal, semantic_inverse_costs = solve_semantic_latents(
             source_semantics, nearest_prior, latent_std, pca, bones, target_rest,
-            sem_mean, sem_std, native_gap_targets, native_weight=0.2, iterations=6)
+            sem_mean, sem_std, native_gap_targets,
+            native_weight=args.inverse_native_weight,
+            iterations=args.inverse_iterations, initial_proposal=rbf_proposal)
         smoothed = smooth_latent_sequence(proposal, nearest_prior,
-            np.ones(args.latent_dimensions), lambda_native=0.2,
-            lambda_velocity=0.05, lambda_acceleration=0.5)
+            np.ones(args.latent_dimensions),
+            lambda_native=args.sequence_native_weight,
+            lambda_velocity=args.sequence_velocity_weight,
+            lambda_acceleration=args.sequence_acceleration_weight)
         decoded_features = decode_features(smoothed, latent_std, pca)
         pca_pose_rows = [decode_context_poses(row, bones, target_rest)
                          for row in decoded_features]
 
-        target_objects = associated_objects(target_original)
-        # Earlier arm experiments left helper meshes bound to the production
-        # rig. They are not part of the character and must not enter preview.
-        target_objects = [obj for obj in target_objects
-                          if not obj.name.startswith("ARMTEST_") and
-                          "_ArmRetargetPreview" not in obj.name]
-        mesh_sources = [obj for obj in target_objects if obj.type == "MESH"]
+        mesh_sources = sorted((obj for obj in bpy.data.objects
+            if obj.type == "MESH" and obj.name.startswith(args.baseline_mesh_prefix) and
+            any(mod.type == "ARMATURE" and mod.object == baseline_original
+                for mod in obj.modifiers)), key=lambda obj: obj.name)
+        if not mesh_sources:
+            raise RuntimeError("validated walk has no complete ARMTEST meshes bound to its rig")
         preview_collection = bpy.data.collections.new("SemanticWalk_Waluigi_LeftArm_Preview")
         bpy.context.scene.collection.children.link(preview_collection)
         collections.append(preview_collection)
-        root = make_transform_root("SemanticWalk_Waluigi_Root", preview_collection,
-                                   target_original.matrix_world)
-        created_objects.append(root)
-        parent_rig_to_transform_root(target_copy, root)
         move_to_collection(target_copy, preview_collection)
-        target_meshes = duplicate_character_objects(mesh_sources, target_original,
-            target_copy, preview_collection, "SemanticWalk_Waluigi_")
+        target_meshes = [duplicate_mesh(obj, target_copy, preview_collection,
+            "SemanticWalk_Waluigi_") for obj in mesh_sources]
         created_objects.extend(target_meshes)
         created_meshes.extend(target_meshes)
 
@@ -626,6 +663,7 @@ def main():
         # Leaving its action active would let animated channels overwrite
         # matrix_basis assignments during dependency-graph evaluation.
         walk_pose_rows, walk_scale_rows, baseline_gaps = [], [], []
+        walk_foot_rows, walk_cap_rows = [], []
         for frame in frames:
             set_frame(scene, float(frame))
             walk_pose_rows.append({name: matrix.copy()
@@ -633,6 +671,10 @@ def main():
             walk_scale_rows.append({pb.name: np.asarray(tuple(pb.scale), dtype=np.float64)
                                     for pb in target_copy.pose.bones})
             baseline_gaps.append(continuity(target_copy))
+            walk_foot_rows.append(foot_positions(target_copy, ("bone_8", "bone_14")))
+            baseline_vertices = mesh_vertices(target_meshes)
+            walk_cap_rows.append(weighted_group_centroid(target_meshes,
+                [baseline_vertices[obj.name] for obj in target_meshes], "bone_53"))
         target_copy.animation_data.action = None
 
         combined_pose_rows = []
@@ -644,6 +686,9 @@ def main():
         arm_bones = set(bones) - TORSO_CONTEXT
         max_pose_write_error = 0.0
         max_pose_write_detail = None
+        max_foot_baseline_error = 0.0
+        max_cap_baseline_error = 0.0
+        max_nonmodel_pose_error = 0.0
         for index, frame in enumerate(frames):
             set_frame(scene, float(frame))
             base_pose = walk_pose_rows[index]
@@ -660,11 +705,25 @@ def main():
                 mixed_pose[name] = base_pose[name].copy()
             bases = assign_pose_matrices_hierarchical(target_copy, mixed_pose)
             actual = evaluated_bone_matrices(target_copy)
+            for foot_name, baseline_position in walk_foot_rows[index].items():
+                current_position = foot_positions(target_copy, (foot_name,))[foot_name]
+                max_foot_baseline_error = max(max_foot_baseline_error,
+                    float((Vector(current_position) - Vector(baseline_position)).length))
+            current_vertices = mesh_vertices(target_meshes)
+            current_centroid = weighted_group_centroid(target_meshes,
+                [current_vertices[obj.name] for obj in target_meshes], "bone_53")
+            base_centroid = walk_cap_rows[index]
+            if base_centroid is not None and current_centroid is not None:
+                max_cap_baseline_error = max(max_cap_baseline_error,
+                    float((Vector(base_centroid) - Vector(current_centroid)).length))
             max_pose_scale_delta_vs_walk = max(max_pose_scale_delta_vs_walk,
                 max(float(np.max(np.abs(np.asarray(tuple(pb.scale), dtype=np.float64) -
                                          base_scales[pb.name])))
                     for pb in target_copy.pose.bones))
             for name in actual:
+                if name not in arm_bones:
+                    max_nonmodel_pose_error = max(max_nonmodel_pose_error,
+                        matrix_error(actual[name], base_pose[name]))
                 error = matrix_error(actual[name], mixed_pose[name])
                 if error > max_pose_write_error:
                     max_pose_write_error = error
@@ -686,7 +745,7 @@ def main():
                                                      "vertex": vertex_index})
             basis_samples.append((float(frame), bases))
 
-        action_name = "Waluigi_LuigiWalk_SemanticLeftArm_v1"
+        action_name = "Waluigi_LuigiWalk_SemanticLeftArm_CleanWalk_v2"
         if bpy.data.actions.get(action_name):
             action_name += "_Prototype"
         baked_action = make_action(target_copy, action_name, basis_samples)
@@ -719,6 +778,32 @@ def main():
                       max(0.0, max(row[name] for row in combined_gaps) - native_gap_ranges[name]["max"]))
             for name in native_gap_ranges}
         semantic_error = np.asarray(semantic_target_rows) - source_semantics
+        if os.path.isfile(args.v1_report):
+            with open(args.v1_report, "r", encoding="utf-8") as stream:
+                v1_report = json.load(stream)
+            v1_rmse = v1_report.get("source_target_semantic_rmse",
+                v1_report.get("preview", {}).get("semantic_feature_rmse_after_solve", {}))
+        else:
+            raise RuntimeError("v1 residual report is required for the improvement gate")
+        current_rmse = {name: float(np.sqrt(np.mean(semantic_error[:, i] ** 2)))
+                        for i, name in enumerate(SEMANTIC_NAMES)}
+        semantic_groups = {
+            "shoulder_orientation": (0, 1, 2), "elbow_flexion": (3,),
+            "forearm_roll": (4,), "wrist_orientation": (5, 6, 7),
+            "hand_position": (8, 9, 10)}
+        group_comparison = {}
+        for label, indices in semantic_groups.items():
+            names = [SEMANTIC_NAMES[i] for i in indices]
+            before = math.sqrt(sum(float(v1_rmse[name]) ** 2 for name in names) / len(names))
+            after = math.sqrt(sum(current_rmse[name] ** 2 for name in names) / len(names))
+            group_comparison[label] = {"v1_rmse": before, "current_rmse": after,
+                "relative_improvement": (before - after) / max(before, 1e-12)}
+        worst_frame_index = int(np.argmax(np.max(np.abs(semantic_error), axis=1)))
+        worst_semantic = {"frame": frames[worst_frame_index],
+            "feature": SEMANTIC_NAMES[int(np.argmax(np.abs(semantic_error[worst_frame_index])))],
+            "absolute_residual": float(np.max(np.abs(semantic_error[worst_frame_index]))),
+            "per_feature_absolute_residual": {name: float(abs(semantic_error[worst_frame_index, i]))
+                for i, name in enumerate(SEMANTIC_NAMES)}}
         squared_vel = np.diff(smoothed, axis=0)
         squared_acc = np.diff(smoothed, n=2, axis=0)
         objective_terms = {
@@ -726,7 +811,9 @@ def main():
             "native_pose_prior_mse": float(np.mean((smoothed - nearest_prior) ** 2)),
             "velocity_mse": float(np.mean(squared_vel ** 2)),
             "acceleration_mse": float(np.mean(squared_acc ** 2)),
-            "lambdas": {"native": 0.2, "velocity": 0.05, "acceleration": 0.5}}
+            "lambdas": {"native": args.sequence_native_weight,
+                "velocity": args.sequence_velocity_weight,
+                "acceleration": args.sequence_acceleration_weight}}
         feature_min, feature_max = source_semantics.min(axis=0), source_semantics.max(axis=0)
         nearest_d = train_distance.min(axis=0)
         weighted_mesh_centroids = {}
@@ -749,13 +836,17 @@ def main():
             "schema": "mg1.semantic-luigi-walk-to-waluigi-left-arm.v1",
             "source_rig": source_rig.name, "source_action": source_action.name,
             "source_slot": source_slot.identifier, "source_frames": frames,
-            "target_rig": target_original.name, "target_walk_action": walk_action.name,
-                "target_walk_slot": walk_slot.identifier,
+            "target_rig": target_original.name, "target_walk_action": walk_source_action.name,
+                "target_walk_source_slot": walk_source_slot.identifier,
+                "target_walk_duplicate_slot": walk_slot.identifier,
                 "target_walk_curves_imported_from_live_bridge": walk_curve_payload is not None,
                 "target_bones": bones,
             "semantic_feature_names": list(SEMANTIC_NAMES),
             "source_target_semantic_rmse": {name: float(np.sqrt(np.mean(semantic_error[:, i] ** 2)))
                                               for i, name in enumerate(SEMANTIC_NAMES)},
+            "residual_comparison_to_v1": {"v1_rmse": v1_rmse,
+                "current_rmse": current_rmse, "semantic_group_rmse": group_comparison,
+                "worst_frame": worst_semantic},
             "source_semantic_range": {name: [float(feature_min[i]), float(feature_max[i])]
                                       for i, name in enumerate(SEMANTIC_NAMES)},
             "native_training_semantic_range": {name: [float(sem_train[:, i].min()),
@@ -773,12 +864,13 @@ def main():
                 "grouped_cv": cv_rows, "native_holdout_validation": holdout_rows},
             "optimization": {"objective_terms": objective_terms,
                 "per_frame_semantic_inverse_objective": {
-                    "form": "||normalized semantic residual||^2 + ||native joint-gap residual / tolerance||^2 + 0.2||z-nearest_native||^2",
+                    "form": "||normalized semantic residual||^2 + ||native joint-gap residual / tolerance||^2 + lambda_native||z-nearest_native||^2",
                     "mean": float(np.mean(semantic_inverse_costs)),
                     "max": float(np.max(semantic_inverse_costs)),
                     "native_joint_gap_targets_armature_units": {name: float(native_gap_targets[i]) for i, name in enumerate(GAP_PAIRS)},
                     "joint_gap_scales_armature_units": {name: value for name, value in zip(GAP_PAIRS, (0.01, 0.005, 0.005, 0.005))},
-                    "iterations_max": 6,
+                    "native_weight": args.inverse_native_weight,
+                    "iterations_max": args.inverse_iterations,
                     "initialization": "nearest native latent pose"},
                 "rbf_baseline_proposal_rms_from_inverse": float(np.sqrt(np.mean((rbf_proposal - proposal) ** 2))),
                 "latent_coefficients_normalized": {"min": float(smoothed.min()), "max": float(smoothed.max()),
@@ -787,17 +879,21 @@ def main():
                 "max_step": float(np.max(np.linalg.norm(np.diff(smoothed, axis=0), axis=1))),
                 "max_acceleration": float(np.max(np.linalg.norm(np.diff(smoothed, n=2, axis=0), axis=1)))},
             "preview": {"file": os.path.abspath(args.preview), "collection": preview_collection.name,
-                "root": root.name, "rig": target_copy.name, "action": baked_action.name,
+                "root": None, "rig": target_copy.name, "action": baked_action.name,
                 "mesh_objects": [obj.name for obj in target_meshes],
                 "object_scale_unchanged": [float(v) for v in target_copy.scale],
+                "rig_world_matrix": matrix_rows(target_copy.matrix_world),
                 "constraints_removed_from_duplicate": cleared_constraints,
                 "runtime_constraints_remaining": sum(len(obj.constraints) +
                     sum(len(pb.constraints) for pb in obj.pose.bones) for obj in (target_copy,)),
                 "max_pose_write_matrix_error": max_pose_write_error,
                 "max_pose_write_divergence": max_pose_write_detail,
                 "max_pose_scale_delta_vs_validated_walk": max_pose_scale_delta_vs_walk,
+                "max_nonmodeled_bone_pose_matrix_error_vs_walk": max_nonmodel_pose_error,
+                "max_foot_tail_error_vs_walk": max_foot_baseline_error,
+                "max_head_cap_centroid_error_vs_walk": max_cap_baseline_error,
                 "max_baked_action_replay_matrix_error": max_baked_replay_error,
-                "walk_root_world_matrix": matrix_rows(root.matrix_world),
+                "walk_root_world_matrix": matrix_rows(target_copy.matrix_world),
                 "max_joint_gap_change_vs_validated_walk": baseline_gap_change,
                 "native_training_joint_gap_ranges_armature_units": native_gap_ranges,
                 "max_joint_gap_outside_native_range_armature_units": native_gap_outside_range,
@@ -812,11 +908,16 @@ def main():
         report["validation"] = {
             "fit_gate": "pass" if not mesh_finite_failures and max_pose_write_error < 2e-3 and
                          max_baked_replay_error < 1e-4 and
+                         max_nonmodel_pose_error < 2e-3 and
+                         max_foot_baseline_error < 2e-4 and
+                         max_cap_baseline_error < 2e-4 and
                          all(value < 0.02 for value in native_gap_outside_range.values()) else "fail",
-            "semantic_fit_gate": "pass" if max(float(np.sqrt(np.mean(semantic_error[:, i] ** 2)))
-                                                  for i in range(len(SEMANTIC_NAMES))) < 0.3 else "fail",
+            "semantic_fit_gate": "pass" if all(
+                row["relative_improvement"] >= 0.25 for row in group_comparison.values()) else "fail",
             "max_pose_write_matrix_tolerance": 2e-3,
             "max_baked_action_replay_matrix_tolerance": 1e-4,
+            "max_nonmodeled_pose_error_tolerance": 2e-3,
+            "max_foot_cap_baseline_error_tolerance": 2e-4,
             "max_joint_gap_outside_native_range_tolerance_armature_units": 0.02,
             "finite_pose_mesh_values": "pass" if not mesh_finite_failures else "fail"}
 
@@ -827,6 +928,8 @@ def main():
         os.makedirs(os.path.dirname(os.path.abspath(args.preview)), exist_ok=True)
         for obj in old_objects:
             obj.hide_set(True)
+            obj.hide_viewport = True
+            obj.hide_render = True
         for obj in created_objects:
             # Object copies inherit source-level viewport hiding independently
             # from hide_set(); clear both before saving the standalone preview.
@@ -852,6 +955,8 @@ def main():
             "selected_rbf": {"width": selected["width_factor"], "alpha": selected["ridge_alpha"]}}))
         if report["validation"]["fit_gate"] != "pass":
             raise RuntimeError("semantic walk preview failed numerical bake validation")
+        if report["validation"]["semantic_fit_gate"] != "pass":
+            raise RuntimeError("semantic feature residuals did not improve by 25% in every group")
     finally:
         scene.frame_set(old_frame, subframe=old_subframe)
         # Preserve the saved preview file, but clean temporary data from this
@@ -860,6 +965,8 @@ def main():
             if obj in old_objects:
                 try:
                     obj.hide_set(old_obj_visibility[obj])
+                    obj.hide_viewport = old_obj_hide_viewport[obj]
+                    obj.hide_render = old_obj_hide_render[obj]
                 except Exception:
                     pass
                 continue
