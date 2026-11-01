@@ -1,0 +1,5170 @@
+{
+  "schema": "mg1.native-arm-visual-preview.v1",
+  "read_only_sources": true,
+  "source_object": "Waluigi_Arm_Test",
+  "production_object": "123475520_waluigi.gpl",
+  "rest_signature_match": true,
+  "production_scale": [
+    43.4370002746582,
+    43.4370002746582,
+    43.4370002746582
+  ],
+  "source_scale_unchanged": true,
+  "action_count": 3,
+  "action_data_copied": false,
+  "new_actions_created": [],
+  "preview_group": "native-arm-preview-d375606872704b40a8e3e339af1939e7",
+  "placement_spacing_world": 350.0,
+  "previous_scene_frame": [
+    0,
+    0.0
+  ],
+  "preview_frame": [
+    0,
+    0.0
+  ],
+  "previews": [
+    {
+      "action": "sequence_10.003",
+      "slot_identifier": "OBArmature.004",
+      "preview_armature": "Waluigi_NativePreview_sequence_10_003",
+      "preview_meshes": [
+        "Waluigi_NativePreview_sequence_10_003_ARMTEST_29_0x75c1640_submesh0",
+        "Waluigi_NativePreview_sequence_10_003_ARMTEST_29_0x75c1640_submesh1"
+      ],
+      "animated_bone_count": 61,
+      "animated_bones": [
+        "bone_10",
+        "bone_13",
+        "bone_14",
+        "bone_15",
+        "bone_16",
+        "bone_19",
+        "bone_20",
+        "bone_22",
+        "bone_23",
+        "bone_24",
+        "bone_25",
+        "bone_26",
+        "bone_27",
+        "bone_29",
+        "bone_3",
+        "bone_30",
+        "bone_31",
+        "bone_32",
+        "bone_33",
+        "bone_35",
+        "bone_36",
+        "bone_37",
+        "bone_39",
+        "bone_40",
+        "bone_41",
+        "bone_43",
+        "bone_44",
+        "bone_45",
+        "bone_47",
+        "bone_48",
+        "bone_49",
+        "bone_5",
+        "bone_52",
+        "bone_53",
+        "bone_57",
+        "bone_58",
+        "bone_59",
+        "bone_60",
+        "bone_61",
+        "bone_62",
+        "bone_64",
+        "bone_65",
+        "bone_66",
+        "bone_67",
+        "bone_68",
+        "bone_7",
+        "bone_70",
+        "bone_71",
+        "bone_72",
+        "bone_74",
+        "bone_75",
+        "bone_76",
+        "bone_78",
+        "bone_79",
+        "bone_8",
+        "bone_80",
+        "bone_82",
+        "bone_83",
+        "bone_84",
+        "bone_86",
+        "bone_9"
+      ],
+      "finger_bones_animated": [
+        "bone_31",
+        "bone_32",
+        "bone_33",
+        "bone_35",
+        "bone_36",
+        "bone_37",
+        "bone_39",
+        "bone_40",
+        "bone_41",
+        "bone_43",
+        "bone_44",
+        "bone_45",
+        "bone_47",
+        "bone_48",
+        "bone_49"
+      ],
+      "offset_world": [
+        350.0,
+        0.0,
+        0.0
+      ],
+      "object_scale": [
+        43.4370002746582,
+        43.4370002746582,
+        43.4370002746582
+      ],
+      "source_object_transform": {
+        "matrix_world": [
+          [
+            43.4370002746582,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            -1.8986916074936744e-06,
+            -43.4370002746582,
+            0.0
+          ],
+          [
+            0.0,
+            43.4370002746582,
+            -1.8986916074936744e-06,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "location": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_euler": [
+          1.5707963705062866,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          43.4370002746582,
+          43.4370002746582,
+          43.4370002746582
+        ],
+        "parent": null
+      },
+      "preview_object_transform": {
+        "matrix_world": [
+          [
+            43.4370002746582,
+            0.0,
+            0.0,
+            350.0
+          ],
+          [
+            0.0,
+            -1.8986916074936744e-06,
+            -43.4370002746582,
+            0.0
+          ],
+          [
+            0.0,
+            43.4370002746582,
+            -1.8986916074936744e-06,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "location": [
+          350.0,
+          0.0,
+          0.0
+        ],
+        "rotation_euler": [
+          1.5707963705062866,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          43.4370002746582,
+          43.4370002746582,
+          43.4370002746582
+        ],
+        "parent": null,
+        "matrix_world_error_vs_offset_source": 0.0
+      },
+      "armature_data": {
+        "source": "123475520_waluigi.gpl.001",
+        "preview": "Waluigi_NativePreview_sequence_10_003_Data",
+        "rest_signature_matches": true
+      },
+      "action_binding": {
+        "action": "sequence_10.003",
+        "requested_action": "sequence_10.003",
+        "slot": "OBArmature.004",
+        "requested_slot": "OBArmature.004",
+        "slot_matches": true
+      },
+      "mesh_object_scales": {
+        "ARMTEST_29_0x75c1640_submesh0": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "ARMTEST_29_0x75c1640_submesh1": [
+          0.9999982118606567,
+          0.9999979734420776,
+          0.9999969601631165
+        ]
+      },
+      "mesh_relationships": [
+        {
+          "source": "ARMTEST_29_0x75c1640_submesh0",
+          "source_parent": "123475520_waluigi.gpl",
+          "preview": "Waluigi_NativePreview_sequence_10_003_ARMTEST_29_0x75c1640_submesh0",
+          "preview_parent": "Waluigi_NativePreview_sequence_10_003",
+          "source_matrix_world": [
+            [
+              43.4370002746582,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              -1.8986916074936744e-06,
+              -43.4370002746582,
+              0.0
+            ],
+            [
+              0.0,
+              43.4370002746582,
+              -1.8986916074936744e-06,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_matrix_world": [
+            [
+              43.4370002746582,
+              0.0,
+              0.0,
+              350.0
+            ],
+            [
+              0.0,
+              -1.8986916074936744e-06,
+              -43.4370002746582,
+              0.0
+            ],
+            [
+              0.0,
+              43.4370002746582,
+              -1.8986916074936744e-06,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_world_matrix_error_vs_offset_source": 0.0,
+          "source_armature_modifiers": [
+            "Waluigi_Arm_Test"
+          ],
+          "preview_armature_modifiers": [
+            "Waluigi_NativePreview_sequence_10_003"
+          ]
+        },
+        {
+          "source": "ARMTEST_29_0x75c1640_submesh1",
+          "source_parent": "123475520_waluigi.gpl",
+          "preview": "Waluigi_NativePreview_sequence_10_003_ARMTEST_29_0x75c1640_submesh1",
+          "preview_parent": "Waluigi_NativePreview_sequence_10_003",
+          "source_matrix_world": [
+            [
+              1.7841830413090065e-06,
+              43.436912536621094,
+              0.00013306319306138903,
+              4.620633626473136e-05
+            ],
+            [
+              14.856313705444336,
+              -0.0001256488321814686,
+              40.817298889160156,
+              -1.4951205253601074
+            ],
+            [
+              40.817352294921875,
+              4.3833788367919624e-05,
+              -14.856295585632324,
+              141.2239990234375
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_matrix_world": [
+            [
+              1.7841830413090065e-06,
+              43.436912536621094,
+              0.00013306319306138903,
+              350.00006103515625
+            ],
+            [
+              14.856313705444336,
+              -0.0001256488321814686,
+              40.817298889160156,
+              -1.4951205253601074
+            ],
+            [
+              40.817352294921875,
+              4.3833788367919624e-05,
+              -14.856295585632324,
+              141.2239990234375
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_world_matrix_error_vs_offset_source": 0.0,
+          "source_armature_modifiers": [
+            "Waluigi_Arm_Test"
+          ],
+          "preview_armature_modifiers": [
+            "Waluigi_NativePreview_sequence_10_003"
+          ]
+        }
+      ],
+      "max_matrix_error": 0.0,
+      "max_basis_error": 0.0,
+      "max_centroid_error_armature": 5.960464477539062e-07,
+      "max_centroid_error_world": 0.0001087188720703125,
+      "first_bone_mismatch": null,
+      "first_mesh_mismatch": null,
+      "max_pose_scale_deviation": 0.0,
+      "runtime_constraint_count": 0,
+      "samples": [
+        {
+          "time": 0.0,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 3.2782554626464844e-07,
+          "max_weighted_centroid_error_world": 0.0001087188720703125,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 1.9073486328125e-05,
+                "error_armature": 2.980232238769531e-07,
+                "actual_world_unoffset": [
+                  325.6781005859375,
+                  22.64078712463379,
+                  137.47828674316406
+                ],
+                "actual_world_offset_corrected": [
+                  -24.3218994140625,
+                  22.64078712463379,
+                  137.47828674316406
+                ],
+                "expected_world": [
+                  -24.321880340576172,
+                  22.64078712463379,
+                  137.47828674316406
+                ],
+                "actual_armature": [
+                  -0.5599349141120911,
+                  3.1650044918060303,
+                  -0.5212329030036926
+                ],
+                "expected_armature": [
+                  -0.5599346160888672,
+                  3.1650044918060303,
+                  -0.5212329030036926
+                ]
+              },
+              "bone_23": {
+                "error_world": 7.62939453125e-06,
+                "error_armature": 3.2782554626464844e-07,
+                "actual_world_unoffset": [
+                  330.3746643066406,
+                  18.944963455200195,
+                  138.01222229003906
+                ],
+                "actual_world_offset_corrected": [
+                  -19.625335693359375,
+                  18.944963455200195,
+                  138.01222229003906
+                ],
+                "expected_world": [
+                  -19.625328063964844,
+                  18.944963455200195,
+                  138.01222229003906
+                ],
+                "actual_armature": [
+                  -0.45181164145469666,
+                  3.1772966384887695,
+                  -0.43614816665649414
+                ],
+                "expected_armature": [
+                  -0.4518113136291504,
+                  3.1772966384887695,
+                  -0.43614816665649414
+                ]
+              },
+              "bone_25": {
+                "error_world": 4.863739013671875e-05,
+                "error_armature": 3.2782554626464844e-07,
+                "actual_world_unoffset": [
+                  340.4695739746094,
+                  7.663820743560791,
+                  139.34263610839844
+                ],
+                "actual_world_offset_corrected": [
+                  -9.530426025390625,
+                  7.663820743560791,
+                  139.34263610839844
+                ],
+                "expected_world": [
+                  -9.530474662780762,
+                  7.663820743560791,
+                  139.34263610839844
+                ],
+                "actual_armature": [
+                  -0.21940945088863373,
+                  3.2079238891601562,
+                  -0.1764354109764099
+                ],
+                "expected_armature": [
+                  -0.21940912306308746,
+                  3.2079238891601562,
+                  -0.1764354109764099
+                ]
+              },
+              "bone_27": {
+                "error_world": 6.103515625e-05,
+                "error_armature": 2.682209014892578e-07,
+                "actual_world_unoffset": [
+                  364.82476806640625,
+                  -8.448221206665039,
+                  137.648681640625
+                ],
+                "actual_world_offset_corrected": [
+                  14.82476806640625,
+                  -8.448221206665039,
+                  137.648681640625
+                ],
+                "expected_world": [
+                  14.8248291015625,
+                  -8.448221206665039,
+                  137.648681640625
+                ],
+                "actual_armature": [
+                  0.34129461646080017,
+                  3.1689271926879883,
+                  0.19449344277381897
+                ],
+                "expected_armature": [
+                  0.34129488468170166,
+                  3.1689271926879883,
+                  0.19449344277381897
+                ]
+              },
+              "bone_29": {
+                "error_world": 1.3113021850585938e-06,
+                "error_armature": 2.980232238769531e-07,
+                "actual_world_unoffset": [
+                  351.85137939453125,
+                  -0.875573992729187,
+                  141.99009704589844
+                ],
+                "actual_world_offset_corrected": [
+                  1.85137939453125,
+                  -0.875573992729187,
+                  141.99009704589844
+                ],
+                "expected_world": [
+                  1.851378083229065,
+                  -0.875573992729187,
+                  141.99009704589844
+                ],
+                "actual_armature": [
+                  0.04262184351682663,
+                  3.2688748836517334,
+                  0.020157193765044212
+                ],
+                "expected_armature": [
+                  0.04262214154005051,
+                  3.2688748836517334,
+                  0.020157193765044212
+                ]
+              },
+              "bone_30": {
+                "error_world": 0.0001087188720703125,
+                "error_armature": 3.2782554626464844e-07,
+                "actual_world_unoffset": [
+                  369.07940673828125,
+                  -11.679798126220703,
+                  131.84010314941406
+                ],
+                "actual_world_offset_corrected": [
+                  19.07940673828125,
+                  -11.679798126220703,
+                  131.84010314941406
+                ],
+                "expected_world": [
+                  19.07951545715332,
+                  -11.679798126220703,
+                  131.84010314941406
+                ],
+                "actual_armature": [
+                  0.43924543261528015,
+                  3.035202741622925,
+                  0.26889050006866455
+                ],
+                "expected_armature": [
+                  0.4392457604408264,
+                  3.035202741622925,
+                  0.26889050006866455
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138349465749386,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 17.17630866782833
+          }
+        },
+        {
+          "time": 3.3333334922790527,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 4.76837158203125e-07,
+          "max_weighted_centroid_error_world": 5.340576171875e-05,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 2.288818359375e-05,
+                "error_armature": 4.76837158203125e-07,
+                "actual_world_unoffset": [
+                  373.3707580566406,
+                  18.248079299926758,
+                  141.10716247558594
+                ],
+                "actual_world_offset_corrected": [
+                  23.370758056640625,
+                  18.248079299926758,
+                  141.10716247558594
+                ],
+                "expected_world": [
+                  23.37073516845703,
+                  18.248079299926758,
+                  141.10716247558594
+                ],
+                "actual_armature": [
+                  0.538037121295929,
+                  3.2485477924346924,
+                  -0.4201047420501709
+                ],
+                "expected_armature": [
+                  0.5380375981330872,
+                  3.2485477924346924,
+                  -0.4201047420501709
+                ]
+              },
+              "bone_23": {
+                "error_world": 4.9591064453125e-05,
+                "error_armature": 1.7881393432617188e-07,
+                "actual_world_unoffset": [
+                  375.1627502441406,
+                  18.959375381469727,
+                  135.2526092529297
+                ],
+                "actual_world_offset_corrected": [
+                  25.162750244140625,
+                  18.959375381469727,
+                  135.2526092529297
+                ],
+                "expected_world": [
+                  25.162700653076172,
+                  18.959375381469727,
+                  135.2526092529297
+                ],
+                "actual_armature": [
+                  0.5792917013168335,
+                  3.113765001296997,
+                  -0.43647992610931396
+                ],
+                "expected_armature": [
+                  0.5792918801307678,
+                  3.113765001296997,
+                  -0.43647992610931396
+                ]
+              },
+              "bone_25": {
+                "error_world": 1.9073486328125e-05,
+                "error_armature": 2.980232238769531e-07,
+                "actual_world_unoffset": [
+                  382.2515869140625,
+                  20.569889068603516,
+                  121.9337158203125
+                ],
+                "actual_world_offset_corrected": [
+                  32.2515869140625,
+                  20.569889068603516,
+                  121.9337158203125
+                ],
+                "expected_world": [
+                  32.25156784057617,
+                  20.569889068603516,
+                  121.9337158203125
+                ],
+                "actual_armature": [
+                  0.7424902319908142,
+                  2.8071396350860596,
+                  -0.4735570251941681
+                ],
+                "expected_armature": [
+                  0.7424905300140381,
+                  2.8071396350860596,
+                  -0.4735570251941681
+                ]
+              },
+              "bone_27": {
+                "error_world": 2.288818359375e-05,
+                "error_armature": 3.5762786865234375e-07,
+                "actual_world_unoffset": [
+                  395.9373779296875,
+                  24.406906127929688,
+                  96.98629760742188
+                ],
+                "actual_world_offset_corrected": [
+                  45.9373779296875,
+                  24.406906127929688,
+                  96.98629760742188
+                ],
+                "expected_world": [
+                  45.937400817871094,
+                  24.406906127929688,
+                  96.98629760742188
+                ],
+                "actual_armature": [
+                  1.0575634241104126,
+                  2.232804298400879,
+                  -0.5618923306465149
+                ],
+                "expected_armature": [
+                  1.0575637817382812,
+                  2.232804298400879,
+                  -0.5618923306465149
+                ]
+              },
+              "bone_29": {
+                "error_world": 2.288818359375e-05,
+                "error_armature": 2.980232238769531e-07,
+                "actual_world_unoffset": [
+                  390.2113037109375,
+                  22.912858963012695,
+                  110.0158920288086
+                ],
+                "actual_world_offset_corrected": [
+                  40.2113037109375,
+                  22.912858963012695,
+                  110.0158920288086
+                ],
+                "expected_world": [
+                  40.211326599121094,
+                  22.912858963012695,
+                  110.0158920288086
+                ],
+                "actual_armature": [
+                  0.9257386922836304,
+                  2.5327694416046143,
+                  -0.5274965763092041
+                ],
+                "expected_armature": [
+                  0.9257389903068542,
+                  2.5327694416046143,
+                  -0.5274965763092041
+                ]
+              },
+              "bone_30": {
+                "error_world": 5.340576171875e-05,
+                "error_armature": 2.384185791015625e-07,
+                "actual_world_unoffset": [
+                  399.58062744140625,
+                  26.06233787536621,
+                  90.0927963256836
+                ],
+                "actual_world_offset_corrected": [
+                  49.58062744140625,
+                  26.06233787536621,
+                  90.0927963256836
+                ],
+                "expected_world": [
+                  49.58068084716797,
+                  26.06233787536621,
+                  90.0927963256836
+                ],
+                "actual_armature": [
+                  1.1414382457733154,
+                  2.0741024017333984,
+                  -0.6000032424926758
+                ],
+                "expected_armature": [
+                  1.1414384841918945,
+                  2.0741024017333984,
+                  -0.6000032424926758
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138327442960099,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 15.978622743914066
+          }
+        },
+        {
+          "time": 6.833333492279053,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 5.960464477539062e-07,
+          "max_weighted_centroid_error_world": 0.000102996826171875,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 0.000102996826171875,
+                "error_armature": 2.384185791015625e-07,
+                "actual_world_unoffset": [
+                  375.6994934082031,
+                  -13.537117958068848,
+                  130.31243896484375
+                ],
+                "actual_world_offset_corrected": [
+                  25.699493408203125,
+                  -13.537117958068848,
+                  130.31243896484375
+                ],
+                "expected_world": [
+                  25.699596405029297,
+                  -13.537117958068848,
+                  130.31243896484375
+                ],
+                "actual_armature": [
+                  0.5916517376899719,
+                  3.0000338554382324,
+                  0.311649352312088
+                ],
+                "expected_armature": [
+                  0.591651976108551,
+                  3.0000338554382324,
+                  0.311649352312088
+                ]
+              },
+              "bone_23": {
+                "error_world": 2.09808349609375e-05,
+                "error_armature": 3.5762786865234375e-07,
+                "actual_world_unoffset": [
+                  377.9140930175781,
+                  -9.654170989990234,
+                  127.3961181640625
+                ],
+                "actual_world_offset_corrected": [
+                  27.914093017578125,
+                  -9.654170989990234,
+                  127.3961181640625
+                ],
+                "expected_world": [
+                  27.914113998413086,
+                  -9.654170989990234,
+                  127.3961181640625
+                ],
+                "actual_armature": [
+                  0.6426340937614441,
+                  2.9328951835632324,
+                  0.22225673496723175
+                ],
+                "expected_armature": [
+                  0.6426344513893127,
+                  2.9328951835632324,
+                  0.22225673496723175
+                ]
+              },
+              "bone_25": {
+                "error_world": 1.9073486328125e-06,
+                "error_armature": 1.7881393432617188e-07,
+                "actual_world_unoffset": [
+                  380.3746337890625,
+                  -0.44222185015678406,
+                  115.47563171386719
+                ],
+                "actual_world_offset_corrected": [
+                  30.3746337890625,
+                  -0.44222185015678406,
+                  115.47563171386719
+                ],
+                "expected_world": [
+                  30.374631881713867,
+                  -0.44222185015678406,
+                  115.47563171386719
+                ],
+                "actual_armature": [
+                  0.6992799043655396,
+                  2.6584630012512207,
+                  0.010180646553635597
+                ],
+                "expected_armature": [
+                  0.6992800831794739,
+                  2.6584630012512207,
+                  0.010180646553635597
+                ]
+              },
+              "bone_27": {
+                "error_world": 1.52587890625e-05,
+                "error_armature": 5.960464477539062e-07,
+                "actual_world_unoffset": [
+                  403.70196533203125,
+                  18.716705322265625,
+                  105.76524353027344
+                ],
+                "actual_world_offset_corrected": [
+                  53.70196533203125,
+                  18.716705322265625,
+                  105.76524353027344
+                ],
+                "expected_world": [
+                  53.70198059082031,
+                  18.716705322265625,
+                  105.76524353027344
+                ],
+                "actual_armature": [
+                  1.2363181114196777,
+                  2.434910535812378,
+                  -0.4308931827545166
+                ],
+                "expected_armature": [
+                  1.2363187074661255,
+                  2.434910535812378,
+                  -0.4308931827545166
+                ]
+              },
+              "bone_29": {
+                "error_world": 1.1444091796875e-05,
+                "error_armature": 4.76837158203125e-07,
+                "actual_world_unoffset": [
+                  385.7016296386719,
+                  8.528701782226562,
+                  105.43345642089844
+                ],
+                "actual_world_offset_corrected": [
+                  35.701629638671875,
+                  8.528701782226562,
+                  105.43345642089844
+                ],
+                "expected_world": [
+                  35.70161819458008,
+                  8.528701782226562,
+                  105.43345642089844
+                ],
+                "actual_armature": [
+                  0.821916937828064,
+                  2.4272725582122803,
+                  -0.19634661078453064
+                ],
+                "expected_armature": [
+                  0.8219174146652222,
+                  2.4272725582122803,
+                  -0.19634661078453064
+                ]
+              },
+              "bone_30": {
+                "error_world": 1.1444091796875e-05,
+                "error_armature": 4.76837158203125e-07,
+                "actual_world_unoffset": [
+                  409.2745056152344,
+                  24.038515090942383,
+                  103.71573638916016
+                ],
+                "actual_world_offset_corrected": [
+                  59.274505615234375,
+                  24.038515090942383,
+                  103.71573638916016
+                ],
+                "expected_world": [
+                  59.27451705932617,
+                  24.038515090942383,
+                  103.71573638916016
+                ],
+                "actual_armature": [
+                  1.364608645439148,
+                  2.3877272605895996,
+                  -0.5534112453460693
+                ],
+                "expected_armature": [
+                  1.3646091222763062,
+                  2.3877272605895996,
+                  -0.5534112453460693
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138361933642685,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 21.27561365737494
+          }
+        },
+        {
+          "time": 10.333333015441895,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 3.5762786865234375e-07,
+          "max_weighted_centroid_error_world": 7.2479248046875e-05,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 5.340576171875e-05,
+                "error_armature": 3.5762786865234375e-07,
+                "actual_world_unoffset": [
+                  362.4555358886719,
+                  2.9920494556427,
+                  135.930908203125
+                ],
+                "actual_world_offset_corrected": [
+                  12.455535888671875,
+                  2.9920494556427,
+                  135.930908203125
+                ],
+                "expected_world": [
+                  12.455589294433594,
+                  2.9920494556427,
+                  135.930908203125
+                ],
+                "actual_armature": [
+                  0.28675034642219543,
+                  3.129380464553833,
+                  -0.06888265907764435
+                ],
+                "expected_armature": [
+                  0.2867507040500641,
+                  3.129380464553833,
+                  -0.06888265907764435
+                ]
+              },
+              "bone_23": {
+                "error_world": 2.002716064453125e-05,
+                "error_armature": 2.980232238769531e-07,
+                "actual_world_unoffset": [
+                  365.88287353515625,
+                  -0.9982039332389832,
+                  137.5004425048828
+                ],
+                "actual_world_offset_corrected": [
+                  15.88287353515625,
+                  -0.9982039332389832,
+                  137.5004425048828
+                ],
+                "expected_world": [
+                  15.882893562316895,
+                  -0.9982039332389832,
+                  137.5004425048828
+                ],
+                "actual_armature": [
+                  0.36565324664115906,
+                  3.1655142307281494,
+                  0.02298036217689514
+                ],
+                "expected_armature": [
+                  0.36565354466438293,
+                  3.1655142307281494,
+                  0.02298036217689514
+                ]
+              },
+              "bone_25": {
+                "error_world": 5.53131103515625e-05,
+                "error_armature": 2.384185791015625e-07,
+                "actual_world_unoffset": [
+                  374.59063720703125,
+                  -7.152365207672119,
+                  148.54116821289062
+                ],
+                "actual_world_offset_corrected": [
+                  24.59063720703125,
+                  -7.152365207672119,
+                  148.54116821289062
+                ],
+                "expected_world": [
+                  24.5905818939209,
+                  -7.152365207672119,
+                  148.54116821289062
+                ],
+                "actual_armature": [
+                  0.5661203265190125,
+                  3.419691324234009,
+                  0.1646605283021927
+                ],
+                "expected_armature": [
+                  0.5661205649375916,
+                  3.419691324234009,
+                  0.1646605283021927
+                ]
+              },
+              "bone_27": {
+                "error_world": 7.2479248046875e-05,
+                "error_armature": 2.980232238769531e-07,
+                "actual_world_unoffset": [
+                  389.39801025390625,
+                  -34.774845123291016,
+                  145.4056854248047
+                ],
+                "actual_world_offset_corrected": [
+                  39.39801025390625,
+                  -34.774845123291016,
+                  145.4056854248047
+                ],
+                "expected_world": [
+                  39.3980827331543,
+                  -34.774845123291016,
+                  145.4056854248047
+                ],
+                "actual_armature": [
+                  0.9070165753364563,
+                  3.347508192062378,
+                  0.8005807995796204
+                ],
+                "expected_armature": [
+                  0.9070168733596802,
+                  3.347508192062378,
+                  0.8005807995796204
+                ]
+              },
+              "bone_29": {
+                "error_world": 3.4332275390625e-05,
+                "error_armature": 1.7881393432617188e-07,
+                "actual_world_unoffset": [
+                  381.9222106933594,
+                  -14.65948486328125,
+                  158.6045379638672
+                ],
+                "actual_world_offset_corrected": [
+                  31.922210693359375,
+                  -14.65948486328125,
+                  158.6045379638672
+                ],
+                "expected_world": [
+                  31.922176361083984,
+                  -14.65948486328125,
+                  158.6045379638672
+                ],
+                "actual_armature": [
+                  0.7349071502685547,
+                  3.65136981010437,
+                  0.3374882936477661
+                ],
+                "expected_armature": [
+                  0.734907329082489,
+                  3.65136981010437,
+                  0.3374882936477661
+                ]
+              },
+              "bone_30": {
+                "error_world": 3.814697265625e-06,
+                "error_armature": 3.5762786865234375e-07,
+                "actual_world_unoffset": [
+                  393.8322448730469,
+                  -38.046958923339844,
+                  139.75782775878906
+                ],
+                "actual_world_offset_corrected": [
+                  43.832244873046875,
+                  -38.046958923339844,
+                  139.75782775878906
+                ],
+                "expected_world": [
+                  43.83224105834961,
+                  -38.046958923339844,
+                  139.75782775878906
+                ],
+                "actual_armature": [
+                  1.0090986490249634,
+                  3.2174830436706543,
+                  0.8759112358093262
+                ],
+                "expected_armature": [
+                  1.009099006652832,
+                  3.2174830436706543,
+                  0.8759112358093262
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138354209183738,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 25.379207769584117
+          }
+        },
+        {
+          "time": 13.666666984558105,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 4.76837158203125e-07,
+          "max_weighted_centroid_error_world": 5.7220458984375e-05,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 5.7220458984375e-05,
+                "error_armature": 2.980232238769531e-07,
+                "actual_world_unoffset": [
+                  375.52001953125,
+                  -14.128978729248047,
+                  131.6702880859375
+                ],
+                "actual_world_offset_corrected": [
+                  25.52001953125,
+                  -14.128978729248047,
+                  131.6702880859375
+                ],
+                "expected_world": [
+                  25.519962310791016,
+                  -14.128978729248047,
+                  131.6702880859375
+                ],
+                "actual_armature": [
+                  0.5875166058540344,
+                  3.03129243850708,
+                  0.32527512311935425
+                ],
+                "expected_armature": [
+                  0.5875169038772583,
+                  3.03129243850708,
+                  0.32527512311935425
+                ]
+              },
+              "bone_23": {
+                "error_world": 1.71661376953125e-05,
+                "error_armature": 4.76837158203125e-07,
+                "actual_world_unoffset": [
+                  377.9117431640625,
+                  -10.185487747192383,
+                  129.0072479248047
+                ],
+                "actual_world_offset_corrected": [
+                  27.9117431640625,
+                  -10.185487747192383,
+                  129.0072479248047
+                ],
+                "expected_world": [
+                  27.911725997924805,
+                  -10.185487747192383,
+                  129.0072479248047
+                ],
+                "actual_armature": [
+                  0.6425790786743164,
+                  2.969984292984009,
+                  0.23448863625526428
+                ],
+                "expected_armature": [
+                  0.6425795555114746,
+                  2.969984292984009,
+                  0.23448863625526428
+                ]
+              },
+              "bone_25": {
+                "error_world": 4.76837158203125e-05,
+                "error_armature": 4.76837158203125e-07,
+                "actual_world_unoffset": [
+                  380.4554443359375,
+                  -0.4696900546550751,
+                  117.45093536376953
+                ],
+                "actual_world_offset_corrected": [
+                  30.4554443359375,
+                  -0.4696900546550751,
+                  117.45093536376953
+                ],
+                "expected_world": [
+                  30.45539665222168,
+                  -0.4696900546550751,
+                  117.45093536376953
+                ],
+                "actual_armature": [
+                  0.7011390924453735,
+                  2.7039377689361572,
+                  0.010813013650476933
+                ],
+                "expected_armature": [
+                  0.7011395692825317,
+                  2.7039377689361572,
+                  0.010813013650476933
+                ]
+              },
+              "bone_27": {
+                "error_world": 7.62939453125e-06,
+                "error_armature": 1.1920928955078125e-07,
+                "actual_world_unoffset": [
+                  404.5496826171875,
+                  18.5611515045166,
+                  108.91232299804688
+                ],
+                "actual_world_offset_corrected": [
+                  54.5496826171875,
+                  18.5611515045166,
+                  108.91232299804688
+                ],
+                "expected_world": [
+                  54.54969024658203,
+                  18.5611515045166,
+                  108.91232299804688
+                ],
+                "actual_armature": [
+                  1.2558344602584839,
+                  2.5073633193969727,
+                  -0.4273119866847992
+                ],
+                "expected_armature": [
+                  1.2558345794677734,
+                  2.5073633193969727,
+                  -0.4273119866847992
+                ]
+              },
+              "bone_29": {
+                "error_world": 1.52587890625e-05,
+                "error_armature": 1.1920928955078125e-07,
+                "actual_world_unoffset": [
+                  385.93035888671875,
+                  8.851213455200195,
+                  107.80785369873047
+                ],
+                "actual_world_offset_corrected": [
+                  35.93035888671875,
+                  8.851213455200195,
+                  107.80785369873047
+                ],
+                "expected_world": [
+                  35.93037414550781,
+                  8.851213455200195,
+                  107.80785369873047
+                ],
+                "actual_armature": [
+                  0.8271834254264832,
+                  2.48193621635437,
+                  -0.20377135276794434
+                ],
+                "expected_armature": [
+                  0.8271835446357727,
+                  2.48193621635437,
+                  -0.20377135276794434
+                ]
+              },
+              "bone_30": {
+                "error_world": 3.0517578125e-05,
+                "error_armature": 3.5762786865234375e-07,
+                "actual_world_unoffset": [
+                  410.30377197265625,
+                  23.792255401611328,
+                  107.14945983886719
+                ],
+                "actual_world_offset_corrected": [
+                  60.30377197265625,
+                  23.792255401611328,
+                  107.14945983886719
+                ],
+                "expected_world": [
+                  60.303741455078125,
+                  23.792255401611328,
+                  107.14945983886719
+                ],
+                "actual_armature": [
+                  1.3883031606674194,
+                  2.4667775630950928,
+                  -0.5477418899536133
+                ],
+                "expected_armature": [
+                  1.388303518295288,
+                  2.4667775630950928,
+                  -0.5477418899536133
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138347484866811,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 21.579531071696483
+          }
+        }
+      ]
+    },
+    {
+      "action": "sequence_15.003",
+      "slot_identifier": "OBArmature.004",
+      "preview_armature": "Waluigi_NativePreview_sequence_15_003",
+      "preview_meshes": [
+        "Waluigi_NativePreview_sequence_15_003_ARMTEST_29_0x75c1640_submesh0",
+        "Waluigi_NativePreview_sequence_15_003_ARMTEST_29_0x75c1640_submesh1"
+      ],
+      "animated_bone_count": 61,
+      "animated_bones": [
+        "bone_10",
+        "bone_13",
+        "bone_14",
+        "bone_15",
+        "bone_16",
+        "bone_19",
+        "bone_20",
+        "bone_22",
+        "bone_23",
+        "bone_24",
+        "bone_25",
+        "bone_26",
+        "bone_27",
+        "bone_29",
+        "bone_3",
+        "bone_30",
+        "bone_31",
+        "bone_32",
+        "bone_33",
+        "bone_35",
+        "bone_36",
+        "bone_37",
+        "bone_39",
+        "bone_40",
+        "bone_41",
+        "bone_43",
+        "bone_44",
+        "bone_45",
+        "bone_47",
+        "bone_48",
+        "bone_49",
+        "bone_5",
+        "bone_52",
+        "bone_53",
+        "bone_57",
+        "bone_58",
+        "bone_59",
+        "bone_60",
+        "bone_61",
+        "bone_62",
+        "bone_64",
+        "bone_65",
+        "bone_66",
+        "bone_67",
+        "bone_68",
+        "bone_7",
+        "bone_70",
+        "bone_71",
+        "bone_72",
+        "bone_74",
+        "bone_75",
+        "bone_76",
+        "bone_78",
+        "bone_79",
+        "bone_8",
+        "bone_80",
+        "bone_82",
+        "bone_83",
+        "bone_84",
+        "bone_86",
+        "bone_9"
+      ],
+      "finger_bones_animated": [
+        "bone_31",
+        "bone_32",
+        "bone_33",
+        "bone_35",
+        "bone_36",
+        "bone_37",
+        "bone_39",
+        "bone_40",
+        "bone_41",
+        "bone_43",
+        "bone_44",
+        "bone_45",
+        "bone_47",
+        "bone_48",
+        "bone_49"
+      ],
+      "offset_world": [
+        700.0,
+        0.0,
+        0.0
+      ],
+      "object_scale": [
+        43.4370002746582,
+        43.4370002746582,
+        43.4370002746582
+      ],
+      "source_object_transform": {
+        "matrix_world": [
+          [
+            43.4370002746582,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            -1.8986916074936744e-06,
+            -43.4370002746582,
+            0.0
+          ],
+          [
+            0.0,
+            43.4370002746582,
+            -1.8986916074936744e-06,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "location": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_euler": [
+          1.5707963705062866,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          43.4370002746582,
+          43.4370002746582,
+          43.4370002746582
+        ],
+        "parent": null
+      },
+      "preview_object_transform": {
+        "matrix_world": [
+          [
+            43.4370002746582,
+            0.0,
+            0.0,
+            700.0
+          ],
+          [
+            0.0,
+            -1.8986916074936744e-06,
+            -43.4370002746582,
+            0.0
+          ],
+          [
+            0.0,
+            43.4370002746582,
+            -1.8986916074936744e-06,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "location": [
+          700.0,
+          0.0,
+          0.0
+        ],
+        "rotation_euler": [
+          1.5707963705062866,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          43.4370002746582,
+          43.4370002746582,
+          43.4370002746582
+        ],
+        "parent": null,
+        "matrix_world_error_vs_offset_source": 0.0
+      },
+      "armature_data": {
+        "source": "123475520_waluigi.gpl.001",
+        "preview": "Waluigi_NativePreview_sequence_15_003_Data",
+        "rest_signature_matches": true
+      },
+      "action_binding": {
+        "action": "sequence_15.003",
+        "requested_action": "sequence_15.003",
+        "slot": "OBArmature.004",
+        "requested_slot": "OBArmature.004",
+        "slot_matches": true
+      },
+      "mesh_object_scales": {
+        "ARMTEST_29_0x75c1640_submesh0": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "ARMTEST_29_0x75c1640_submesh1": [
+          0.9999982118606567,
+          0.9999979734420776,
+          0.9999969601631165
+        ]
+      },
+      "mesh_relationships": [
+        {
+          "source": "ARMTEST_29_0x75c1640_submesh0",
+          "source_parent": "123475520_waluigi.gpl",
+          "preview": "Waluigi_NativePreview_sequence_15_003_ARMTEST_29_0x75c1640_submesh0",
+          "preview_parent": "Waluigi_NativePreview_sequence_15_003",
+          "source_matrix_world": [
+            [
+              43.4370002746582,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              -1.8986916074936744e-06,
+              -43.4370002746582,
+              0.0
+            ],
+            [
+              0.0,
+              43.4370002746582,
+              -1.8986916074936744e-06,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_matrix_world": [
+            [
+              43.4370002746582,
+              0.0,
+              0.0,
+              700.0
+            ],
+            [
+              0.0,
+              -1.8986916074936744e-06,
+              -43.4370002746582,
+              0.0
+            ],
+            [
+              0.0,
+              43.4370002746582,
+              -1.8986916074936744e-06,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_world_matrix_error_vs_offset_source": 0.0,
+          "source_armature_modifiers": [
+            "Waluigi_Arm_Test"
+          ],
+          "preview_armature_modifiers": [
+            "Waluigi_NativePreview_sequence_15_003"
+          ]
+        },
+        {
+          "source": "ARMTEST_29_0x75c1640_submesh1",
+          "source_parent": "123475520_waluigi.gpl",
+          "preview": "Waluigi_NativePreview_sequence_15_003_ARMTEST_29_0x75c1640_submesh1",
+          "preview_parent": "Waluigi_NativePreview_sequence_15_003",
+          "source_matrix_world": [
+            [
+              1.7841830413090065e-06,
+              43.436912536621094,
+              0.00013306319306138903,
+              4.620633626473136e-05
+            ],
+            [
+              14.856313705444336,
+              -0.0001256488321814686,
+              40.817298889160156,
+              -1.4951205253601074
+            ],
+            [
+              40.817352294921875,
+              4.3833788367919624e-05,
+              -14.856295585632324,
+              141.2239990234375
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_matrix_world": [
+            [
+              1.7841830413090065e-06,
+              43.436912536621094,
+              0.00013306319306138903,
+              700.0000610351562
+            ],
+            [
+              14.856313705444336,
+              -0.0001256488321814686,
+              40.817298889160156,
+              -1.4951205253601074
+            ],
+            [
+              40.817352294921875,
+              4.3833788367919624e-05,
+              -14.856295585632324,
+              141.2239990234375
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_world_matrix_error_vs_offset_source": 0.0,
+          "source_armature_modifiers": [
+            "Waluigi_Arm_Test"
+          ],
+          "preview_armature_modifiers": [
+            "Waluigi_NativePreview_sequence_15_003"
+          ]
+        }
+      ],
+      "max_matrix_error": 0.0,
+      "max_basis_error": 0.0,
+      "max_centroid_error_armature": 1.0132789611816406e-06,
+      "max_centroid_error_world": 0.00022172927856445312,
+      "first_bone_mismatch": null,
+      "first_mesh_mismatch": null,
+      "max_pose_scale_deviation": 0.0,
+      "runtime_constraint_count": 0,
+      "samples": [
+        {
+          "time": 0.0,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 7.748603820800781e-07,
+          "max_weighted_centroid_error_world": 0.000133514404296875,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 0.0001049041748046875,
+                "error_armature": 5.066394805908203e-07,
+                "actual_world_unoffset": [
+                  717.3763427734375,
+                  25.12541389465332,
+                  144.60719299316406
+                ],
+                "actual_world_offset_corrected": [
+                  17.3763427734375,
+                  25.12541389465332,
+                  144.60719299316406
+                ],
+                "expected_world": [
+                  17.376237869262695,
+                  25.12541389465332,
+                  144.60719299316406
+                ],
+                "actual_armature": [
+                  0.4000324606895447,
+                  3.329125165939331,
+                  -0.5784335732460022
+                ],
+                "expected_armature": [
+                  0.40003296732902527,
+                  3.329125165939331,
+                  -0.5784335732460022
+                ]
+              },
+              "bone_23": {
+                "error_world": 3.814697265625e-05,
+                "error_armature": 6.556510925292969e-07,
+                "actual_world_unoffset": [
+                  719.0746459960938,
+                  24.109119415283203,
+                  140.08099365234375
+                ],
+                "actual_world_offset_corrected": [
+                  19.07464599609375,
+                  24.109119415283203,
+                  140.08099365234375
+                ],
+                "expected_world": [
+                  19.074607849121094,
+                  24.109119415283203,
+                  140.08099365234375
+                ],
+                "actual_armature": [
+                  0.43913203477859497,
+                  3.2249231338500977,
+                  -0.5550366044044495
+                ],
+                "expected_armature": [
+                  0.4391326904296875,
+                  3.2249231338500977,
+                  -0.5550366044044495
+                ]
+              },
+              "bone_25": {
+                "error_world": 5.7220458984375e-06,
+                "error_armature": 6.556510925292969e-07,
+                "actual_world_unoffset": [
+                  725.315185546875,
+                  16.61542510986328,
+                  128.35580444335938
+                ],
+                "actual_world_offset_corrected": [
+                  25.315185546875,
+                  16.61542510986328,
+                  128.35580444335938
+                ],
+                "expected_world": [
+                  25.3151912689209,
+                  16.61542510986328,
+                  128.35580444335938
+                ],
+                "actual_armature": [
+                  0.5828017592430115,
+                  2.954987049102783,
+                  -0.38251787424087524
+                ],
+                "expected_armature": [
+                  0.582802414894104,
+                  2.954987049102783,
+                  -0.38251787424087524
+                ]
+              },
+              "bone_27": {
+                "error_world": 0.000133514404296875,
+                "error_armature": 7.152557373046875e-07,
+                "actual_world_unoffset": [
+                  728.11669921875,
+                  -6.898149490356445,
+                  118.59501647949219
+                ],
+                "actual_world_offset_corrected": [
+                  28.11669921875,
+                  -6.898149490356445,
+                  118.59501647949219
+                ],
+                "expected_world": [
+                  28.116565704345703,
+                  -6.898149490356445,
+                  118.59501647949219
+                ],
+                "actual_armature": [
+                  0.6472946405410767,
+                  2.730276107788086,
+                  0.15880802273750305
+                ],
+                "expected_armature": [
+                  0.647295355796814,
+                  2.730276107788086,
+                  0.15880802273750305
+                ]
+              },
+              "bone_29": {
+                "error_world": 6.866455078125e-05,
+                "error_armature": 7.748603820800781e-07,
+                "actual_world_unoffset": [
+                  732.323974609375,
+                  10.306114196777344,
+                  117.32622528076172
+                ],
+                "actual_world_offset_corrected": [
+                  32.323974609375,
+                  10.306114196777344,
+                  117.32622528076172
+                ],
+                "expected_world": [
+                  32.32390594482422,
+                  10.306114196777344,
+                  117.32622528076172
+                ],
+                "actual_armature": [
+                  0.7441554069519043,
+                  2.701066255569458,
+                  -0.23726588487625122
+                ],
+                "expected_armature": [
+                  0.7441561818122864,
+                  2.701066255569458,
+                  -0.23726588487625122
+                ]
+              },
+              "bone_30": {
+                "error_world": 4.1961669921875e-05,
+                "error_armature": 7.152557373046875e-07,
+                "actual_world_unoffset": [
+                  723.29052734375,
+                  -13.029803276062012,
+                  119.7413101196289
+                ],
+                "actual_world_offset_corrected": [
+                  23.29052734375,
+                  -13.029803276062012,
+                  119.7413101196289
+                ],
+                "expected_world": [
+                  23.290569305419922,
+                  -13.029803276062012,
+                  119.7413101196289
+                ],
+                "actual_armature": [
+                  0.5361911058425903,
+                  2.7566654682159424,
+                  0.29996997117996216
+                ],
+                "expected_armature": [
+                  0.5361918210983276,
+                  2.7566654682159424,
+                  0.29996997117996216
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.1383749647003585,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 18.111736426702514
+          }
+        },
+        {
+          "time": 1.3333333730697632,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 1.0132789611816406e-06,
+          "max_weighted_centroid_error_world": 6.866455078125e-05,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 1.9073486328125e-06,
+                "error_armature": 4.76837158203125e-07,
+                "actual_world_unoffset": [
+                  716.5804443359375,
+                  58.61275100708008,
+                  148.10365295410156
+                ],
+                "actual_world_offset_corrected": [
+                  16.5804443359375,
+                  58.61275100708008,
+                  148.10365295410156
+                ],
+                "expected_world": [
+                  16.580442428588867,
+                  58.61275100708008,
+                  148.10365295410156
+                ],
+                "actual_armature": [
+                  0.3817119300365448,
+                  3.409619092941284,
+                  -1.3493735790252686
+                ],
+                "expected_armature": [
+                  0.381712406873703,
+                  3.409619092941284,
+                  -1.3493735790252686
+                ]
+              },
+              "bone_23": {
+                "error_world": 0.0,
+                "error_armature": 5.364418029785156e-07,
+                "actual_world_unoffset": [
+                  720.4441528320312,
+                  54.899200439453125,
+                  148.75637817382812
+                ],
+                "actual_world_offset_corrected": [
+                  20.44415283203125,
+                  54.899200439453125,
+                  148.75637817382812
+                ],
+                "expected_world": [
+                  20.44415283203125,
+                  54.899200439453125,
+                  148.75637817382812
+                ],
+                "actual_armature": [
+                  0.47066155076026917,
+                  3.4246461391448975,
+                  -1.2638812065124512
+                ],
+                "expected_armature": [
+                  0.47066208720207214,
+                  3.4246461391448975,
+                  -1.2638812065124512
+                ]
+              },
+              "bone_25": {
+                "error_world": 5.14984130859375e-05,
+                "error_armature": 9.5367431640625e-07,
+                "actual_world_unoffset": [
+                  730.7361450195312,
+                  44.015743255615234,
+                  148.10154724121094
+                ],
+                "actual_world_offset_corrected": [
+                  30.73614501953125,
+                  44.015743255615234,
+                  148.10154724121094
+                ],
+                "expected_world": [
+                  30.736093521118164,
+                  44.015743255615234,
+                  148.10154724121094
+                ],
+                "actual_armature": [
+                  0.7076007723808289,
+                  3.4095706939697266,
+                  -1.0133237838745117
+                ],
+                "expected_armature": [
+                  0.7076017260551453,
+                  3.4095706939697266,
+                  -1.0133237838745117
+                ]
+              },
+              "bone_27": {
+                "error_world": 6.866455078125e-05,
+                "error_armature": 2.980232238769531e-07,
+                "actual_world_unoffset": [
+                  734.1034545898438,
+                  24.396156311035156,
+                  135.89404296875
+                ],
+                "actual_world_offset_corrected": [
+                  34.10345458984375,
+                  24.396156311035156,
+                  135.89404296875
+                ],
+                "expected_world": [
+                  34.10352325439453,
+                  24.396156311035156,
+                  135.89404296875
+                ],
+                "actual_armature": [
+                  0.7851258516311646,
+                  3.1285314559936523,
+                  -0.5616446733474731
+                ],
+                "expected_armature": [
+                  0.7851261496543884,
+                  3.1285314559936523,
+                  -0.5616446733474731
+                ]
+              },
+              "bone_29": {
+                "error_world": 1.52587890625e-05,
+                "error_armature": 4.172325134277344e-07,
+                "actual_world_unoffset": [
+                  740.52294921875,
+                  33.5772705078125,
+                  150.2346954345703
+                ],
+                "actual_world_offset_corrected": [
+                  40.52294921875,
+                  33.5772705078125,
+                  150.2346954345703
+                ],
+                "expected_world": [
+                  40.52293395996094,
+                  33.5772705078125,
+                  150.2346954345703
+                ],
+                "actual_armature": [
+                  0.9329126477241516,
+                  3.458681106567383,
+                  -0.7730109095573425
+                ],
+                "expected_armature": [
+                  0.932913064956665,
+                  3.458681106567383,
+                  -0.7730109095573425
+                ]
+              },
+              "bone_30": {
+                "error_world": 4.57763671875e-05,
+                "error_armature": 1.0132789611816406e-06,
+                "actual_world_unoffset": [
+                  734.0184936523438,
+                  28.388813018798828,
+                  129.1707763671875
+                ],
+                "actual_world_offset_corrected": [
+                  34.01849365234375,
+                  28.388813018798828,
+                  129.1707763671875
+                ],
+                "expected_world": [
+                  34.01844787597656,
+                  28.388813018798828,
+                  129.1707763671875
+                ],
+                "actual_armature": [
+                  0.7831670641899109,
+                  2.9737496376037598,
+                  -0.6535630822181702
+                ],
+                "expected_armature": [
+                  0.7831680774688721,
+                  2.9737496376037598,
+                  -0.6535630822181702
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138344528107072,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 18.384118133882488
+          }
+        },
+        {
+          "time": 2.5,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 7.450580596923828e-07,
+          "max_weighted_centroid_error_world": 8.392333984375e-05,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 1.7642974853515625e-05,
+                "error_armature": 6.258487701416016e-07,
+                "actual_world_unoffset": [
+                  707.1356811523438,
+                  53.320255279541016,
+                  160.6415252685547
+                ],
+                "actual_world_offset_corrected": [
+                  7.13568115234375,
+                  53.320255279541016,
+                  160.6415252685547
+                ],
+                "expected_world": [
+                  7.1356987953186035,
+                  53.320255279541016,
+                  160.6415252685547
+                ],
+                "actual_armature": [
+                  0.1642763316631317,
+                  3.6982638835906982,
+                  -1.227530837059021
+                ],
+                "expected_armature": [
+                  0.16427695751190186,
+                  3.6982638835906982,
+                  -1.227530837059021
+                ]
+              },
+              "bone_23": {
+                "error_world": 7.05718994140625e-05,
+                "error_armature": 7.301568984985352e-07,
+                "actual_world_unoffset": [
+                  708.5173950195312,
+                  50.60226821899414,
+                  156.3990020751953
+                ],
+                "actual_world_offset_corrected": [
+                  8.51739501953125,
+                  50.60226821899414,
+                  156.3990020751953
+                ],
+                "expected_world": [
+                  8.517465591430664,
+                  50.60226821899414,
+                  156.3990020751953
+                ],
+                "actual_armature": [
+                  0.1960870921611786,
+                  3.6005935668945312,
+                  -1.164957880973816
+                ],
+                "expected_armature": [
+                  0.1960878223180771,
+                  3.6005935668945312,
+                  -1.164957880973816
+                ]
+              },
+              "bone_25": {
+                "error_world": 5.626678466796875e-05,
+                "error_armature": 7.450580596923828e-07,
+                "actual_world_unoffset": [
+                  713.9304809570312,
+                  55.58283615112305,
+                  141.51785278320312
+                ],
+                "actual_world_offset_corrected": [
+                  13.93048095703125,
+                  55.58283615112305,
+                  141.51785278320312
+                ],
+                "expected_world": [
+                  13.930424690246582,
+                  55.58283615112305,
+                  141.51785278320312
+                ],
+                "actual_armature": [
+                  0.32070332765579224,
+                  3.258002758026123,
+                  -1.2796199321746826
+                ],
+                "expected_armature": [
+                  0.32070407271385193,
+                  3.258002758026123,
+                  -1.2796199321746826
+                ]
+              },
+              "bone_27": {
+                "error_world": 3.814697265625e-05,
+                "error_armature": 5.21540641784668e-07,
+                "actual_world_unoffset": [
+                  709.4788818359375,
+                  46.62834930419922,
+                  114.60780334472656
+                ],
+                "actual_world_offset_corrected": [
+                  9.4788818359375,
+                  46.62834930419922,
+                  114.60780334472656
+                ],
+                "expected_world": [
+                  9.478843688964844,
+                  46.62834930419922,
+                  114.60780334472656
+                ],
+                "actual_armature": [
+                  0.21821996569633484,
+                  2.6384835243225098,
+                  -1.0734705924987793
+                ],
+                "expected_armature": [
+                  0.21822048723697662,
+                  2.6384835243225098,
+                  -1.0734705924987793
+                ]
+              },
+              "bone_29": {
+                "error_world": 8.392333984375e-05,
+                "error_armature": 6.854534149169922e-07,
+                "actual_world_unoffset": [
+                  718.8626708984375,
+                  56.100528717041016,
+                  127.74392700195312
+                ],
+                "actual_world_offset_corrected": [
+                  18.8626708984375,
+                  56.100528717041016,
+                  127.74392700195312
+                ],
+                "expected_world": [
+                  18.862586975097656,
+                  56.100528717041016,
+                  127.74392700195312
+                ],
+                "actual_armature": [
+                  0.4342508912086487,
+                  2.940901279449463,
+                  -1.2915380001068115
+                ],
+                "expected_armature": [
+                  0.4342515766620636,
+                  2.940901279449463,
+                  -1.2915380001068115
+                ]
+              },
+              "bone_30": {
+                "error_world": 8.0108642578125e-05,
+                "error_armature": 6.109476089477539e-07,
+                "actual_world_unoffset": [
+                  707.75244140625,
+                  51.65857696533203,
+                  108.71577453613281
+                ],
+                "actual_world_offset_corrected": [
+                  7.75244140625,
+                  51.65857696533203,
+                  108.71577453613281
+                ],
+                "expected_world": [
+                  7.752521514892578,
+                  51.65857696533203,
+                  108.71577453613281
+                ],
+                "actual_armature": [
+                  0.1784767210483551,
+                  2.502837657928467,
+                  -1.189275860786438
+                ],
+                "expected_armature": [
+                  0.17847733199596405,
+                  2.502837657928467,
+                  -1.189275860786438
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138365002061139,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 19.42629181286621
+          }
+        },
+        {
+          "time": 3.6666667461395264,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 8.791685104370117e-07,
+          "max_weighted_centroid_error_world": 0.00010609626770019531,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 6.008148193359375e-05,
+                "error_armature": 6.109476089477539e-07,
+                "actual_world_unoffset": [
+                  691.5130004882812,
+                  82.6897964477539,
+                  139.23562622070312
+                ],
+                "actual_world_offset_corrected": [
+                  -8.48699951171875,
+                  82.6897964477539,
+                  139.23562622070312
+                ],
+                "expected_world": [
+                  -8.487059593200684,
+                  82.6897964477539,
+                  139.23562622070312
+                ],
+                "actual_armature": [
+                  -0.19538834691047668,
+                  3.205460786819458,
+                  -1.9036725759506226
+                ],
+                "expected_armature": [
+                  -0.19538773596286774,
+                  3.205460786819458,
+                  -1.9036725759506226
+                ]
+              },
+              "bone_23": {
+                "error_world": 1.049041748046875e-05,
+                "error_armature": 5.662441253662109e-07,
+                "actual_world_unoffset": [
+                  692.31396484375,
+                  84.84244537353516,
+                  134.6131134033203
+                ],
+                "actual_world_offset_corrected": [
+                  -7.68603515625,
+                  84.84244537353516,
+                  134.6131134033203
+                ],
+                "expected_world": [
+                  -7.6860456466674805,
+                  84.84244537353516,
+                  134.6131134033203
+                ],
+                "actual_armature": [
+                  -0.17694750428199768,
+                  3.099043369293213,
+                  -1.9532300233840942
+                ],
+                "expected_armature": [
+                  -0.17694693803787231,
+                  3.099043369293213,
+                  -1.9532300233840942
+                ]
+              },
+              "bone_25": {
+                "error_world": 3.6716461181640625e-05,
+                "error_armature": 4.76837158203125e-07,
+                "actual_world_unoffset": [
+                  692.8927612304688,
+                  102.2581558227539,
+                  136.64703369140625
+                ],
+                "actual_world_offset_corrected": [
+                  -7.10723876953125,
+                  102.2581558227539,
+                  136.64703369140625
+                ],
+                "expected_world": [
+                  -7.107202053070068,
+                  102.2581558227539,
+                  136.64703369140625
+                ],
+                "actual_armature": [
+                  -0.1636214256286621,
+                  3.145867347717285,
+                  -2.3541717529296875
+                ],
+                "expected_armature": [
+                  -0.1636209487915039,
+                  3.145867347717285,
+                  -2.3541717529296875
+                ]
+              },
+              "bone_27": {
+                "error_world": 0.00010609626770019531,
+                "error_armature": 8.791685104370117e-07,
+                "actual_world_unoffset": [
+                  701.5581665039062,
+                  119.75272369384766,
+                  110.67028045654297
+                ],
+                "actual_world_offset_corrected": [
+                  1.55816650390625,
+                  119.75272369384766,
+                  110.67028045654297
+                ],
+                "expected_world": [
+                  1.5582726001739502,
+                  119.75272369384766,
+                  110.67028045654297
+                ],
+                "actual_armature": [
+                  0.03587343543767929,
+                  2.5478341579437256,
+                  -2.7569286823272705
+                ],
+                "expected_armature": [
+                  0.03587431460618973,
+                  2.5478341579437256,
+                  -2.7569286823272705
+                ]
+              },
+              "bone_29": {
+                "error_world": 4.2438507080078125e-05,
+                "error_armature": 6.705522537231445e-07,
+                "actual_world_unoffset": [
+                  694.5054931640625,
+                  116.85533905029297,
+                  134.87875366210938
+                ],
+                "actual_world_offset_corrected": [
+                  -5.4945068359375,
+                  116.85533905029297,
+                  134.87875366210938
+                ],
+                "expected_world": [
+                  -5.49446439743042,
+                  116.85533905029297,
+                  134.87875366210938
+                ],
+                "actual_armature": [
+                  -0.1264934092760086,
+                  3.105159044265747,
+                  -2.690225839614868
+                ],
+                "expected_armature": [
+                  -0.12649273872375488,
+                  3.105159044265747,
+                  -2.690225839614868
+                ]
+              },
+              "bone_30": {
+                "error_world": 7.009506225585938e-05,
+                "error_armature": 7.450580596923828e-07,
+                "actual_world_unoffset": [
+                  704.6607666015625,
+                  126.62393951416016,
+                  108.06720733642578
+                ],
+                "actual_world_offset_corrected": [
+                  4.6607666015625,
+                  126.62393951416016,
+                  108.06720733642578
+                ],
+                "expected_world": [
+                  4.660836696624756,
+                  126.62393951416016,
+                  108.06720733642578
+                ],
+                "actual_armature": [
+                  0.10730031132698059,
+                  2.4879066944122314,
+                  -2.915116548538208
+                ],
+                "expected_armature": [
+                  0.10730105638504028,
+                  2.4879066944122314,
+                  -2.915116548538208
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138344460135567,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 25.535018437343236
+          }
+        },
+        {
+          "time": 5.0,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 6.92903995513916e-07,
+          "max_weighted_centroid_error_world": 0.00022172927856445312,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 0.00010919570922851562,
+                "error_armature": 6.407499313354492e-07,
+                "actual_world_unoffset": [
+                  692.2969970703125,
+                  95.91654968261719,
+                  148.06752014160156
+                ],
+                "actual_world_offset_corrected": [
+                  -7.7030029296875,
+                  95.91654968261719,
+                  148.06752014160156
+                ],
+                "expected_world": [
+                  -7.7028937339782715,
+                  95.91654968261719,
+                  148.06752014160156
+                ],
+                "actual_armature": [
+                  -0.1773354858160019,
+                  3.4087884426116943,
+                  -2.208176612854004
+                ],
+                "expected_armature": [
+                  -0.17733484506607056,
+                  3.4087884426116943,
+                  -2.208176612854004
+                ]
+              },
+              "bone_23": {
+                "error_world": 8.106231689453125e-06,
+                "error_armature": 6.854534149169922e-07,
+                "actual_world_unoffset": [
+                  692.004638671875,
+                  98.24275970458984,
+                  143.82838439941406
+                ],
+                "actual_world_offset_corrected": [
+                  -7.995361328125,
+                  98.24275970458984,
+                  143.82838439941406
+                ],
+                "expected_world": [
+                  -7.9953532218933105,
+                  98.24275970458984,
+                  143.82838439941406
+                ],
+                "actual_armature": [
+                  -0.1840684860944748,
+                  3.311194658279419,
+                  -2.2617299556732178
+                ],
+                "expected_armature": [
+                  -0.18406780064105988,
+                  3.311194658279419,
+                  -2.2617299556732178
+                ]
+              },
+              "bone_25": {
+                "error_world": 3.1113624572753906e-05,
+                "error_armature": 5.476176738739014e-07,
+                "actual_world_unoffset": [
+                  698.1611328125,
+                  114.91051483154297,
+                  147.2567138671875
+                ],
+                "actual_world_offset_corrected": [
+                  -1.8388671875,
+                  114.91051483154297,
+                  147.2567138671875
+                ],
+                "expected_world": [
+                  -1.8388983011245728,
+                  114.91051483154297,
+                  147.2567138671875
+                ],
+                "actual_armature": [
+                  -0.042335394769907,
+                  3.390122175216675,
+                  -2.6454522609710693
+                ],
+                "expected_armature": [
+                  -0.042334847152233124,
+                  3.390122175216675,
+                  -2.6454522609710693
+                ]
+              },
+              "bone_27": {
+                "error_world": 0.00022172927856445312,
+                "error_armature": 5.066394805908203e-07,
+                "actual_world_unoffset": [
+                  696.3002319335938,
+                  134.69618225097656,
+                  121.57540893554688
+                ],
+                "actual_world_offset_corrected": [
+                  -3.69976806640625,
+                  134.69618225097656,
+                  121.57540893554688
+                ],
+                "expected_world": [
+                  -3.6999897956848145,
+                  134.69618225097656,
+                  121.57540893554688
+                ],
+                "actual_armature": [
+                  -0.0851811021566391,
+                  2.7988905906677246,
+                  -3.10095477104187
+                ],
+                "expected_armature": [
+                  -0.08518059551715851,
+                  2.7988905906677246,
+                  -3.10095477104187
+                ]
+              },
+              "bone_29": {
+                "error_world": 6.175041198730469e-05,
+                "error_armature": 6.92903995513916e-07,
+                "actual_world_unoffset": [
+                  702.8536376953125,
+                  129.01412963867188,
+                  146.509033203125
+                ],
+                "actual_world_offset_corrected": [
+                  2.8536376953125,
+                  129.01412963867188,
+                  146.509033203125
+                ],
+                "expected_world": [
+                  2.8536994457244873,
+                  129.01412963867188,
+                  146.509033203125
+                ],
+                "actual_armature": [
+                  0.06569674611091614,
+                  3.372907876968384,
+                  -2.970144033432007
+                ],
+                "expected_armature": [
+                  0.06569743901491165,
+                  3.372907876968384,
+                  -2.970144033432007
+                ]
+              },
+              "bone_30": {
+                "error_world": 8.821487426757812e-06,
+                "error_armature": 5.364418029785156e-07,
+                "actual_world_unoffset": [
+                  697.1611938476562,
+                  139.1862335205078,
+                  115.03388977050781
+                ],
+                "actual_world_offset_corrected": [
+                  -2.83880615234375,
+                  139.1862335205078,
+                  115.03388977050781
+                ],
+                "expected_world": [
+                  -2.8387973308563232,
+                  139.1862335205078,
+                  115.03388977050781
+                ],
+                "actual_armature": [
+                  -0.06535488367080688,
+                  2.6482930183410645,
+                  -3.2043232917785645
+                ],
+                "expected_armature": [
+                  -0.0653543472290039,
+                  2.6482930183410645,
+                  -3.2043232917785645
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138361896015708,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 26.3360627928735
+          }
+        }
+      ]
+    },
+    {
+      "action": "sequence_24",
+      "slot_identifier": "OBArmature.004",
+      "preview_armature": "Waluigi_NativePreview_sequence_24",
+      "preview_meshes": [
+        "Waluigi_NativePreview_sequence_24_ARMTEST_29_0x75c1640_submesh0",
+        "Waluigi_NativePreview_sequence_24_ARMTEST_29_0x75c1640_submesh1"
+      ],
+      "animated_bone_count": 61,
+      "animated_bones": [
+        "bone_10",
+        "bone_13",
+        "bone_14",
+        "bone_15",
+        "bone_16",
+        "bone_19",
+        "bone_20",
+        "bone_22",
+        "bone_23",
+        "bone_24",
+        "bone_25",
+        "bone_26",
+        "bone_27",
+        "bone_29",
+        "bone_3",
+        "bone_30",
+        "bone_31",
+        "bone_32",
+        "bone_33",
+        "bone_35",
+        "bone_36",
+        "bone_37",
+        "bone_39",
+        "bone_40",
+        "bone_41",
+        "bone_43",
+        "bone_44",
+        "bone_45",
+        "bone_47",
+        "bone_48",
+        "bone_49",
+        "bone_5",
+        "bone_52",
+        "bone_53",
+        "bone_57",
+        "bone_58",
+        "bone_59",
+        "bone_60",
+        "bone_61",
+        "bone_62",
+        "bone_64",
+        "bone_65",
+        "bone_66",
+        "bone_67",
+        "bone_68",
+        "bone_7",
+        "bone_70",
+        "bone_71",
+        "bone_72",
+        "bone_74",
+        "bone_75",
+        "bone_76",
+        "bone_78",
+        "bone_79",
+        "bone_8",
+        "bone_80",
+        "bone_82",
+        "bone_83",
+        "bone_84",
+        "bone_86",
+        "bone_9"
+      ],
+      "finger_bones_animated": [
+        "bone_31",
+        "bone_32",
+        "bone_33",
+        "bone_35",
+        "bone_36",
+        "bone_37",
+        "bone_39",
+        "bone_40",
+        "bone_41",
+        "bone_43",
+        "bone_44",
+        "bone_45",
+        "bone_47",
+        "bone_48",
+        "bone_49"
+      ],
+      "offset_world": [
+        1050.0,
+        0.0,
+        0.0
+      ],
+      "object_scale": [
+        43.4370002746582,
+        43.4370002746582,
+        43.4370002746582
+      ],
+      "source_object_transform": {
+        "matrix_world": [
+          [
+            43.4370002746582,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            -1.8986916074936744e-06,
+            -43.4370002746582,
+            0.0
+          ],
+          [
+            0.0,
+            43.4370002746582,
+            -1.8986916074936744e-06,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "location": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_euler": [
+          1.5707963705062866,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          43.4370002746582,
+          43.4370002746582,
+          43.4370002746582
+        ],
+        "parent": null
+      },
+      "preview_object_transform": {
+        "matrix_world": [
+          [
+            43.4370002746582,
+            0.0,
+            0.0,
+            1050.0
+          ],
+          [
+            0.0,
+            -1.8986916074936744e-06,
+            -43.4370002746582,
+            0.0
+          ],
+          [
+            0.0,
+            43.4370002746582,
+            -1.8986916074936744e-06,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "location": [
+          1050.0,
+          0.0,
+          0.0
+        ],
+        "rotation_euler": [
+          1.5707963705062866,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          43.4370002746582,
+          43.4370002746582,
+          43.4370002746582
+        ],
+        "parent": null,
+        "matrix_world_error_vs_offset_source": 0.0
+      },
+      "armature_data": {
+        "source": "123475520_waluigi.gpl.001",
+        "preview": "Waluigi_NativePreview_sequence_24_Data",
+        "rest_signature_matches": true
+      },
+      "action_binding": {
+        "action": "sequence_24",
+        "requested_action": "sequence_24",
+        "slot": "OBArmature.004",
+        "requested_slot": "OBArmature.004",
+        "slot_matches": true
+      },
+      "mesh_object_scales": {
+        "ARMTEST_29_0x75c1640_submesh0": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "ARMTEST_29_0x75c1640_submesh1": [
+          0.9999982118606567,
+          0.9999979734420776,
+          0.9999969601631165
+        ]
+      },
+      "mesh_relationships": [
+        {
+          "source": "ARMTEST_29_0x75c1640_submesh0",
+          "source_parent": "123475520_waluigi.gpl",
+          "preview": "Waluigi_NativePreview_sequence_24_ARMTEST_29_0x75c1640_submesh0",
+          "preview_parent": "Waluigi_NativePreview_sequence_24",
+          "source_matrix_world": [
+            [
+              43.4370002746582,
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              -1.8986916074936744e-06,
+              -43.4370002746582,
+              0.0
+            ],
+            [
+              0.0,
+              43.4370002746582,
+              -1.8986916074936744e-06,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_matrix_world": [
+            [
+              43.4370002746582,
+              0.0,
+              0.0,
+              1050.0
+            ],
+            [
+              0.0,
+              -1.8986916074936744e-06,
+              -43.4370002746582,
+              0.0
+            ],
+            [
+              0.0,
+              43.4370002746582,
+              -1.8986916074936744e-06,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_world_matrix_error_vs_offset_source": 0.0,
+          "source_armature_modifiers": [
+            "Waluigi_Arm_Test"
+          ],
+          "preview_armature_modifiers": [
+            "Waluigi_NativePreview_sequence_24"
+          ]
+        },
+        {
+          "source": "ARMTEST_29_0x75c1640_submesh1",
+          "source_parent": "123475520_waluigi.gpl",
+          "preview": "Waluigi_NativePreview_sequence_24_ARMTEST_29_0x75c1640_submesh1",
+          "preview_parent": "Waluigi_NativePreview_sequence_24",
+          "source_matrix_world": [
+            [
+              1.7841830413090065e-06,
+              43.436912536621094,
+              0.00013306319306138903,
+              4.620633626473136e-05
+            ],
+            [
+              14.856313705444336,
+              -0.0001256488321814686,
+              40.817298889160156,
+              -1.4951205253601074
+            ],
+            [
+              40.817352294921875,
+              4.3833788367919624e-05,
+              -14.856295585632324,
+              141.2239990234375
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_matrix_world": [
+            [
+              1.7841830413090065e-06,
+              43.436912536621094,
+              0.00013306319306138903,
+              1050.0
+            ],
+            [
+              14.856313705444336,
+              -0.0001256488321814686,
+              40.817298889160156,
+              -1.4951205253601074
+            ],
+            [
+              40.817352294921875,
+              4.3833788367919624e-05,
+              -14.856295585632324,
+              141.2239990234375
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "preview_world_matrix_error_vs_offset_source": 0.0,
+          "source_armature_modifiers": [
+            "Waluigi_Arm_Test"
+          ],
+          "preview_armature_modifiers": [
+            "Waluigi_NativePreview_sequence_24"
+          ]
+        }
+      ],
+      "max_matrix_error": 0.0,
+      "max_basis_error": 0.0,
+      "max_centroid_error_armature": 5.131627613700064e-06,
+      "max_centroid_error_world": 0.0004415337000891673,
+      "first_bone_mismatch": null,
+      "first_mesh_mismatch": null,
+      "max_pose_scale_deviation": 0.0,
+      "runtime_constraint_count": 0,
+      "samples": [
+        {
+          "time": 0.0,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 4.243666532356158e-06,
+          "max_weighted_centroid_error_world": 0.0004415337000891673,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 0.00010689052359513107,
+                "error_armature": 3.4340307108358084e-06,
+                "actual_world_unoffset": [
+                  1053.6676025390625,
+                  -16.890859603881836,
+                  134.40097045898438
+                ],
+                "actual_world_offset_corrected": [
+                  3.6676025390625,
+                  -16.890859603881836,
+                  134.40097045898438
+                ],
+                "expected_world": [
+                  3.6675217151641846,
+                  -16.890796661376953,
+                  134.40093994140625
+                ],
+                "actual_armature": [
+                  0.08443013578653336,
+                  3.094158172607422,
+                  0.3888586759567261
+                ],
+                "expected_armature": [
+                  0.08443313091993332,
+                  3.0941574573516846,
+                  0.3888571560382843
+                ]
+              },
+              "bone_23": {
+                "error_world": 0.00010349014256477765,
+                "error_armature": 2.707791516943182e-06,
+                "actual_world_unoffset": [
+                  1058.1966552734375,
+                  -19.5593204498291,
+                  136.18771362304688
+                ],
+                "actual_world_offset_corrected": [
+                  8.1966552734375,
+                  -19.5593204498291,
+                  136.18771362304688
+                ],
+                "expected_world": [
+                  8.196746826171875,
+                  -19.559274673461914,
+                  136.1876983642578
+                ],
+                "actual_armature": [
+                  0.18870197236537933,
+                  3.1352927684783936,
+                  0.45029154419898987
+                ],
+                "expected_armature": [
+                  0.18870428204536438,
+                  3.135291814804077,
+                  0.4502905011177063
+                ]
+              },
+              "bone_25": {
+                "error_world": 4.059562044867089e-05,
+                "error_armature": 2.351930100554092e-06,
+                "actual_world_unoffset": [
+                  1073.1986083984375,
+                  -21.634750366210938,
+                  138.97056579589844
+                ],
+                "actual_world_offset_corrected": [
+                  23.1986083984375,
+                  -21.634750366210938,
+                  138.97056579589844
+                ],
+                "expected_world": [
+                  23.198640823364258,
+                  -21.63473129272461,
+                  138.97055053710938
+                ],
+                "actual_armature": [
+                  0.5340732336044312,
+                  3.199359655380249,
+                  0.4980718493461609
+                ],
+                "expected_armature": [
+                  0.5340754985809326,
+                  3.199359178543091,
+                  0.49807143211364746
+                ]
+              },
+              "bone_27": {
+                "error_world": 8.665326455383718e-05,
+                "error_armature": 3.009296789494595e-06,
+                "actual_world_unoffset": [
+                  1093.3531494140625,
+                  -36.47559356689453,
+                  133.32273864746094
+                ],
+                "actual_world_offset_corrected": [
+                  43.3531494140625,
+                  -36.47559356689453,
+                  133.32273864746094
+                ],
+                "expected_world": [
+                  43.35313415527344,
+                  -36.475555419921875,
+                  133.32281494140625
+                ],
+                "actual_armature": [
+                  0.9980663061141968,
+                  3.0693368911743164,
+                  0.8397352695465088
+                ],
+                "expected_armature": [
+                  0.9980690479278564,
+                  3.0693376064300537,
+                  0.8397342562675476
+                ]
+              },
+              "bone_29": {
+                "error_world": 7.396972438684585e-05,
+                "error_armature": 2.1399644697923947e-06,
+                "actual_world_unoffset": [
+                  1086.416015625,
+                  -25.186899185180664,
+                  143.7091064453125
+                ],
+                "actual_world_offset_corrected": [
+                  36.416015625,
+                  -25.186899185180664,
+                  143.7091064453125
+                ],
+                "expected_world": [
+                  36.41608428955078,
+                  -25.18687629699707,
+                  143.70909118652344
+                ],
+                "actual_armature": [
+                  0.8383634090423584,
+                  3.3084490299224854,
+                  0.57984858751297
+                ],
+                "expected_armature": [
+                  0.8383654952049255,
+                  3.3084490299224854,
+                  0.5798481106758118
+                ]
+              },
+              "bone_30": {
+                "error_world": 0.0004415337000891673,
+                "error_armature": 4.243666532356158e-06,
+                "actual_world_unoffset": [
+                  1093.103759765625,
+                  -40.541465759277344,
+                  126.53825378417969
+                ],
+                "actual_world_offset_corrected": [
+                  43.103759765625,
+                  -40.541465759277344,
+                  126.53825378417969
+                ],
+                "expected_world": [
+                  43.104190826416016,
+                  -40.541419982910156,
+                  126.53833770751953
+                ],
+                "actual_armature": [
+                  0.9923346042633057,
+                  2.9131453037261963,
+                  0.9333392977714539
+                ],
+                "expected_armature": [
+                  0.9923382997512817,
+                  2.91314697265625,
+                  0.9333380460739136
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138356962024717,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 17.440573800822985
+          }
+        },
+        {
+          "time": 2.6666667461395264,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 5.131627613700064e-06,
+          "max_weighted_centroid_error_world": 0.00026187907608640163,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 0.00012218504409028968,
+                "error_armature": 3.1023773859864967e-06,
+                "actual_world_unoffset": [
+                  1048.31494140625,
+                  -6.778410911560059,
+                  125.37535858154297
+                ],
+                "actual_world_offset_corrected": [
+                  -1.68505859375,
+                  -6.778410911560059,
+                  125.37535858154297
+                ],
+                "expected_world": [
+                  -1.6849524974822998,
+                  -6.7783522605896,
+                  125.37537384033203
+                ],
+                "actual_armature": [
+                  -0.03879335895180702,
+                  2.8863723278045654,
+                  0.1560513973236084
+                ],
+                "expected_armature": [
+                  -0.03879072144627571,
+                  2.886373281478882,
+                  0.15605007112026215
+                ]
+              },
+              "bone_23": {
+                "error_world": 0.00026187907608640163,
+                "error_armature": 3.168863072369227e-06,
+                "actual_world_unoffset": [
+                  1050.1473388671875,
+                  -10.664324760437012,
+                  121.04270935058594
+                ],
+                "actual_world_offset_corrected": [
+                  0.1473388671875,
+                  -10.664324760437012,
+                  121.04270935058594
+                ],
+                "expected_world": [
+                  0.1475880742073059,
+                  -10.66427230834961,
+                  121.04277038574219
+                ],
+                "actual_armature": [
+                  0.0033952011726796627,
+                  2.7866270542144775,
+                  0.24551236629486084
+                ],
+                "expected_armature": [
+                  0.00339775113388896,
+                  2.786628484725952,
+                  0.24551114439964294
+                ]
+              },
+              "bone_25": {
+                "error_world": 9.507252873409229e-05,
+                "error_armature": 3.44110370251204e-06,
+                "actual_world_unoffset": [
+                  1055.10205078125,
+                  -23.742799758911133,
+                  115.51170349121094
+                ],
+                "actual_world_offset_corrected": [
+                  5.10205078125,
+                  -23.742799758911133,
+                  115.51170349121094
+                ],
+                "expected_world": [
+                  5.102113246917725,
+                  -23.742734909057617,
+                  115.51173400878906
+                ],
+                "actual_armature": [
+                  0.11745715886354446,
+                  2.659292697906494,
+                  0.5466030240058899
+                ],
+                "expected_armature": [
+                  0.11746007949113846,
+                  2.6592936515808105,
+                  0.5466014742851257
+                ]
+              },
+              "bone_27": {
+                "error_world": 0.00021680941899841904,
+                "error_armature": 3.7701999189540075e-06,
+                "actual_world_unoffset": [
+                  1072.4273681640625,
+                  -39.7724494934082,
+                  119.06527709960938
+                ],
+                "actual_world_offset_corrected": [
+                  22.4273681640625,
+                  -39.7724494934082,
+                  119.06527709960938
+                ],
+                "expected_world": [
+                  22.427560806274414,
+                  -39.772396087646484,
+                  119.06519317626953
+                ],
+                "actual_armature": [
+                  0.516320526599884,
+                  2.741102695465088,
+                  0.9156351685523987
+                ],
+                "expected_armature": [
+                  0.5163238048553467,
+                  2.7411012649536133,
+                  0.9156339764595032
+                ]
+              },
+              "bone_29": {
+                "error_world": 8.401540561384975e-05,
+                "error_armature": 3.589293520701576e-06,
+                "actual_world_unoffset": [
+                  1061.4725341796875,
+                  -34.9541015625,
+                  108.93120574951172
+                ],
+                "actual_world_offset_corrected": [
+                  11.4725341796875,
+                  -34.9541015625,
+                  108.93120574951172
+                ],
+                "expected_world": [
+                  11.472512245178223,
+                  -34.95404052734375,
+                  108.93125915527344
+                ],
+                "actual_armature": [
+                  0.26411542296409607,
+                  2.5077974796295166,
+                  0.8047078251838684
+                ],
+                "expected_armature": [
+                  0.2641184329986572,
+                  2.507798671722412,
+                  0.8047062754631042
+                ]
+              },
+              "bone_30": {
+                "error_world": 0.00023552473511403093,
+                "error_armature": 5.131627613700064e-06,
+                "actual_world_unoffset": [
+                  1067.9075927734375,
+                  -45.88278579711914,
+                  120.94532775878906
+                ],
+                "actual_world_offset_corrected": [
+                  17.9075927734375,
+                  -45.88278579711914,
+                  120.94532775878906
+                ],
+                "expected_world": [
+                  17.907821655273438,
+                  -45.88273239135742,
+                  120.9453125
+                ],
+                "actual_armature": [
+                  0.41226640343666077,
+                  2.7843856811523438,
+                  1.0563063621520996
+                ],
+                "expected_armature": [
+                  0.4122712016105652,
+                  2.7843847274780273,
+                  1.0563048124313354
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138323986112984,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 16.41471612383307
+          }
+        },
+        {
+          "time": 5.166666507720947,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 3.845423579995757e-06,
+          "max_weighted_centroid_error_world": 0.0001948117611676877,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 6.580352783203125e-05,
+                "error_armature": 2.9688857568293266e-06,
+                "actual_world_unoffset": [
+                  1041.035888671875,
+                  -5.87982702255249,
+                  127.2302017211914
+                ],
+                "actual_world_offset_corrected": [
+                  -8.964111328125,
+                  -5.87982702255249,
+                  127.2302017211914
+                ],
+                "expected_world": [
+                  -8.964107513427734,
+                  -5.8797688484191895,
+                  127.23023223876953
+                ],
+                "actual_armature": [
+                  -0.2063729614019394,
+                  2.9290740489959717,
+                  0.1353643834590912
+                ],
+                "expected_armature": [
+                  -0.20637033879756927,
+                  2.929074287414551,
+                  0.13536301255226135
+                ]
+              },
+              "bone_23": {
+                "error_world": 0.0001948117611676877,
+                "error_armature": 3.198477932190711e-06,
+                "actual_world_unoffset": [
+                  1043.7442626953125,
+                  -10.201018333435059,
+                  124.3763656616211
+                ],
+                "actual_world_offset_corrected": [
+                  -6.2557373046875,
+                  -10.201018333435059,
+                  124.3763656616211
+                ],
+                "expected_world": [
+                  -6.255553722381592,
+                  -10.200957298278809,
+                  124.37638854980469
+                ],
+                "actual_armature": [
+                  -0.1440170854330063,
+                  2.863373041152954,
+                  0.23484618961811066
+                ],
+                "expected_armature": [
+                  -0.1440143883228302,
+                  2.8633739948272705,
+                  0.23484475910663605
+                ]
+              },
+              "bone_25": {
+                "error_world": 0.00014765026993660325,
+                "error_armature": 3.1636203997227754e-06,
+                "actual_world_unoffset": [
+                  1048.486083984375,
+                  -24.40650177001953,
+                  122.4928970336914
+                ],
+                "actual_world_offset_corrected": [
+                  -1.513916015625,
+                  -24.40650177001953,
+                  122.4928970336914
+                ],
+                "expected_world": [
+                  -1.5137861967086792,
+                  -24.40643310546875,
+                  122.49291229248047
+                ],
+                "actual_armature": [
+                  -0.034852802753448486,
+                  2.8200128078460693,
+                  0.5618826150894165
+                ],
+                "expected_armature": [
+                  -0.03485015779733658,
+                  2.8200132846832275,
+                  0.5618809461593628
+                ]
+              },
+              "bone_27": {
+                "error_world": 9.069437734961502e-05,
+                "error_armature": 3.2014963631619893e-06,
+                "actual_world_unoffset": [
+                  1070.5518798828125,
+                  -42.711788177490234,
+                  112.18083953857422
+                ],
+                "actual_world_offset_corrected": [
+                  20.5518798828125,
+                  -42.711788177490234,
+                  112.18083953857422
+                ],
+                "expected_world": [
+                  20.551942825317383,
+                  -42.71172332763672,
+                  112.18084716796875
+                ],
+                "actual_armature": [
+                  0.4731409251689911,
+                  2.5826096534729004,
+                  0.9833041429519653
+                ],
+                "expected_armature": [
+                  0.47314366698265076,
+                  2.5826103687286377,
+                  0.983302652835846
+                ]
+              },
+              "bone_29": {
+                "error_world": 0.00010438378179063606,
+                "error_armature": 3.1810401971121846e-06,
+                "actual_world_unoffset": [
+                  1055.196533203125,
+                  -36.857669830322266,
+                  119.38919830322266
+                ],
+                "actual_world_offset_corrected": [
+                  5.196533203125,
+                  -36.857669830322266,
+                  119.38919830322266
+                ],
+                "expected_world": [
+                  5.196468830108643,
+                  -36.85759353637695,
+                  119.38922882080078
+                ],
+                "actual_armature": [
+                  0.11962947994470596,
+                  2.7485604286193848,
+                  0.8485312461853027
+                ],
+                "expected_armature": [
+                  0.1196323111653328,
+                  2.748560667037964,
+                  0.8485298156738281
+                ]
+              },
+              "bone_30": {
+                "error_world": 0.00016381004755847083,
+                "error_armature": 3.845423579995757e-06,
+                "actual_world_unoffset": [
+                  1068.6541748046875,
+                  -50.113094329833984,
+                  110.35125732421875
+                ],
+                "actual_world_offset_corrected": [
+                  18.6541748046875,
+                  -50.113094329833984,
+                  110.35125732421875
+                ],
+                "expected_world": [
+                  18.654312133789062,
+                  -50.11301040649414,
+                  110.35128784179688
+                ],
+                "actual_armature": [
+                  0.42945316433906555,
+                  2.5404903888702393,
+                  1.1536954641342163
+                ],
+                "expected_armature": [
+                  0.4294566512107849,
+                  2.5404908657073975,
+                  1.1536939144134521
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.1383397166936815,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 19.167061721489823
+          }
+        },
+        {
+          "time": 7.666666507720947,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 2.977399672033795e-06,
+          "max_weighted_centroid_error_world": 0.0001749596044164808,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 0.000153537492520365,
+                "error_armature": 2.427254624802904e-06,
+                "actual_world_unoffset": [
+                  1046.7938232421875,
+                  -2.233684778213501,
+                  126.1797866821289
+                ],
+                "actual_world_offset_corrected": [
+                  -3.2061767578125,
+                  -2.233684778213501,
+                  126.1797866821289
+                ],
+                "expected_world": [
+                  -3.2060296535491943,
+                  -2.2336435317993164,
+                  126.17980194091797
+                ],
+                "actual_armature": [
+                  -0.07381093502044678,
+                  2.9048922061920166,
+                  0.05142343044281006
+                ],
+                "expected_armature": [
+                  -0.07380872219800949,
+                  2.9048924446105957,
+                  0.05142246186733246
+                ]
+              },
+              "bone_23": {
+                "error_world": 5.9773949734973986e-05,
+                "error_armature": 2.6192711862859354e-06,
+                "actual_world_unoffset": [
+                  1050.7432861328125,
+                  -5.154111385345459,
+                  123.28763580322266
+                ],
+                "actual_world_offset_corrected": [
+                  0.7432861328125,
+                  -5.154111385345459,
+                  123.28763580322266
+                ],
+                "expected_world": [
+                  0.7433249354362488,
+                  -5.154066562652588,
+                  123.28764343261719
+                ],
+                "actual_armature": [
+                  0.017110353335738182,
+                  2.8383092880249023,
+                  0.11865705251693726
+                ],
+                "expected_armature": [
+                  0.01711271144449711,
+                  2.8383097648620605,
+                  0.11865601688623428
+                ]
+              },
+              "bone_25": {
+                "error_world": 0.0001749596044164808,
+                "error_armature": 2.953626666134289e-06,
+                "actual_world_unoffset": [
+                  1060.65478515625,
+                  -16.08059310913086,
+                  121.1206283569336
+                ],
+                "actual_world_offset_corrected": [
+                  10.65478515625,
+                  -16.08059310913086,
+                  121.1206283569336
+                ],
+                "expected_world": [
+                  10.654950141906738,
+                  -16.080543518066406,
+                  121.12065887451172
+                ],
+                "actual_armature": [
+                  0.24529407918453217,
+                  2.7884209156036377,
+                  0.370204895734787
+                ],
+                "expected_armature": [
+                  0.2452966570854187,
+                  2.788421630859375,
+                  0.3702036440372467
+                ]
+              },
+              "bone_27": {
+                "error_world": 8.110157633006783e-05,
+                "error_armature": 2.585770125804408e-06,
+                "actual_world_unoffset": [
+                  1086.0394287109375,
+                  -27.666378021240234,
+                  110.72499084472656
+                ],
+                "actual_world_offset_corrected": [
+                  36.0394287109375,
+                  -27.666378021240234,
+                  110.72499084472656
+                ],
+                "expected_world": [
+                  36.03948974609375,
+                  -27.666324615478516,
+                  110.72499084472656
+                ],
+                "actual_armature": [
+                  0.8296932578086853,
+                  2.549093723297119,
+                  0.6369310617446899
+                ],
+                "expected_armature": [
+                  0.8296955823898315,
+                  2.549093723297119,
+                  0.6369299292564392
+                ]
+              },
+              "bone_29": {
+                "error_world": 0.00015562141536051372,
+                "error_armature": 2.977399672033795e-06,
+                "actual_world_unoffset": [
+                  1071.4822998046875,
+                  -25.04714584350586,
+                  117.68509674072266
+                ],
+                "actual_world_offset_corrected": [
+                  21.4822998046875,
+                  -25.04714584350586,
+                  117.68509674072266
+                ],
+                "expected_world": [
+                  21.482444763183594,
+                  -25.04709815979004,
+                  117.68512725830078
+                ],
+                "actual_armature": [
+                  0.4945630133152008,
+                  2.7093281745910645,
+                  0.5766316056251526
+                ],
+                "expected_armature": [
+                  0.49456554651260376,
+                  2.7093286514282227,
+                  0.5766301155090332
+                ]
+              },
+              "bone_30": {
+                "error_world": 0.00016888384720747875,
+                "error_armature": 2.5898886898041285e-06,
+                "actual_world_unoffset": [
+                  1091.038330078125,
+                  -33.83761215209961,
+                  111.0411148071289
+                ],
+                "actual_world_offset_corrected": [
+                  41.038330078125,
+                  -33.83761215209961,
+                  111.0411148071289
+                ],
+                "expected_world": [
+                  41.038169860839844,
+                  -33.83755874633789,
+                  111.0411148071289
+                ],
+                "actual_armature": [
+                  0.9447725415229797,
+                  2.5563716888427734,
+                  0.7790045738220215
+                ],
+                "expected_armature": [
+                  0.9447746872901917,
+                  2.5563719272613525,
+                  0.7790031433105469
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138306934894795,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 17.642078349926457
+          }
+        },
+        {
+          "time": 10.333333015441895,
+          "max_armature_matrix_abs_error": 0.0,
+          "max_matrix_basis_abs_error": 0.0,
+          "bone_transform_errors": {
+            "bone_22": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_23": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_24": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_25": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_26": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_27": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_29": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            },
+            "bone_30": {
+              "matrix_basis_abs_error": 0.0,
+              "armature_pose_abs_error": 0.0
+            }
+          },
+          "max_weighted_centroid_error_armature": 4.243666532356158e-06,
+          "max_weighted_centroid_error_world": 0.0004415337000891673,
+          "weighted_centroid_errors": {
+            "ARMTEST_29_0x75c1640_submesh0": {
+              "bone_22": {
+                "error_world": 0.00010689052359513107,
+                "error_armature": 3.4340307108358084e-06,
+                "actual_world_unoffset": [
+                  1053.6676025390625,
+                  -16.890859603881836,
+                  134.40097045898438
+                ],
+                "actual_world_offset_corrected": [
+                  3.6676025390625,
+                  -16.890859603881836,
+                  134.40097045898438
+                ],
+                "expected_world": [
+                  3.6675217151641846,
+                  -16.890796661376953,
+                  134.40093994140625
+                ],
+                "actual_armature": [
+                  0.08443013578653336,
+                  3.094158172607422,
+                  0.3888586759567261
+                ],
+                "expected_armature": [
+                  0.08443313091993332,
+                  3.0941574573516846,
+                  0.3888571560382843
+                ]
+              },
+              "bone_23": {
+                "error_world": 0.00010349014256477765,
+                "error_armature": 2.707791516943182e-06,
+                "actual_world_unoffset": [
+                  1058.1966552734375,
+                  -19.5593204498291,
+                  136.18771362304688
+                ],
+                "actual_world_offset_corrected": [
+                  8.1966552734375,
+                  -19.5593204498291,
+                  136.18771362304688
+                ],
+                "expected_world": [
+                  8.196746826171875,
+                  -19.559274673461914,
+                  136.1876983642578
+                ],
+                "actual_armature": [
+                  0.18870197236537933,
+                  3.1352927684783936,
+                  0.45029154419898987
+                ],
+                "expected_armature": [
+                  0.18870428204536438,
+                  3.135291814804077,
+                  0.4502905011177063
+                ]
+              },
+              "bone_25": {
+                "error_world": 4.059562044867089e-05,
+                "error_armature": 2.351930100554092e-06,
+                "actual_world_unoffset": [
+                  1073.1986083984375,
+                  -21.634750366210938,
+                  138.97056579589844
+                ],
+                "actual_world_offset_corrected": [
+                  23.1986083984375,
+                  -21.634750366210938,
+                  138.97056579589844
+                ],
+                "expected_world": [
+                  23.198640823364258,
+                  -21.63473129272461,
+                  138.97055053710938
+                ],
+                "actual_armature": [
+                  0.5340732336044312,
+                  3.199359655380249,
+                  0.4980718493461609
+                ],
+                "expected_armature": [
+                  0.5340754985809326,
+                  3.199359178543091,
+                  0.49807143211364746
+                ]
+              },
+              "bone_27": {
+                "error_world": 8.665326455383718e-05,
+                "error_armature": 3.009296789494595e-06,
+                "actual_world_unoffset": [
+                  1093.3531494140625,
+                  -36.47559356689453,
+                  133.32273864746094
+                ],
+                "actual_world_offset_corrected": [
+                  43.3531494140625,
+                  -36.47559356689453,
+                  133.32273864746094
+                ],
+                "expected_world": [
+                  43.35313415527344,
+                  -36.475555419921875,
+                  133.32281494140625
+                ],
+                "actual_armature": [
+                  0.9980663061141968,
+                  3.0693368911743164,
+                  0.8397352695465088
+                ],
+                "expected_armature": [
+                  0.9980690479278564,
+                  3.0693376064300537,
+                  0.8397342562675476
+                ]
+              },
+              "bone_29": {
+                "error_world": 7.396972438684585e-05,
+                "error_armature": 2.1399644697923947e-06,
+                "actual_world_unoffset": [
+                  1086.416015625,
+                  -25.186899185180664,
+                  143.7091064453125
+                ],
+                "actual_world_offset_corrected": [
+                  36.416015625,
+                  -25.186899185180664,
+                  143.7091064453125
+                ],
+                "expected_world": [
+                  36.41608428955078,
+                  -25.18687629699707,
+                  143.70909118652344
+                ],
+                "actual_armature": [
+                  0.8383634090423584,
+                  3.3084490299224854,
+                  0.57984858751297
+                ],
+                "expected_armature": [
+                  0.8383654952049255,
+                  3.3084490299224854,
+                  0.5798481106758118
+                ]
+              },
+              "bone_30": {
+                "error_world": 0.0004415337000891673,
+                "error_armature": 4.243666532356158e-06,
+                "actual_world_unoffset": [
+                  1093.103759765625,
+                  -40.541465759277344,
+                  126.53825378417969
+                ],
+                "actual_world_offset_corrected": [
+                  43.103759765625,
+                  -40.541465759277344,
+                  126.53825378417969
+                ],
+                "expected_world": [
+                  43.104190826416016,
+                  -40.541419982910156,
+                  126.53833770751953
+                ],
+                "actual_armature": [
+                  0.9923346042633057,
+                  2.9131453037261963,
+                  0.9333392977714539
+                ],
+                "expected_armature": [
+                  0.9923382997512817,
+                  2.91314697265625,
+                  0.9333380460739136
+                ]
+              }
+            }
+          },
+          "pose_scales": {
+            "bone_22": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_23": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_24": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_25": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_26": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_27": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_29": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "bone_30": [
+              1.0,
+              1.0,
+              1.0
+            ]
+          },
+          "joint_gaps_world": {
+            "shoulder_parent_to_head": 6.138356962024717,
+            "main_elbow_parent_to_head": 0.0,
+            "overlap_elbow_parent_to_head": 0.0,
+            "main_wrist_parent_to_head": 0.0,
+            "glove_parent_to_head": 0.0,
+            "overlap_forearm_to_glove": 17.440573800822985
+          }
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "rest_signature_matches_production": true,
+    "all_action_bones_exist": true,
+    "source_scale_unchanged": true,
+    "preview_object_scale_max_error": 0.0,
+    "preview_mesh_scale_max_error": 0.0,
+    "preview_scales_match_source": true,
+    "max_matrix_error": 0.0,
+    "max_matrix_basis_error": 0.0,
+    "max_weighted_centroid_error_armature": 5.131627613700064e-06,
+    "max_weighted_centroid_error_world": 0.0004415337000891673,
+    "pose_scale_deviation_max": 0.0,
+    "no_runtime_constraints": true,
+    "transform_match_within_tolerance": true,
+    "basis_match_within_tolerance": true,
+    "centroid_match_within_tolerance": true,
+    "finite": true
+  },
+  "visual_captures": {
+    "preview_group": "native-arm-preview-d375606872704b40a8e3e339af1939e7",
+    "render_engine": "BLENDER_WORKBENCH",
+    "images": [
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_10_003_f0.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_10_003_f3p3333.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_10_003_f6p8333.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_10_003_f10p3333.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_10_003_f13p6667.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_15_003_f0.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_15_003_f1p3333.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_15_003_f2p5.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_15_003_f3p6667.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_15_003_f5.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_24_f0.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_24_f2p6667.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_24_f5p1667.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_24_f7p6667.png",
+      "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_arm_preview_renders\\sequence_24_f10p3333.png"
+    ],
+    "image_count": 15,
+    "restored_scene_state": true,
+    "isolated_render_scene": true
+  }
+}
