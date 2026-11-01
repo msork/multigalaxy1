@@ -1,0 +1,1651 @@
+{
+  "schema": "mg1.native-locomotion-scaffold-fit.v1",
+  "read_only_production": true,
+  "source": {
+    "rig": "luigi.001_armature",
+    "action": "luigi.001_armature_walk",
+    "slot": "OBluigi.001_armature",
+    "frames": [
+      0,
+      60
+    ]
+  },
+  "method": {
+    "primary_scaffold": "Waluigi_8_Running_seq10",
+    "comparison_scaffold": "Waluigi_6_Fielding_seq21",
+    "semantic_features": [
+      "rest-calibrated shoulder orientation",
+      "absolute elbow angle from straight",
+      "anatomical-axis forearm roll",
+      "forearm-relative wrist orientation",
+      "signed body-frame hand position"
+    ],
+    "path_constraints": "single action only; bounded monotonic local sample transitions; full-pose SE(3) transition and phase costs",
+    "post_bake_smoothing": false
+  },
+  "candidates": [
+    {
+      "action": "Waluigi_8_Running_seq10",
+      "sample_count": 61,
+      "interpolated_candidate_count": 241,
+      "time_mapping": [
+        {
+          "source_frame": 0,
+          "candidate_index_4x": 24,
+          "native_sample_bracket": [
+            6,
+            6
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.1
+        },
+        {
+          "source_frame": 1,
+          "candidate_index_4x": 27,
+          "native_sample_bracket": [
+            6,
+            7
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.1125
+        },
+        {
+          "source_frame": 2,
+          "candidate_index_4x": 29,
+          "native_sample_bracket": [
+            7,
+            8
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.12083333333333333
+        },
+        {
+          "source_frame": 3,
+          "candidate_index_4x": 31,
+          "native_sample_bracket": [
+            7,
+            8
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.12916666666666665
+        },
+        {
+          "source_frame": 4,
+          "candidate_index_4x": 33,
+          "native_sample_bracket": [
+            8,
+            9
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.1375
+        },
+        {
+          "source_frame": 5,
+          "candidate_index_4x": 35,
+          "native_sample_bracket": [
+            8,
+            9
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.14583333333333331
+        },
+        {
+          "source_frame": 6,
+          "candidate_index_4x": 39,
+          "native_sample_bracket": [
+            9,
+            10
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.16249999999999998
+        },
+        {
+          "source_frame": 7,
+          "candidate_index_4x": 44,
+          "native_sample_bracket": [
+            11,
+            11
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.18333333333333332
+        },
+        {
+          "source_frame": 8,
+          "candidate_index_4x": 46,
+          "native_sample_bracket": [
+            11,
+            12
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.19166666666666665
+        },
+        {
+          "source_frame": 9,
+          "candidate_index_4x": 48,
+          "native_sample_bracket": [
+            12,
+            12
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.2
+        },
+        {
+          "source_frame": 10,
+          "candidate_index_4x": 49,
+          "native_sample_bracket": [
+            12,
+            13
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.20416666666666666
+        },
+        {
+          "source_frame": 11,
+          "candidate_index_4x": 50,
+          "native_sample_bracket": [
+            12,
+            13
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.20833333333333334
+        },
+        {
+          "source_frame": 12,
+          "candidate_index_4x": 51,
+          "native_sample_bracket": [
+            12,
+            13
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.21250000000000002
+        },
+        {
+          "source_frame": 13,
+          "candidate_index_4x": 52,
+          "native_sample_bracket": [
+            13,
+            13
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.21666666666666667
+        },
+        {
+          "source_frame": 14,
+          "candidate_index_4x": 53,
+          "native_sample_bracket": [
+            13,
+            14
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.22083333333333333
+        },
+        {
+          "source_frame": 15,
+          "candidate_index_4x": 54,
+          "native_sample_bracket": [
+            13,
+            14
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.225
+        },
+        {
+          "source_frame": 16,
+          "candidate_index_4x": 55,
+          "native_sample_bracket": [
+            13,
+            14
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.22916666666666669
+        },
+        {
+          "source_frame": 17,
+          "candidate_index_4x": 57,
+          "native_sample_bracket": [
+            14,
+            15
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.2375
+        },
+        {
+          "source_frame": 18,
+          "candidate_index_4x": 59,
+          "native_sample_bracket": [
+            14,
+            15
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.24583333333333335
+        },
+        {
+          "source_frame": 19,
+          "candidate_index_4x": 66,
+          "native_sample_bracket": [
+            16,
+            17
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.275
+        },
+        {
+          "source_frame": 20,
+          "candidate_index_4x": 71,
+          "native_sample_bracket": [
+            17,
+            18
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.29583333333333334
+        },
+        {
+          "source_frame": 21,
+          "candidate_index_4x": 73,
+          "native_sample_bracket": [
+            18,
+            19
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.30416666666666664
+        },
+        {
+          "source_frame": 22,
+          "candidate_index_4x": 75,
+          "native_sample_bracket": [
+            18,
+            19
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.3125
+        },
+        {
+          "source_frame": 23,
+          "candidate_index_4x": 77,
+          "native_sample_bracket": [
+            19,
+            20
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.3208333333333333
+        },
+        {
+          "source_frame": 24,
+          "candidate_index_4x": 79,
+          "native_sample_bracket": [
+            19,
+            20
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.32916666666666666
+        },
+        {
+          "source_frame": 25,
+          "candidate_index_4x": 83,
+          "native_sample_bracket": [
+            20,
+            21
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.3458333333333333
+        },
+        {
+          "source_frame": 26,
+          "candidate_index_4x": 91,
+          "native_sample_bracket": [
+            22,
+            23
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.37916666666666665
+        },
+        {
+          "source_frame": 27,
+          "candidate_index_4x": 99,
+          "native_sample_bracket": [
+            24,
+            25
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.41250000000000003
+        },
+        {
+          "source_frame": 28,
+          "candidate_index_4x": 105,
+          "native_sample_bracket": [
+            26,
+            27
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.4375
+        },
+        {
+          "source_frame": 29,
+          "candidate_index_4x": 110,
+          "native_sample_bracket": [
+            27,
+            28
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.45833333333333337
+        },
+        {
+          "source_frame": 30,
+          "candidate_index_4x": 115,
+          "native_sample_bracket": [
+            28,
+            29
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.4791666666666667
+        },
+        {
+          "source_frame": 31,
+          "candidate_index_4x": 120,
+          "native_sample_bracket": [
+            30,
+            30
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.5
+        },
+        {
+          "source_frame": 32,
+          "candidate_index_4x": 125,
+          "native_sample_bracket": [
+            31,
+            32
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.5208333333333334
+        },
+        {
+          "source_frame": 33,
+          "candidate_index_4x": 131,
+          "native_sample_bracket": [
+            32,
+            33
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.5458333333333334
+        },
+        {
+          "source_frame": 34,
+          "candidate_index_4x": 137,
+          "native_sample_bracket": [
+            34,
+            35
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.5708333333333333
+        },
+        {
+          "source_frame": 35,
+          "candidate_index_4x": 144,
+          "native_sample_bracket": [
+            36,
+            36
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.6
+        },
+        {
+          "source_frame": 36,
+          "candidate_index_4x": 151,
+          "native_sample_bracket": [
+            37,
+            38
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.6291666666666667
+        },
+        {
+          "source_frame": 37,
+          "candidate_index_4x": 158,
+          "native_sample_bracket": [
+            39,
+            40
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.6583333333333333
+        },
+        {
+          "source_frame": 38,
+          "candidate_index_4x": 166,
+          "native_sample_bracket": [
+            41,
+            42
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.6916666666666667
+        },
+        {
+          "source_frame": 39,
+          "candidate_index_4x": 174,
+          "native_sample_bracket": [
+            43,
+            44
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.725
+        },
+        {
+          "source_frame": 40,
+          "candidate_index_4x": 182,
+          "native_sample_bracket": [
+            45,
+            46
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.7583333333333333
+        },
+        {
+          "source_frame": 41,
+          "candidate_index_4x": 184,
+          "native_sample_bracket": [
+            46,
+            46
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.7666666666666667
+        },
+        {
+          "source_frame": 42,
+          "candidate_index_4x": 185,
+          "native_sample_bracket": [
+            46,
+            47
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.7708333333333334
+        },
+        {
+          "source_frame": 43,
+          "candidate_index_4x": 186,
+          "native_sample_bracket": [
+            46,
+            47
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.775
+        },
+        {
+          "source_frame": 44,
+          "candidate_index_4x": 187,
+          "native_sample_bracket": [
+            46,
+            47
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.7791666666666667
+        },
+        {
+          "source_frame": 45,
+          "candidate_index_4x": 188,
+          "native_sample_bracket": [
+            47,
+            47
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.7833333333333333
+        },
+        {
+          "source_frame": 46,
+          "candidate_index_4x": 189,
+          "native_sample_bracket": [
+            47,
+            48
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.7875
+        },
+        {
+          "source_frame": 47,
+          "candidate_index_4x": 190,
+          "native_sample_bracket": [
+            47,
+            48
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.7916666666666667
+        },
+        {
+          "source_frame": 48,
+          "candidate_index_4x": 191,
+          "native_sample_bracket": [
+            47,
+            48
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.7958333333333334
+        },
+        {
+          "source_frame": 49,
+          "candidate_index_4x": 192,
+          "native_sample_bracket": [
+            48,
+            48
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.8
+        },
+        {
+          "source_frame": 50,
+          "candidate_index_4x": 195,
+          "native_sample_bracket": [
+            48,
+            49
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.8125
+        },
+        {
+          "source_frame": 51,
+          "candidate_index_4x": 198,
+          "native_sample_bracket": [
+            49,
+            50
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.825
+        },
+        {
+          "source_frame": 52,
+          "candidate_index_4x": 201,
+          "native_sample_bracket": [
+            50,
+            51
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.8375
+        },
+        {
+          "source_frame": 53,
+          "candidate_index_4x": 204,
+          "native_sample_bracket": [
+            51,
+            51
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.85
+        },
+        {
+          "source_frame": 54,
+          "candidate_index_4x": 207,
+          "native_sample_bracket": [
+            51,
+            52
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.8625
+        },
+        {
+          "source_frame": 55,
+          "candidate_index_4x": 210,
+          "native_sample_bracket": [
+            52,
+            53
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.875
+        },
+        {
+          "source_frame": 56,
+          "candidate_index_4x": 213,
+          "native_sample_bracket": [
+            53,
+            54
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.8875
+        },
+        {
+          "source_frame": 57,
+          "candidate_index_4x": 216,
+          "native_sample_bracket": [
+            54,
+            54
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.9
+        },
+        {
+          "source_frame": 58,
+          "candidate_index_4x": 219,
+          "native_sample_bracket": [
+            54,
+            55
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.9125
+        },
+        {
+          "source_frame": 59,
+          "candidate_index_4x": 222,
+          "native_sample_bracket": [
+            55,
+            56
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.925
+        },
+        {
+          "source_frame": 60,
+          "candidate_index_4x": 225,
+          "native_sample_bracket": [
+            56,
+            57
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.9375
+        }
+      ],
+      "semantic_rmse": {
+        "left": {
+          "shoulder_orientation": 0.4214154781113965,
+          "elbow_flexion": 0.9972841589568991,
+          "forearm_roll": 2.021622050925285,
+          "wrist_orientation": 0.20984123336601057,
+          "normalized_hand_position": 0.5305732424092678
+        },
+        "right": {
+          "shoulder_orientation": 1.03184692400833,
+          "elbow_flexion": 0.5991868332321985,
+          "forearm_roll": 1.045914789393851,
+          "wrist_orientation": 0.34218869104720157,
+          "normalized_hand_position": 0.5682488835222316
+        },
+        "combined": {
+          "shoulder_orientation": 0.7266312010598632,
+          "elbow_flexion": 0.7982354960945488,
+          "forearm_roll": 1.533768420159568,
+          "wrist_orientation": 0.27601496220660604,
+          "normalized_hand_position": 0.5494110629657497
+        }
+      },
+      "linear_phase_reference_rmse": {
+        "left": {
+          "shoulder_orientation": 0.43094624857990554,
+          "elbow_flexion": 1.0329614300594165,
+          "forearm_roll": 2.0274888493062218,
+          "wrist_orientation": 0.23631670602892238,
+          "normalized_hand_position": 0.5648398165756655
+        },
+        "right": {
+          "shoulder_orientation": 1.0075266676356098,
+          "elbow_flexion": 0.623528410943052,
+          "forearm_roll": 1.0275939880889573,
+          "wrist_orientation": 0.3521340815448468,
+          "normalized_hand_position": 0.5764095166170521
+        }
+      },
+      "feature_ranges": {
+        "source_left": {
+          "shoulder_orientation": {
+            "min": -0.7664731411678001,
+            "max": 0.6353373661343564,
+            "range": 1.4018105073021565
+          },
+          "elbow_flexion": {
+            "min": 0.17498513473432772,
+            "max": 0.6780089994776323,
+            "range": 0.5030238647433045
+          },
+          "forearm_roll": {
+            "min": -0.1452089706520918,
+            "max": 0.4918419292977387,
+            "range": 0.6370508999498304
+          },
+          "wrist_orientation": {
+            "min": -0.4280874639926283,
+            "max": 0.28027687809639346,
+            "range": 0.7083643420890218
+          },
+          "signed_hand_position": {
+            "min": -0.4929702452628736,
+            "max": 0.3683988917352641,
+            "range": 0.8613691369981377
+          }
+        },
+        "target_left": {
+          "shoulder_orientation": {
+            "min": -1.508575204115413,
+            "max": 1.5005081222893435,
+            "range": 3.0090833264047565
+          },
+          "elbow_flexion": {
+            "min": 0.1789341321486643,
+            "max": 2.177365144198136,
+            "range": 1.9984310120494717
+          },
+          "forearm_roll": {
+            "min": -2.923283229269834,
+            "max": -0.6081497355786476,
+            "range": 2.315133493691186
+          },
+          "wrist_orientation": {
+            "min": -0.5495763806837507,
+            "max": 0.41238076150998026,
+            "range": 0.961957142193731
+          },
+          "signed_hand_position": {
+            "min": -0.6980450809499825,
+            "max": 1.296979221156121,
+            "range": 1.9950243021061036
+          }
+        },
+        "source_right": {
+          "shoulder_orientation": {
+            "min": -0.766545075767765,
+            "max": 0.6351804947491264,
+            "range": 1.4017255705168914
+          },
+          "elbow_flexion": {
+            "min": 0.8443643426936813,
+            "max": 1.312999326326879,
+            "range": 0.4686349836331978
+          },
+          "forearm_roll": {
+            "min": -0.23452009687818132,
+            "max": 0.47659925965342653,
+            "range": 0.7111193565316078
+          },
+          "wrist_orientation": {
+            "min": -0.27922561247404803,
+            "max": 0.4285318121384418,
+            "range": 0.7077574246124898
+          },
+          "signed_hand_position": {
+            "min": -0.4902020729741511,
+            "max": 0.3446918265215877,
+            "range": 0.8348938994957388
+          }
+        },
+        "target_right": {
+          "shoulder_orientation": {
+            "min": -1.5005044877498448,
+            "max": 1.5085772977695413,
+            "range": 3.009081785519386
+          },
+          "elbow_flexion": {
+            "min": 0.17893045774997784,
+            "max": 2.177369814862722,
+            "range": 1.9984393571127441
+          },
+          "forearm_roll": {
+            "min": 0.517017489352412,
+            "max": 2.0372749062309885,
+            "range": 1.5202574168785765
+          },
+          "wrist_orientation": {
+            "min": -0.5495752240235805,
+            "max": 0.4191917698521172,
+            "range": 0.9687669938756978
+          },
+          "signed_hand_position": {
+            "min": -1.296982036408163,
+            "max": 0.9106421630410757,
+            "range": 2.2076241994492385
+          }
+        }
+      },
+      "motion_retention": {
+        "left": {
+          "shoulder_source_excursion_rad": 1.1091748557967556,
+          "shoulder_target_excursion_rad": 1.4761856939726137,
+          "shoulder_retention_percent": 133.08863667958127,
+          "elbow_source_range_rad": 0.5030238647433045,
+          "elbow_target_range_rad": 1.9984310120494717,
+          "elbow_retention_percent": 397.28353903632
+        },
+        "right": {
+          "shoulder_source_excursion_rad": 1.1091559820311494,
+          "shoulder_target_excursion_rad": 1.476185693972569,
+          "shoulder_retention_percent": 133.09090135990556,
+          "elbow_source_range_rad": 0.4686349836331978,
+          "elbow_target_range_rad": 1.9984393571127441,
+          "elbow_retention_percent": 426.4383639521307
+        }
+      },
+      "max_final_pose_jump": {
+        "from_frame": 19,
+        "to_frame": 20,
+        "normalized_se3_max": 0.49824723936781246,
+        "normalized_se3_rms": 0.40433266407154356,
+        "worst_bone_index": 61,
+        "worst_bone": "bone_81"
+      },
+      "mean_final_pose_jump_rms": 0.24292357776860485,
+      "largest_per_bone_step": {
+        "from_frame": 19,
+        "to_frame": 20,
+        "normalized_se3_max": 0.49824723936781246,
+        "normalized_se3_rms": 0.40433266407154356,
+        "worst_bone_index": 61,
+        "worst_bone": "bone_81"
+      },
+      "glove_gap_max_armature_units": 0.007478669088090807,
+      "glove_gap_frame": 15,
+      "objective_cost": 2847.816212130299,
+      "phase_radius": 6.0,
+      "gate_passed": true
+    },
+    {
+      "action": "Waluigi_6_Fielding_seq21",
+      "sample_count": 26,
+      "interpolated_candidate_count": 101,
+      "time_mapping": [
+        {
+          "source_frame": 0,
+          "candidate_index_4x": 8,
+          "native_sample_bracket": [
+            2,
+            2
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.08
+        },
+        {
+          "source_frame": 1,
+          "candidate_index_4x": 8,
+          "native_sample_bracket": [
+            2,
+            2
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.08
+        },
+        {
+          "source_frame": 2,
+          "candidate_index_4x": 8,
+          "native_sample_bracket": [
+            2,
+            2
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.08
+        },
+        {
+          "source_frame": 3,
+          "candidate_index_4x": 8,
+          "native_sample_bracket": [
+            2,
+            2
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.08
+        },
+        {
+          "source_frame": 4,
+          "candidate_index_4x": 8,
+          "native_sample_bracket": [
+            2,
+            2
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.08
+        },
+        {
+          "source_frame": 5,
+          "candidate_index_4x": 8,
+          "native_sample_bracket": [
+            2,
+            2
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.08
+        },
+        {
+          "source_frame": 6,
+          "candidate_index_4x": 8,
+          "native_sample_bracket": [
+            2,
+            2
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.08
+        },
+        {
+          "source_frame": 7,
+          "candidate_index_4x": 8,
+          "native_sample_bracket": [
+            2,
+            2
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.08
+        },
+        {
+          "source_frame": 8,
+          "candidate_index_4x": 8,
+          "native_sample_bracket": [
+            2,
+            2
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.08
+        },
+        {
+          "source_frame": 9,
+          "candidate_index_4x": 8,
+          "native_sample_bracket": [
+            2,
+            2
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.08
+        },
+        {
+          "source_frame": 10,
+          "candidate_index_4x": 8,
+          "native_sample_bracket": [
+            2,
+            2
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.08
+        },
+        {
+          "source_frame": 11,
+          "candidate_index_4x": 9,
+          "native_sample_bracket": [
+            2,
+            3
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.09
+        },
+        {
+          "source_frame": 12,
+          "candidate_index_4x": 10,
+          "native_sample_bracket": [
+            2,
+            3
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.1
+        },
+        {
+          "source_frame": 13,
+          "candidate_index_4x": 11,
+          "native_sample_bracket": [
+            2,
+            3
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.11
+        },
+        {
+          "source_frame": 14,
+          "candidate_index_4x": 13,
+          "native_sample_bracket": [
+            3,
+            4
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.13
+        },
+        {
+          "source_frame": 15,
+          "candidate_index_4x": 15,
+          "native_sample_bracket": [
+            3,
+            4
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.15
+        },
+        {
+          "source_frame": 16,
+          "candidate_index_4x": 17,
+          "native_sample_bracket": [
+            4,
+            5
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.17
+        },
+        {
+          "source_frame": 17,
+          "candidate_index_4x": 22,
+          "native_sample_bracket": [
+            5,
+            6
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.22
+        },
+        {
+          "source_frame": 18,
+          "candidate_index_4x": 25,
+          "native_sample_bracket": [
+            6,
+            7
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.25
+        },
+        {
+          "source_frame": 19,
+          "candidate_index_4x": 26,
+          "native_sample_bracket": [
+            6,
+            7
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.26
+        },
+        {
+          "source_frame": 20,
+          "candidate_index_4x": 27,
+          "native_sample_bracket": [
+            6,
+            7
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.27
+        },
+        {
+          "source_frame": 21,
+          "candidate_index_4x": 28,
+          "native_sample_bracket": [
+            7,
+            7
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.28
+        },
+        {
+          "source_frame": 22,
+          "candidate_index_4x": 29,
+          "native_sample_bracket": [
+            7,
+            8
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.29000000000000004
+        },
+        {
+          "source_frame": 23,
+          "candidate_index_4x": 29,
+          "native_sample_bracket": [
+            7,
+            8
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.29000000000000004
+        },
+        {
+          "source_frame": 24,
+          "candidate_index_4x": 30,
+          "native_sample_bracket": [
+            7,
+            8
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.30000000000000004
+        },
+        {
+          "source_frame": 25,
+          "candidate_index_4x": 31,
+          "native_sample_bracket": [
+            7,
+            8
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.31
+        },
+        {
+          "source_frame": 26,
+          "candidate_index_4x": 33,
+          "native_sample_bracket": [
+            8,
+            9
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.33
+        },
+        {
+          "source_frame": 27,
+          "candidate_index_4x": 35,
+          "native_sample_bracket": [
+            8,
+            9
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.35
+        },
+        {
+          "source_frame": 28,
+          "candidate_index_4x": 38,
+          "native_sample_bracket": [
+            9,
+            10
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.38
+        },
+        {
+          "source_frame": 29,
+          "candidate_index_4x": 41,
+          "native_sample_bracket": [
+            10,
+            11
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.41000000000000003
+        },
+        {
+          "source_frame": 30,
+          "candidate_index_4x": 43,
+          "native_sample_bracket": [
+            10,
+            11
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.43
+        },
+        {
+          "source_frame": 31,
+          "candidate_index_4x": 44,
+          "native_sample_bracket": [
+            11,
+            11
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.44
+        },
+        {
+          "source_frame": 32,
+          "candidate_index_4x": 45,
+          "native_sample_bracket": [
+            11,
+            12
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.45
+        },
+        {
+          "source_frame": 33,
+          "candidate_index_4x": 46,
+          "native_sample_bracket": [
+            11,
+            12
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.45999999999999996
+        },
+        {
+          "source_frame": 34,
+          "candidate_index_4x": 47,
+          "native_sample_bracket": [
+            11,
+            12
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.47
+        },
+        {
+          "source_frame": 35,
+          "candidate_index_4x": 48,
+          "native_sample_bracket": [
+            12,
+            12
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.48
+        },
+        {
+          "source_frame": 36,
+          "candidate_index_4x": 50,
+          "native_sample_bracket": [
+            12,
+            13
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.5
+        },
+        {
+          "source_frame": 37,
+          "candidate_index_4x": 51,
+          "native_sample_bracket": [
+            12,
+            13
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.51
+        },
+        {
+          "source_frame": 38,
+          "candidate_index_4x": 53,
+          "native_sample_bracket": [
+            13,
+            14
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.53
+        },
+        {
+          "source_frame": 39,
+          "candidate_index_4x": 55,
+          "native_sample_bracket": [
+            13,
+            14
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.55
+        },
+        {
+          "source_frame": 40,
+          "candidate_index_4x": 59,
+          "native_sample_bracket": [
+            14,
+            15
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.59
+        },
+        {
+          "source_frame": 41,
+          "candidate_index_4x": 66,
+          "native_sample_bracket": [
+            16,
+            17
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.66
+        },
+        {
+          "source_frame": 42,
+          "candidate_index_4x": 72,
+          "native_sample_bracket": [
+            18,
+            18
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.72
+        },
+        {
+          "source_frame": 43,
+          "candidate_index_4x": 75,
+          "native_sample_bracket": [
+            18,
+            19
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.75
+        },
+        {
+          "source_frame": 44,
+          "candidate_index_4x": 77,
+          "native_sample_bracket": [
+            19,
+            20
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.77
+        },
+        {
+          "source_frame": 45,
+          "candidate_index_4x": 79,
+          "native_sample_bracket": [
+            19,
+            20
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.79
+        },
+        {
+          "source_frame": 46,
+          "candidate_index_4x": 80,
+          "native_sample_bracket": [
+            20,
+            20
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.8
+        },
+        {
+          "source_frame": 47,
+          "candidate_index_4x": 81,
+          "native_sample_bracket": [
+            20,
+            21
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.81
+        },
+        {
+          "source_frame": 48,
+          "candidate_index_4x": 81,
+          "native_sample_bracket": [
+            20,
+            21
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.81
+        },
+        {
+          "source_frame": 49,
+          "candidate_index_4x": 81,
+          "native_sample_bracket": [
+            20,
+            21
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.81
+        },
+        {
+          "source_frame": 50,
+          "candidate_index_4x": 81,
+          "native_sample_bracket": [
+            20,
+            21
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.81
+        },
+        {
+          "source_frame": 51,
+          "candidate_index_4x": 81,
+          "native_sample_bracket": [
+            20,
+            21
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.81
+        },
+        {
+          "source_frame": 52,
+          "candidate_index_4x": 81,
+          "native_sample_bracket": [
+            20,
+            21
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.81
+        },
+        {
+          "source_frame": 53,
+          "candidate_index_4x": 81,
+          "native_sample_bracket": [
+            20,
+            21
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.81
+        },
+        {
+          "source_frame": 54,
+          "candidate_index_4x": 81,
+          "native_sample_bracket": [
+            20,
+            21
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.81
+        },
+        {
+          "source_frame": 55,
+          "candidate_index_4x": 82,
+          "native_sample_bracket": [
+            20,
+            21
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.8200000000000001
+        },
+        {
+          "source_frame": 56,
+          "candidate_index_4x": 83,
+          "native_sample_bracket": [
+            20,
+            21
+          ],
+          "interpolation_fraction": 0.75,
+          "native_normalized_time": 0.83
+        },
+        {
+          "source_frame": 57,
+          "candidate_index_4x": 85,
+          "native_sample_bracket": [
+            21,
+            22
+          ],
+          "interpolation_fraction": 0.25,
+          "native_normalized_time": 0.85
+        },
+        {
+          "source_frame": 58,
+          "candidate_index_4x": 86,
+          "native_sample_bracket": [
+            21,
+            22
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.86
+        },
+        {
+          "source_frame": 59,
+          "candidate_index_4x": 88,
+          "native_sample_bracket": [
+            22,
+            22
+          ],
+          "interpolation_fraction": 0.0,
+          "native_normalized_time": 0.88
+        },
+        {
+          "source_frame": 60,
+          "candidate_index_4x": 90,
+          "native_sample_bracket": [
+            22,
+            23
+          ],
+          "interpolation_fraction": 0.5,
+          "native_normalized_time": 0.9
+        }
+      ],
+      "semantic_rmse": {
+        "left": {
+          "shoulder_orientation": 0.6254920838185369,
+          "elbow_flexion": 0.5246707742407517,
+          "forearm_roll": 0.8892764379627549,
+          "wrist_orientation": 0.1944122018423573,
+          "normalized_hand_position": 0.5486207179035685
+        },
+        "right": {
+          "shoulder_orientation": 0.8033794911479171,
+          "elbow_flexion": 0.6971663562285256,
+          "forearm_roll": 0.6388343395609272,
+          "wrist_orientation": 0.14290741629777284,
+          "normalized_hand_position": 0.44084695291156467
+        },
+        "combined": {
+          "shoulder_orientation": 0.714435787483227,
+          "elbow_flexion": 0.6109185652346387,
+          "forearm_roll": 0.7640553887618411,
+          "wrist_orientation": 0.16865980907006506,
+          "normalized_hand_position": 0.49473383540756655
+        }
+      },
+      "linear_phase_reference_rmse": {
+        "left": {
+          "shoulder_orientation": 0.6159157415795262,
+          "elbow_flexion": 0.6001784819822066,
+          "forearm_roll": 0.9579681835032127,
+          "wrist_orientation": 0.2099394067812347,
+          "normalized_hand_position": 0.6487904209887753
+        },
+        "right": {
+          "shoulder_orientation": 0.8275589050448312,
+          "elbow_flexion": 0.7535970653204791,
+          "forearm_roll": 0.7204546507540606,
+          "wrist_orientation": 0.16068627297514435,
+          "normalized_hand_position": 0.5177367664293249
+        }
+      },
+      "feature_ranges": {
+        "source_left": {
+          "shoulder_orientation": {
+            "min": -0.7664731411678001,
+            "max": 0.6353373661343564,
+            "range": 1.4018105073021565
+          },
+          "elbow_flexion": {
+            "min": 0.17498513473432772,
+            "max": 0.6780089994776323,
+            "range": 0.5030238647433045
+          },
+          "forearm_roll": {
+            "min": -0.1452089706520918,
+            "max": 0.4918419292977387,
+            "range": 0.6370508999498304
+          },
+          "wrist_orientation": {
+            "min": -0.4280874639926283,
+            "max": 0.28027687809639346,
+            "range": 0.7083643420890218
+          },
+          "signed_hand_position": {
+            "min": -0.4929702452628736,
+            "max": 0.3683988917352641,
+            "range": 0.8613691369981377
+          }
+        },
+        "target_left": {
+          "shoulder_orientation": {
+            "min": -0.6900240308019339,
+            "max": 0.9430074705581223,
+            "range": 1.633031501360056
+          },
+          "elbow_flexion": {
+            "min": 0.12486190705027307,
+            "max": 1.0061845358772206,
+            "range": 0.8813226288269475
+          },
+          "forearm_roll": {
+            "min": -1.2766810226466585,
+            "max": -0.004421802754560833,
+            "range": 1.2722592198920977
+          },
+          "wrist_orientation": {
+            "min": -0.09571199266412138,
+            "max": 0.21689034391975515,
+            "range": 0.31260233658387654
+          },
+          "signed_hand_position": {
+            "min": -0.8009705560530689,
+            "max": 0.7764117501191762,
+            "range": 1.577382306172245
+          }
+        },
+        "source_right": {
+          "shoulder_orientation": {
+            "min": -0.766545075767765,
+            "max": 0.6351804947491264,
+            "range": 1.4017255705168914
+          },
+          "elbow_flexion": {
+            "min": 0.8443643426936813,
+            "max": 1.312999326326879,
+            "range": 0.4686349836331978
+          },
+          "forearm_roll": {
+            "min": -0.23452009687818132,
+            "max": 0.47659925965342653,
+            "range": 0.7111193565316078
+          },
+          "wrist_orientation": {
+            "min": -0.27922561247404803,
+            "max": 0.4285318121384418,
+            "range": 0.7077574246124898
+          },
+          "signed_hand_position": {
+            "min": -0.4902020729741511,
+            "max": 0.3446918265215877,
+            "range": 0.8348938994957388
+          }
+        },
+        "target_right": {
+          "shoulder_orientation": {
+            "min": -0.9430062040160111,
+            "max": 0.7851482691738978,
+            "range": 1.728154473189909
+          },
+          "elbow_flexion": {
+            "min": 0.12485754889350598,
+            "max": 1.0061841080776994,
+            "range": 0.8813265591841934
+          },
+          "forearm_roll": {
+            "min": -0.04700098149742837,
+            "max": 1.0623323526898187,
+            "range": 1.109333334187247
+          },
+          "wrist_orientation": {
+            "min": -0.21689030292294947,
+            "max": 0.09207588411100807,
+            "range": 0.30896618703395756
+          },
+          "signed_hand_position": {
+            "min": -0.800968221765794,
+            "max": 0.7764135581285908,
+            "range": 1.5773817798943848
+          }
+        }
+      },
+      "motion_retention": {
+        "left": {
+          "shoulder_source_excursion_rad": 1.1091748557967556,
+          "shoulder_target_excursion_rad": 1.1994618675395263,
+          "shoulder_retention_percent": 108.14001609132356,
+          "elbow_source_range_rad": 0.5030238647433045,
+          "elbow_target_range_rad": 0.8813226288269475,
+          "elbow_retention_percent": 175.20493372152245
+        },
+        "right": {
+          "shoulder_source_excursion_rad": 1.1091559820311494,
+          "shoulder_target_excursion_rad": 1.199461867539514,
+          "shoulder_retention_percent": 108.14185623765842,
+          "elbow_source_range_rad": 0.4686349836331978,
+          "elbow_target_range_rad": 0.8813265591841934,
+          "elbow_retention_percent": 188.06247718672466
+        }
+      },
+      "max_final_pose_jump": {
+        "from_frame": 25,
+        "to_frame": 26,
+        "normalized_se3_max": 0.48919794829407126,
+        "normalized_se3_rms": 0.3547988752453889,
+        "worst_bone_index": 25,
+        "worst_bone": "bone_42"
+      },
+      "mean_final_pose_jump_rms": 0.14448396527604543,
+      "largest_per_bone_step": {
+        "from_frame": 25,
+        "to_frame": 26,
+        "normalized_se3_max": 0.48919794829407126,
+        "normalized_se3_rms": 0.3547988752453889,
+        "worst_bone_index": 25,
+        "worst_bone": "bone_42"
+      },
+      "glove_gap_max_armature_units": 0.03235241518610315,
+      "glove_gap_frame": 14,
+      "objective_cost": 3108.998024513206,
+      "phase_radius": 6.0,
+      "gate_passed": false
+    }
+  ],
+  "preview": {
+    "path": "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\luigi_walk_native_scaffold_v1.blend",
+    "action": "Waluigi_LuigiWalk_NativeScaffold_v1",
+    "rig": "ScaffoldWalk_Waluigi_Rig",
+    "meshes": [
+      "ScaffoldWalk_Waluigi_ARMTEST_29_0x75c1640_submesh0",
+      "ScaffoldWalk_Waluigi_ARMTEST_29_0x75c1640_submesh1"
+    ],
+    "replay_matrix_error": 3.860202464123219e-05,
+    "runtime_constraints": 0
+  }
+}
