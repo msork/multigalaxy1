@@ -103,6 +103,40 @@ with float32 prediction storage and Blender matrix evaluation. These results
 validate the identity and linear reconstruction path only; they do not validate
 a Luigi semantic driver or a retargeted motion manifold.
 
+## Full-character holdout overlay previews
+
+The arm-region PCA report alone is not a useful visual check: a character
+preview must retain the native pose context and every accessory. The preview
+builder evaluates each held-out native action on a disposable candidate-owner
+duplicate, converts the full pose to production basis, and duplicates the
+complete production character (both bound submeshes and their associated child
+objects) into separate native and PCA collections. The PCA copy starts from
+the full converted native pose; only the 38 profile bone transforms are
+replaced by the training-only PCA projection of that held-out pose. Root/object
+transforms, the intentional 43.437 scale, hat/cap, face, fingers, and all
+non-profile bone transforms remain native. No production object, rig, or
+action is written.
+
+Each holdout is saved as an independent local `.blend` under
+`tools/blender/reports/native_waluigi_context_pca_holdouts/`. The PCA collection
+is visible on open. To compare the native reference, show its
+`NativeReference_<action>` collection in the Outliner and hide
+`PCAOverlay_<action>`; showing both at once overlaps coincident geometry.
+`validate_context_pca_preview_file.py` reopens each saved file and compares
+world-space vertices at every action key and midpoint. All five holdouts pass;
+the largest saved-file vertex difference is `1.56e-4` world units across both
+submeshes (3,020 vertices per sampled time), with root and mesh object matrices
+matching exactly. This is an overlay/reconstruction check, not proof that the
+PCA projection is semantically suitable for a different source character.
+
+The live converted holdout context can differ from the stored dataset's
+selected-bone transforms (worst observed discrepancy: `bone_48` in
+`sequence_26`, about `4.57` matrix units at frame 0). The previews deliberately
+project the live native held-out profile into the training PCA subspace so the
+comparison isolates PCA reconstruction while retaining the live native
+context. Resolve this dataset/action-basis discrepancy before using the
+dataset for semantic source fitting.
+
 ## Reusable profile boundary
 
 Bone names, arm influence groups, mesh objects, holdout IDs, and hierarchy

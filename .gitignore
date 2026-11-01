@@ -30,3 +30,5 @@ dist/
 /tools/blender/reports/native_waluigi_arm_context_*.npz
 /tools/blender/reports/native_waluigi_arm_context_*.blend
 /tools/blender/reports/context_identity_probe.json
+/tools/blender/reports/native_waluigi_context_pca_holdouts/
+/tools/blender/reports/native_waluigi_context_pca_diagnostic/
