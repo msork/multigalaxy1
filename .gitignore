@@ -18,4 +18,5 @@ dist/
 *.exe
 # Native animation samples are extracted from proprietary game assets; regenerate locally.
 /tools/blender/reports/native_waluigi_arm_calibration.json
+/tools/blender/reports/native_waluigi_arm_calibration_production_basis.json.gz
 /tools/blender/reports/native_arm_preview_renders/

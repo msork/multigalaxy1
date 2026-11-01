@@ -150,3 +150,63 @@ action against the generic `sequence_*` channels and slot. Only a match with
 the expected source metadata and successful native mesh deformation should
 promote the generic actions to trusted data. No conversion matrix should be
 inferred from the current autosave alone.
+
+## Converted production-basis calibration dataset
+
+The earlier decision to exclude the `.004` slot family followed the failed direct
+replay on the production rest basis. It is superseded for calibration by the
+candidate-owner conversion validated in the previous section. The source family
+is still described as a candidate-owner family: action slot strings and generic
+`sequence_*` names do not recover the missing raw `.anm` import metadata. The
+anchor `sequence_10.003` was visually confirmed on the candidate owner; three
+converted actions (`sequence_10.003`, `sequence_15.003`, `sequence_24`) were
+visually reviewed on production-basis duplicates and remained coherent.
+
+`tools/blender/build_converted_native_arm_dataset.py` rebuilds the arm dataset
+from actions with exactly one `OBArmature.004` slot on temporary duplicates of
+`Armature.001` and `123475520_waluigi.gpl`. For every sample time it evaluates
+the candidate action, applies the validated constant object conversion and
+per-bone rest correction, solves target local bases top-down, writes a new
+temporary converted action, and re-evaluates that action. It then extracts
+production-basis arm transforms for bones 22, 23, 24, 25, 26, 27, 29, and 30,
+relative branch orientations, landmarks, and weighted centroids from duplicated
+production meshes. A matching candidate-space comparison mesh is generated
+from the production mesh with `inverse(C)` for full evaluated-vertex and
+centroid-motion comparisons. No original rig, mesh, or action is assigned or
+changed, and the intentional object scale remains 43.437.
+
+Sampling is the union of every exact FCurve key X value for the eight arm bones
+(including fractional/subframe keys) and the action frame-range endpoints.
+There is no uniform resampling. The 23/5 complete-action split remains valid;
+holdouts are `sequence_11.003`, `sequence_15.003`, `sequence_20.001`,
+`sequence_24`, and `sequence_26`. All 28 single-slot `.004` family actions pass
+conversion, full-mesh vertex, weighted-centroid-motion, and joint-gap checks.
+The rebuilt local gzip dataset has 1,100 samples (838 train, 262 holdout) and
+is ignored by Git because it is a large analysis artifact derived from external
+game assets. The compact committed report is
+`tools/blender/reports/native_waluigi_arm_conversion_validation.json`.
+
+Across all actions the maximum production pose-matrix replay error is
+`5.25e-6`; the maximum evaluated mesh-vertex error is `0.000226` world units;
+the maximum weighted-centroid motion error is `0.000201` world units. The
+largest joint-gap deviation from the neutral production duplicate is
+`0.000161` world units. The written local action basis replay error stays below
+`1.23e-6`. These results make the dataset suitable for **exploratory** manifold
+fitting, but not for claiming semantic completeness or final retarget quality.
+No manifold has been fitted. Verify source `.anm` provenance and add semantic
+labels/coverage before treating a learned model as production-ready.
+
+Rebuild from the local autosave with:
+
+```powershell
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background `
+  "$env:LOCALAPPDATA\Temp\Waluigi_Sluggers_2368_autosave.blend" --python `
+  tools/blender/build_converted_native_arm_dataset.py -- `
+  --output tools/blender/reports/native_waluigi_arm_calibration_production_basis.json.gz `
+  --validation-output tools/blender/reports/native_waluigi_arm_conversion_validation.json
+```
+
+The tool accepts source/target object names, slot ID, mesh names, bone names,
+holdouts, and validation tolerances as arguments so the conversion/data
+extraction mechanics can be reused with a Wario target profile after its source
+and matching skeleton have been verified.
