@@ -1,0 +1,93 @@
+{
+  "schema": "mg1.native-arm-context-results.v1",
+  "source_dataset": "native_waluigi_arm_calibration_production_basis.json.gz",
+  "source_profile": "Armature.001 / OBArmature.004 converted to production Waluigi basis",
+  "native_actions": 28,
+  "samples": {
+    "total": 1107,
+    "train_actions": 23,
+    "train_samples": 845,
+    "holdout_actions": [
+      "sequence_11.003",
+      "sequence_15.003",
+      "sequence_20.001",
+      "sequence_24",
+      "sequence_26"
+    ],
+    "holdout_samples": 262
+  },
+  "context_profile": {
+    "arm_region_vertex_count": 239,
+    "initial_arm_bone_count": 8,
+    "expanded_bone_count": 38,
+    "added_bone_count": 30,
+    "direct_co_influences": [
+      "bone_20",
+      "bone_31",
+      "bone_35",
+      "bone_39",
+      "bone_43",
+      "bone_47",
+      "bone_48",
+      "bone_52"
+    ],
+    "other_added_context": [
+      "bone_1",
+      "bone_2",
+      "bone_3",
+      "bone_5",
+      "bone_6",
+      "bone_19",
+      "bone_21",
+      "bone_32",
+      "bone_33",
+      "bone_34",
+      "bone_36",
+      "bone_37",
+      "bone_38",
+      "bone_40",
+      "bone_41",
+      "bone_42",
+      "bone_44",
+      "bone_45",
+      "bone_46",
+      "bone_49",
+      "bone_50",
+      "bone_51"
+    ],
+    "deformation_rank_top": [
+      {"bone": "bone_20", "affected_vertices": 40, "animated_actions": 28, "relative_score": 206.39},
+      {"bone": "bone_35", "affected_vertices": 9, "animated_actions": 20, "relative_score": 167.54},
+      {"bone": "bone_43", "affected_vertices": 9, "animated_actions": 21, "relative_score": 153.13},
+      {"bone": "bone_47", "affected_vertices": 10, "animated_actions": 21, "relative_score": 148.55},
+      {"bone": "bone_39", "affected_vertices": 9, "animated_actions": 21, "relative_score": 147.66},
+      {"bone": "bone_31", "affected_vertices": 5, "animated_actions": 21, "relative_score": 122.04},
+      {"bone": "bone_48", "affected_vertices": 1, "animated_actions": 21, "relative_score": 52.19},
+      {"bone": "bone_52", "affected_vertices": 1, "animated_actions": 21, "relative_score": 3.83}
+    ]
+  },
+  "identity_replay": {
+    "status": "pass",
+    "max_pose_matrix_error": 0.000003815,
+    "max_arm_region_vertex_error_world": 0.000173107,
+    "rmse_arm_region_vertex_error_world": 0.000054779,
+    "max_arm_region_centroid_error_world": 0.000167152,
+    "max_landmark_error_world": 0.000141970,
+    "method": "replay extracted transforms on a disposable production-basis rig; compare all affected vertices and arm-region centroids to full converted action captures"
+  },
+  "pca_only": {
+    "input_feature_dimensions": 228,
+    "latent_dimensions": 192,
+    "selection": "five-fold action-grouped CV on the 23 training actions only, one-standard-error rule",
+    "training_feature_rmse_standardized": 0.00000001352,
+    "holdout_feature_rmse_standardized": 0.00000007254,
+    "holdout_max_arm_region_vertex_error_world": 0.000148381,
+    "holdout_max_arm_region_centroid_error_world": 0.000143291,
+    "holdout_max_landmark_error_world": 0.000127497,
+    "worst_aggregate_holdout_bone_rotation_rmse_degrees": {"bone": "bone_51", "value": 0.000014873},
+    "worst_aggregate_holdout_bone_translation_rmse_world": {"bone": "bone_51", "value": 0.000000721},
+    "nonlinear_decoder": "not fit"
+  },
+  "preview_file": "tools/blender/reports/native_waluigi_arm_context_pca_holdout_previews.blend",
+  "production_mutated": false
+}

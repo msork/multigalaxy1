@@ -204,7 +204,7 @@ def continuity_values(rig, pairs):
     return out
 
 
-def mesh_centroids(meshes, depsgraph, bones):
+def mesh_centroids(meshes, depsgraph, bones, region_bones):
     rows = {}
     for obj in meshes:
         mesh_label = obj.name.removeprefix("_MG1_Dataset_Target_")
@@ -212,6 +212,14 @@ def mesh_centroids(meshes, depsgraph, bones):
         sums = {name: Vector((0.0, 0.0, 0.0)) for name in bones}
         weight_sums = {name: 0.0 for name in bones}
         counts = {name: 0 for name in bones}
+        region_indices = set()
+        arm_groups = {g.index for g in obj.vertex_groups if g.name in region_bones}
+        for vertex in obj.data.vertices:
+            if any(a.group in arm_groups and a.weight > 0 for a in vertex.groups):
+                region_indices.add(vertex.index)
+        region_sums = {name: Vector((0.0, 0.0, 0.0)) for name in bones}
+        region_weight_sums = {name: 0.0 for name in bones}
+        region_counts = {name: 0 for name in bones}
         evaluated = obj.evaluated_get(depsgraph)
         mesh = evaluated.to_mesh()
         try:
@@ -225,18 +233,44 @@ def mesh_centroids(meshes, depsgraph, bones):
                         sums[name] += world * assignment.weight
                         weight_sums[name] += assignment.weight
                         counts[name] += 1
+                        if index in region_indices:
+                            region_sums[name] += world * assignment.weight
+                            region_weight_sums[name] += assignment.weight
+                            region_counts[name] += 1
         finally:
             evaluated.to_mesh_clear()
         rows[mesh_label] = {}
         for name in bones:
             centroid_world = sums[name] / weight_sums[name] if weight_sums[name] else None
             centroid_armature = (inv_armature @ centroid_world) if centroid_world is not None else None
+            region_centroid = (region_sums[name] / region_weight_sums[name]
+                               if region_weight_sums[name] else None)
             rows[mesh_label][name] = {
                 "weighted_vertex_count": counts[name],
                 "weighted_centroid_world": [float(v) for v in centroid_world] if centroid_world is not None else None,
                 "weighted_centroid_armature": [float(v) for v in centroid_armature] if centroid_armature is not None else None,
+                "arm_region_weighted_vertex_count": region_counts[name],
+                "arm_region_weighted_centroid_world": [float(v) for v in region_centroid] if region_centroid is not None else None,
             }
     return rows
+
+
+def arm_region_vertex_positions(meshes, depsgraph, region_bones):
+    """World positions for vertices touched by any configured region bone."""
+    output = {}
+    for obj in meshes:
+        arm_groups = {g.index for g in obj.vertex_groups if g.name in region_bones}
+        indices = [v.index for v in obj.data.vertices
+                   if any(a.group in arm_groups and a.weight > 0 for a in v.groups)]
+        evaluated = obj.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+        try:
+            label = obj.name.removeprefix("_MG1_Dataset_Target_")
+            output[label] = {str(i): [float(x) for x in evaluated.matrix_world @ mesh.vertices[i].co]
+                             for i in indices}
+        finally:
+            evaluated.to_mesh_clear()
+    return output
 
 
 def extract_pose(target, bones, landmarks, relative_pairs, centroids):
@@ -303,6 +337,8 @@ def args_parse():
     parser.add_argument("--target-rig", default="123475520_waluigi.gpl")
     parser.add_argument("--mesh", action="append", dest="meshes")
     parser.add_argument("--bones", nargs="+", default=list(DEFAULT_BONES))
+    parser.add_argument("--arm-region-bones", nargs="+", default=list(DEFAULT_BONES),
+                        help="groups defining the affected mesh region used for identity validation")
     parser.add_argument("--slot-id", default="OBArmature.004")
     parser.add_argument("--anchor-action", default="sequence_10.003")
     parser.add_argument("--holdout", action="append", dest="holdouts")
@@ -319,6 +355,7 @@ def main():
     args = args_parse()
     import bpy
     bones = list(args.bones)
+    region_bones = set(args.arm_region_bones)
     holdouts = set(args.holdouts or DEFAULT_HOLDOUTS)
     landmarks = DEFAULT_LANDMARKS
     relative_pairs = DEFAULT_RELATIVE_PAIRS
@@ -409,6 +446,10 @@ def main():
                 exact_keys, sample_times = arm_curve_times(action, slot, bones)
                 if not exact_keys:
                     raise ValueError("no keyed channels for requested arm bones")
+                # Each native clip is an independent action from the candidate
+                # owner's clean rest basis. Do not leak omitted channels from
+                # the previously sampled sequence into this clip.
+                reset_pose(source)
                 source.animation_data_create()
                 target.animation_data_create()
                 source.animation_data.action = action
@@ -452,8 +493,8 @@ def main():
                                      for n in expected_bases), default=0.0)
                     max_written_err = max(max_written_err, basis_err)
                     depsgraph = bpy.context.evaluated_depsgraph_get()
-                    source_centroids = mesh_centroids(source_meshes, depsgraph, bones)
-                    target_centroids = mesh_centroids(target_meshes, depsgraph, bones)
+                    source_centroids = mesh_centroids(source_meshes, depsgraph, bones, region_bones)
+                    target_centroids = mesh_centroids(target_meshes, depsgraph, bones, region_bones)
                     if src_base is None:
                         src_base, dst_base = source_centroids, target_centroids
                     motion_errors = centroid_motion_error(source_centroids, target_centroids, src_base, dst_base, bones)
@@ -468,7 +509,9 @@ def main():
                     for label, value in gaps.items():
                         gap_series[label].append(value)
                     feature = extract_pose(target, bones, landmarks, relative_pairs, target_centroids)
+                    arm_region_vertices = arm_region_vertex_positions(target_meshes, depsgraph, region_bones)
                     rows.append({"time": float(time), **feature,
+                        "arm_region_vertex_positions_world": arm_region_vertices,
                         "conversion_validation": {"max_pose_matrix_error": max_pose_err,
                             "max_mesh_vertex_error_world": max_vertex_err,
                             "weighted_centroid_motion_error_world": max(motion_errors.values(), default=0.0),
@@ -528,6 +571,7 @@ def main():
             "slot_id": args.slot_id,
             "anchor_action": args.anchor_action,
             "bones": bones,
+            "arm_region_bones": sorted(region_bones),
             "action_count_candidate": len(actions),
             "converted_action_count": sum(r["status"] == "converted" for r in action_reports),
             "failed_action_count": sum(r["status"] != "converted" for r in action_reports),
@@ -558,6 +602,7 @@ def main():
             "anchor_action": args.anchor_action,
             "provenance_policy": "source actions were evaluated only on Armature.001 duplicates, converted to production rest basis, then extracted from production-basis duplicates; raw orphaned channels are never emitted as training features",
             "bones": bones,
+            "arm_region_bones": sorted(region_bones),
             "rest_bones": rest_data,
             "weighted_mesh_vertices_rest": rest_mesh_weights,
             "pose_reset_policy": "all temporary source/target pose bases reset to identity before each source/converted action",

@@ -25,3 +25,8 @@ dist/
 /tools/blender/reports/native_arm_pose_model_metrics.json
 /tools/blender/reports/native_arm_pose_model_previews.blend
 /tools/blender/reports/native_arm_preview_renders/
+/tools/blender/reports/native_waluigi_arm_context_*.json
+/tools/blender/reports/native_waluigi_arm_context_*.json.gz
+/tools/blender/reports/native_waluigi_arm_context_*.npz
+/tools/blender/reports/native_waluigi_arm_context_*.blend
+/tools/blender/reports/context_identity_probe.json
