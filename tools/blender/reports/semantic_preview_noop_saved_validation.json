@@ -1,5 +1,5 @@
 {
-  "schema": "mg1.semantic-preview-noop-saved-validation.v1",
+  "schema": "mg1.validated-walk-noop-saved-validation.v2",
   "file": "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\luigi_walk_semantic_waluigi_left_arm_noop.blend",
   "frames": [
     0,
@@ -66,14 +66,34 @@
   ],
   "actions": {
     "reference": {
-      "action": "Waluigi_LuigiWalk_SemanticNoOp_Reference_v1",
-      "slot": "OBSemanticNoOp_Reference_Rig"
+      "action": "Waluigi_ValidatedWalk_Reference_v2",
+      "slot": "OBValidatedWalk_NoOp_Reference_Rig"
     },
     "preview": {
-      "action": "Waluigi_LuigiWalk_SemanticNoOp_v1",
-      "slot": "OBSemanticNoOp_Preview_Rig"
+      "action": "Waluigi_ValidatedWalk_NoOp_v2",
+      "slot": "OBValidatedWalk_NoOp_Preview_Rig"
     }
   },
+  "baseline_source_comparison": {
+    "max_pose_matrix_error": {
+      "error": 0.0
+    },
+    "max_vertex_world_error": 4.9623292070407e-05,
+    "worst_vertex": {
+      "error": 4.9623292070407e-05,
+      "frame": 56,
+      "mesh": "ARMTEST_29_0x75c1640_submesh1",
+      "vertex": 30
+    },
+    "max_foot_tail_error": 6.877043295791605e-06,
+    "head_cap_weighted_centroid_group": "bone_53",
+    "max_head_cap_centroid_error": 1.621246337890625e-05,
+    "vertex_samples": 184220
+  },
+  "saved_foot_trajectory_max_error": {
+    "error": 0.0
+  },
+  "saved_head_cap_centroid_max_error": 0.0,
   "rig_world_error": 0.0,
   "rig_world_scale": [
     43.4370002746582,
@@ -82,7 +102,7 @@
   ],
   "preview_mesh_bindings": [
     {
-      "object": "SemanticNoOp_Preview_29_0x75c1640_submesh0",
+      "object": "ValidatedWalk_NoOp_Preview_ARMTEST_29_0x75c1640_submesh0",
       "object_scale": [
         1.0,
         1.0,
@@ -93,36 +113,36 @@
         43.4370002746582,
         43.4370002746582
       ],
-      "parent": "SemanticNoOp_Preview_Rig",
+      "parent": "ValidatedWalk_NoOp_Preview_Rig",
       "parent_inverse_scale": [
         1.0,
         1.0,
         1.0
       ],
       "armature_modifier_targets": [
-        "SemanticNoOp_Preview_Rig"
+        "ValidatedWalk_NoOp_Preview_Rig"
       ]
     },
     {
-      "object": "SemanticNoOp_Preview_29_0x75c1640_submesh1",
+      "object": "ValidatedWalk_NoOp_Preview_ARMTEST_29_0x75c1640_submesh1",
       "object_scale": [
-        1.0,
-        1.0,
-        1.0
+        0.9999982118606567,
+        0.9999979734420776,
+        0.9999969005584717
       ],
       "world_scale": [
-        43.4370002746582,
-        43.4370002746582,
-        43.4370002746582
+        43.43692398071289,
+        43.436912536621094,
+        43.436866760253906
       ],
-      "parent": "SemanticNoOp_Preview_Rig",
+      "parent": "ValidatedWalk_NoOp_Preview_Rig",
       "parent_inverse_scale": [
         1.0,
         1.0,
         1.0
       ],
       "armature_modifier_targets": [
-        "SemanticNoOp_Preview_Rig"
+        "ValidatedWalk_NoOp_Preview_Rig"
       ]
     }
   ],
@@ -138,10 +158,10 @@
   "mesh_vertex_world_rmse": 0.0,
   "mesh_vertex_samples": 184220,
   "per_mesh_max_error": {
-    "SemanticNoOp_Preview_29_0x75c1640_submesh0": {
+    "ValidatedWalk_NoOp_Preview_ARMTEST_29_0x75c1640_submesh0": {
       "error": 0.0
     },
-    "SemanticNoOp_Preview_29_0x75c1640_submesh1": {
+    "ValidatedWalk_NoOp_Preview_ARMTEST_29_0x75c1640_submesh1": {
       "error": 0.0
     }
   },

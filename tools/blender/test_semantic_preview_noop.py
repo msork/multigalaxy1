@@ -1,8 +1,7 @@
-"""Build and validate a zero-change semantic preview against the walk action.
+"""Build a clean-basis no-op preview from the validated Arm_Test walk.
 
-Run in Blender background mode on a scene containing the production Waluigi
-rig, its bound meshes, and Waluigi_GalaxyWalk_Legs_Baked. Only duplicates are
-animated or saved. The solver is not imported or executed.
+Run in Blender background mode on a saved recovery scene. The production rig,
+action, and source meshes are sampled only; every preview is a duplicate.
 """
 import argparse
 import json
@@ -10,154 +9,267 @@ import os
 import sys
 
 import bpy
+from mathutils import Matrix, Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from build_context_pca_previews import (
-    associated_objects, duplicate_character_objects, move_to_collection,
-)
 from convert_native_owner_actions import duplicate_rig
 
 
 def parse_args():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     parser = argparse.ArgumentParser()
-    parser.add_argument("--target-rig", default="123475520_waluigi.gpl")
+    parser.add_argument("--baseline-rig", default="Waluigi_Arm_Test")
+    parser.add_argument("--clean-rig", default="Waluigi_Arm_Clean_Backup")
     parser.add_argument("--walk-action", default="Waluigi_GalaxyWalk_Legs_Baked")
     parser.add_argument("--walk-slot", default="")
+    parser.add_argument("--mesh", action="append", default=[])
+    parser.add_argument("--head-group", default="bone_53")
+    parser.add_argument("--foot-bones", nargs=2, default=["bone_8", "bone_14"])
     parser.add_argument("--start", type=int, default=0)
     parser.add_argument("--end", type=int, default=60)
     parser.add_argument("--preview", required=True)
-    parser.add_argument("--report", required=True)
+    parser.add_argument("--baseline-report", required=True)
+    parser.add_argument("--pose-tolerance", type=float, default=1e-5)
+    parser.add_argument("--vertex-tolerance", type=float, default=1e-4)
     return parser.parse_args(argv)
 
 
-def rows(matrix):
-    return [[float(matrix[r][c]) for c in range(4)] for r in range(4)]
-
-
-def max_matrix_error(a, b):
+def mat_error(a, b):
     return max(abs(float(a[r][c]) - float(b[r][c]))
                for r in range(4) for c in range(4))
 
 
-def active_layer_for(collection):
-    def visit(layer):
-        if layer.collection == collection:
-            layer.exclude = False
-            layer.hide_viewport = False
-            return True
-        for child in layer.children:
-            if visit(child):
-                layer.exclude = False
-                layer.hide_viewport = False
-                return True
-        return False
-    return visit(bpy.context.view_layer.layer_collection)
+def vec_rows(v):
+    return [float(v.x), float(v.y), float(v.z)]
 
 
-def rebind_action_curves(action, source_slot, target):
-    """Copy one slot's channels to a duplicate-owned local action slot."""
-    source_bags = [bag for layer in action.layers for strip in layer.strips
-                   for bag in strip.channelbags if bag.slot == source_slot]
-    if len(source_bags) != 1:
-        raise RuntimeError("expected exactly one source walk channelbag")
-    duplicate = bpy.data.actions.new("_NoOpSource_" + target.name)
-    slot = duplicate.slots.new("OBJECT", target.name)
-    layer = duplicate.layers.new("Rebound validated walk channels")
-    strip = layer.strips.new(type="KEYFRAME")
+def matrix_rows(m):
+    return [[float(m[r][c]) for c in range(4)] for r in range(4)]
+
+
+def duplicate_mesh(source, target_rig, collection, prefix):
+    dup = source.copy()
+    dup.data = source.data.copy()
+    dup.name = prefix + source.name
+    dup.data.name = prefix + source.data.name
+    collection.objects.link(dup)
+    dup.parent = target_rig
+    dup.parent_type = 'OBJECT'
+    dup.parent_bone = ''
+    dup.matrix_parent_inverse = source.matrix_parent_inverse.copy()
+    dup.matrix_world = source.matrix_world.copy()
+    for mod in dup.modifiers:
+        if mod.type == 'ARMATURE' and mod.object is not None:
+            mod.object = target_rig
+    for constraint in dup.constraints:
+        if hasattr(constraint, 'target') and constraint.target == source.parent:
+            constraint.target = target_rig
+    return dup
+
+
+def copy_action_slot(action, source_slot, target, name):
+    bags = [bag for layer in action.layers for strip in layer.strips
+            for bag in strip.channelbags if bag.slot == source_slot]
+    if len(bags) != 1:
+        raise RuntimeError(f"expected one action channelbag for {source_slot.identifier}")
+    out = bpy.data.actions.new(name)
+    out.use_fake_user = True
+    slot = out.slots.new('OBJECT', target.name)
+    layer = out.layers.new("Validated walk channels on clean Waluigi basis")
+    strip = layer.strips.new(type='KEYFRAME')
     bag = strip.channelbag(slot, ensure=True)
-    for source_curve in source_bags[0].fcurves:
-        group = source_curve.group.name if source_curve.group else None
-        options = {"index": source_curve.array_index}
-        if group:
-            options["group_name"] = group
-        curve = bag.fcurves.new(source_curve.data_path, **options)
-        curve.keyframe_points.add(len(source_curve.keyframe_points))
-        for source_point, point in zip(source_curve.keyframe_points, curve.keyframe_points):
-            point.co = source_point.co
-            point.interpolation = source_point.interpolation
-            point.handle_left_type = source_point.handle_left_type
-            point.handle_right_type = source_point.handle_right_type
-            point.handle_left = source_point.handle_left
-            point.handle_right = source_point.handle_right
-        curve.update()
+    for curve in bags[0].fcurves:
+        # The walk is baked. Old IK pole-angle curves are debug remnants and
+        # must not add a constraint-driven layer to the preview.
+        if '.constraints[' in curve.data_path:
+            continue
+        kwargs = {'index': curve.array_index}
+        if curve.group:
+            kwargs['group_name'] = curve.group.name
+        copy = bag.fcurves.new(curve.data_path, **kwargs)
+        copy.keyframe_points.add(len(curve.keyframe_points))
+        for p, q in zip(curve.keyframe_points, copy.keyframe_points):
+            q.co = p.co
+            q.interpolation = p.interpolation
+            q.handle_left_type = p.handle_left_type
+            q.handle_right_type = p.handle_right_type
+            q.handle_left = p.handle_left
+            q.handle_right = p.handle_right
+        copy.update()
     target.animation_data_create()
-    target.animation_data.action = duplicate
+    target.animation_data.action = out
     target.animation_data.action_slot = slot
-    return duplicate
+    return out
+
+
+def evaluated_vertices(objects):
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    output = []
+    for obj in objects:
+        ev = obj.evaluated_get(depsgraph)
+        mesh = ev.to_mesh()
+        try:
+            output.append([ev.matrix_world @ v.co for v in mesh.vertices])
+        finally:
+            ev.to_mesh_clear()
+    return output
+
+
+def weighted_group_centroid(objects, evaluated, group_name):
+    weighted_sum = [0.0, 0.0, 0.0]
+    total = 0.0
+    for obj, points in zip(objects, evaluated):
+        group = obj.vertex_groups.get(group_name)
+        if group is None:
+            continue
+        by_index = {v.index: v for v in obj.data.vertices}
+        for index, vertex in by_index.items():
+            try:
+                weight = group.weight(index)
+            except RuntimeError:
+                continue
+            for axis in range(3):
+                weighted_sum[axis] += float(points[index][axis]) * weight
+            total += weight
+    return [value / total for value in weighted_sum] if total else None
+
+
+def foot_positions(rig, names):
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    ev = rig.evaluated_get(depsgraph)
+    result = {}
+    for name in names:
+        if name not in ev.pose.bones:
+            raise RuntimeError(f"foot landmark bone missing: {name}")
+        result[name] = vec_rows(ev.matrix_world @ ev.pose.bones[name].tail)
+    return result
+
+
+def max_point_error(a, b):
+    return max(((x - y).length for xa, xb in zip(a, b) for x, y in zip(xa, xb)), default=0.0)
 
 
 def main():
     args = parse_args()
-    if args.end < args.start:
-        raise ValueError("end frame precedes start frame")
     scene = bpy.context.scene
-    target = bpy.data.objects.get(args.target_rig)
-    walk = bpy.data.actions.get(args.walk_action)
-    if not target or target.type != "ARMATURE" or walk is None:
-        raise RuntimeError("production-basis Waluigi rig or validated walk action is missing")
-    slots = [slot for slot in walk.slots
-             if not args.walk_slot or slot.identifier == args.walk_slot]
+    baseline = bpy.data.objects.get(args.baseline_rig)
+    clean = bpy.data.objects.get(args.clean_rig)
+    action = bpy.data.actions.get(args.walk_action)
+    if not baseline or baseline.type != 'ARMATURE' or not clean or clean.type != 'ARMATURE' or action is None:
+        raise RuntimeError("walk baseline, clean Waluigi rig, or validated walk action is missing")
+    slots = [s for s in action.slots if not args.walk_slot or s.identifier == args.walk_slot]
     if len(slots) != 1:
-        raise RuntimeError("validated walk action slot is ambiguous")
-    slot = slots[0]
-    if abs(float(target.scale.x) - 43.437) > 0.01:
-        raise RuntimeError("Waluigi source object scale differs from the expected 43.437")
+        raise RuntimeError("walk action slot is ambiguous")
+    source_slot = slots[0]
+    source_meshes = [bpy.data.objects[n] for n in args.mesh] if args.mesh else sorted(
+        [o for o in bpy.data.objects if o.name.startswith('ARMTEST_') and o.type == 'MESH'],
+        key=lambda o: o.name)
+    source_meshes = [o for o in source_meshes if any(m.type == 'ARMATURE' and m.object == baseline for m in o.modifiers)]
+    if not source_meshes:
+        raise RuntimeError("no full-character ARMTEST meshes bound to the selected walk baseline")
+    if abs(float(baseline.matrix_world.to_scale().x) - 43.437) > 0.01:
+        raise RuntimeError("validated walk rig does not have its expected 43.437 world scale")
+    if set(clean.data.bones.keys()) != set(baseline.data.bones.keys()):
+        raise RuntimeError("clean rig and walk rig have different bone sets")
+    for bone in clean.data.bones:
+        other = baseline.data.bones[bone.name]
+        if (bone.parent.name if bone.parent else None) != (other.parent.name if other.parent else None):
+            raise RuntimeError(f"parent mismatch against clean basis: {bone.name}")
+        if mat_error(bone.matrix_local, other.matrix_local) > 1e-6:
+            raise RuntimeError(f"rest matrix mismatch against clean basis: {bone.name}")
 
-    source_objects = associated_objects(target)
-    source_objects = [obj for obj in source_objects if obj.type == "MESH" and
-        not obj.name.startswith("ARMTEST_") and "_ArmRetargetPreview" not in obj.name]
-    if not source_objects:
-        raise RuntimeError("no production Waluigi meshes found")
-    old_frame = scene.frame_current
-    old_subframe = scene.frame_subframe
-    original_objects = set(bpy.data.objects)
-    original_actions = set(bpy.data.actions)
-    original_collections = set(bpy.data.collections)
-    reference_collection = bpy.data.collections.new("SemanticNoOp_Reference")
-    preview_collection = bpy.data.collections.new("SemanticNoOp_Preview")
-    scene.collection.children.link(reference_collection)
+    frames = list(range(args.start, args.end + 1))
+    old_frame, old_subframe = scene.frame_current, scene.frame_subframe
+    old_objects = set(bpy.data.objects)
+    old_actions = set(bpy.data.actions)
+    old_collections = set(bpy.data.collections)
+    preview_collection = bpy.data.collections.new("ValidatedWalk_NoOp_Preview")
+    reference_collection = bpy.data.collections.new("ValidatedWalk_NoOp_Reference")
     scene.collection.children.link(preview_collection)
-    rigs, meshes = [], []
-    actions = []
+    scene.collection.children.link(reference_collection)
     try:
-        reference_rig = duplicate_rig(target, "SemanticNoOp_Reference_Rig")
-        preview_rig = duplicate_rig(target, "SemanticNoOp_Preview_Rig")
-        rigs.extend((reference_rig, preview_rig))
-        move_to_collection(reference_rig, reference_collection)
-        move_to_collection(preview_rig, preview_collection)
-        reference_meshes = duplicate_character_objects(source_objects, target,
-            reference_rig, reference_collection, "SemanticNoOp_Reference_")
-        preview_meshes = duplicate_character_objects(source_objects, target,
-            preview_rig, preview_collection, "SemanticNoOp_Preview_")
-        # Match the already visually validated PCA preview: the 43.437 object
-        # transform lives on the armature, and bound meshes have unit world
-        # scale. Preserving the autosave's world-scale-1 mesh while adding a
-        # scaled parent creates a 43.437x different modifier-space transform.
-        for obj in reference_meshes + preview_meshes:
-            obj.matrix_world = target.matrix_world.copy()
-        meshes.extend(reference_meshes + preview_meshes)
-        frames = list(range(args.start, args.end + 1))
-        # Copy the original ActionSlot curves into actions owned by the two
-        # duplicates. Reusing the source slot by name is known to bind
-        # incompletely; reconstructing armature-space matrices is also avoided.
-        reference_action = rebind_action_curves(walk, slot, reference_rig)
-        reference_action.name = "Waluigi_LuigiWalk_SemanticNoOp_Reference_v1"
-        actions.append(reference_action)
-        preview_action = rebind_action_curves(walk, slot, preview_rig)
-        preview_action.name = "Waluigi_LuigiWalk_SemanticNoOp_v1"
-        actions.append(preview_action)
+        # The clean rig is the pose baseline; the validated walk rig supplies
+        # object placement and exact mesh objects. No stale production pose is
+        # sampled or copied.
+        preview_rig = duplicate_rig(clean, "ValidatedWalk_NoOp_Preview_Rig")
+        reference_rig = duplicate_rig(clean, "ValidatedWalk_NoOp_Reference_Rig")
+        for rig, coll in ((preview_rig, preview_collection), (reference_rig, reference_collection)):
+            for c in list(rig.users_collection):
+                c.objects.unlink(rig)
+            coll.objects.link(rig)
+            rig.matrix_world = baseline.matrix_world.copy()
+            rig.animation_data_clear()
+            for pb in rig.pose.bones:
+                pb.matrix_basis = Matrix.Identity(4)
+        preview_meshes = [duplicate_mesh(o, preview_rig, preview_collection, "ValidatedWalk_NoOp_Preview_") for o in source_meshes]
+        reference_meshes = [duplicate_mesh(o, reference_rig, reference_collection, "ValidatedWalk_NoOp_Reference_") for o in source_meshes]
+        preview_action = copy_action_slot(action, source_slot, preview_rig, "Waluigi_ValidatedWalk_NoOp_v2")
+        reference_action = copy_action_slot(action, source_slot, reference_rig, "Waluigi_ValidatedWalk_Reference_v2")
+        # Clear copied constraints on preview duplicates; this action is baked.
+        constraint_counts = {}
+        for rig in (preview_rig, reference_rig):
+            for pb in rig.pose.bones:
+                constraint_counts[pb.name] = len(pb.constraints)
+                for c in list(pb.constraints):
+                    pb.constraints.remove(c)
 
-        # Keep only the no-op preview visible in the generated file.
-        reference_collection.hide_viewport = True
-        reference_collection.hide_render = True
-        preview_collection.hide_viewport = False
-        preview_collection.hide_render = False
-        if not active_layer_for(preview_collection):
-            raise RuntimeError("no-op preview collection is not in the active view layer")
-        if not active_layer_for(preview_collection):
-            raise RuntimeError("preview collection is missing from the active layer")
+        max_pose = {"error": 0.0}
+        max_vertex = {"error": 0.0}
+        max_foot = 0.0
+        max_cap = 0.0
+        cap_positions, foot_tracks = [], {name: [] for name in args.foot_bones}
+        source_pose_error = {"error": 0.0}
+        sample_count = 0
+        for frame in frames:
+            scene.frame_set(frame)
+            bpy.context.view_layer.update()
+            depsgraph = bpy.context.evaluated_depsgraph_get()
+            source_rig_ev = baseline.evaluated_get(depsgraph)
+            ref_ev = reference_rig.evaluated_get(depsgraph)
+            prev_ev = preview_rig.evaluated_get(depsgraph)
+            for pb in prev_ev.pose.bones:
+                err = mat_error(pb.matrix, ref_ev.pose.bones[pb.name].matrix)
+                if err > max_pose['error']:
+                    max_pose = {"error": err, "frame": frame, "bone": pb.name}
+            # Compare the rebound, clean-basis replay against the actual
+            # validated Waluigi_Arm_Test walk before hiding the source.
+            for name in source_rig_ev.pose.bones.keys():
+                err = mat_error(source_rig_ev.pose.bones[name].matrix, ref_ev.pose.bones[name].matrix)
+                if err > source_pose_error['error']:
+                    source_pose_error = {"error": err, "frame": frame, "bone": name}
+            ref_verts = evaluated_vertices(reference_meshes)
+            prev_verts = evaluated_vertices(preview_meshes)
+            src_verts = evaluated_vertices(source_meshes)
+            for mesh_i in range(len(source_meshes)):
+                if len(src_verts[mesh_i]) != len(ref_verts[mesh_i]):
+                    raise RuntimeError(f"vertex count mismatch for {source_meshes[mesh_i].name}")
+                for vi, (a, b) in enumerate(zip(src_verts[mesh_i], ref_verts[mesh_i])):
+                    error = float((a - b).length)
+                    sample_count += 1
+                    if error > max_vertex['error']:
+                        max_vertex = {"error": error, "frame": frame,
+                            "mesh": source_meshes[mesh_i].name, "vertex": vi}
+            for mesh_i, (ref_points, prev_points) in enumerate(zip(ref_verts, prev_verts)):
+                for vi, (a, b) in enumerate(zip(ref_points, prev_points)):
+                    error = float((a - b).length)
+                    if error > max_vertex['error'] and error > args.vertex_tolerance:
+                        max_vertex = {"error": error, "frame": frame,
+                            "mesh": preview_meshes[mesh_i].name, "vertex": vi}
+            src_feet = foot_positions(baseline, args.foot_bones)
+            ref_feet = foot_positions(reference_rig, args.foot_bones)
+            for name in args.foot_bones:
+                foot_tracks[name].append(ref_feet[name])
+                e = (Vector(src_feet[name]) - Vector(ref_feet[name])).length
+                max_foot = max(max_foot, float(e))
+            src_cap = weighted_group_centroid(source_meshes, src_verts, args.head_group)
+            ref_cap = weighted_group_centroid(reference_meshes, ref_verts, args.head_group)
+            if src_cap is not None and ref_cap is not None:
+                cap_positions.append(ref_cap)
+                e = (Vector(src_cap) - Vector(ref_cap)).length
+                max_cap = max(max_cap, float(e))
+
+        # Keep only the preview visible when opening the saved file.
         reference_collection.hide_viewport = True
         reference_collection.hide_render = True
         for obj in list(reference_collection.objects):
@@ -165,68 +277,74 @@ def main():
             obj.hide_render = True
             obj.hide_set(True)
         for obj in list(bpy.data.objects):
-            if obj in original_objects:
-                obj.hide_set(True)
+            if obj not in old_objects:
+                continue
+            obj.hide_set(True)
+            obj.hide_viewport = True
+            obj.hide_render = True
         for obj in [preview_rig] + preview_meshes:
             obj.hide_viewport = False
             obj.hide_render = False
             obj.hide_set(False)
-        bpy.context.view_layer.objects.active = preview_rig
-        preview_rig.select_set(True)
+        preview_collection.hide_viewport = False
+        preview_collection.hide_render = False
         scene.frame_set(args.start)
         bpy.context.view_layer.update()
-
         report = {
-            "schema": "mg1.semantic-preview-noop-validation.v1",
-            "target_rig": target.name, "walk_action": walk.name,
-            "walk_slot": slot.identifier, "frames": frames,
-            "source_mesh_objects": [obj.name for obj in source_objects],
-            "preview_mesh_objects": [obj.name for obj in preview_meshes],
-            "reference_mesh_objects": [obj.name for obj in reference_meshes],
-            "preview": {"file": os.path.abspath(args.preview),
-                "collection": preview_collection.name, "rig": preview_rig.name,
-                "root": None, "action": preview_action.name},
-            "rig_world": rows(preview_rig.matrix_world),
-            "mesh_binding": [{"object": obj.name,
-                "parent": obj.parent.name if obj.parent else None,
-                "matrix_parent_inverse": rows(obj.matrix_parent_inverse),
-                "matrix_world": rows(obj.matrix_world),
-                "armature_modifiers": [{"object": mod.object.name if mod.object else None,
-                    "use_vertex_groups": mod.use_vertex_groups,
-                    "use_bone_envelopes": mod.use_bone_envelopes,
-                    "use_deform_preserve_volume": mod.use_deform_preserve_volume}
-                    for mod in obj.modifiers if mod.type == "ARMATURE"]}
-                for obj in preview_meshes],
-            "generation_status": "saved; run validate_semantic_noop_saved.py in a fresh process",
-            "production_mutated": False}
-
-        os.makedirs(os.path.dirname(os.path.abspath(args.report)), exist_ok=True)
-        with open(args.report, "w", encoding="utf-8") as stream:
-            json.dump(report, stream, indent=2, allow_nan=False)
-            stream.write("\n")
+            "schema": "mg1.validated-walk-noop-baseline.v1",
+            "baseline_rig": baseline.name,
+            "clean_pose_basis": clean.name,
+            "action": action.name,
+            "action_source_slot": source_slot.identifier,
+            "preview_action": preview_action.name,
+            "preview_slot": preview_action.slots[0].identifier,
+            "frames": frames,
+            "mesh_sources": [o.name for o in source_meshes],
+            "preview_meshes": [o.name for o in preview_meshes],
+            "rig_world_scale": list(preview_rig.matrix_world.to_scale()),
+            "action_pose_channel_paths": sorted({fc.data_path for l in action.layers for st in l.strips
+                for bag in st.channelbags if bag.slot == source_slot for fc in bag.fcurves
+                if '.constraints[' not in fc.data_path}),
+            "source_comparison": {"max_pose_matrix_error": source_pose_error,
+                "max_vertex_world_error": max_vertex["error"],
+                "worst_vertex": max_vertex, "max_foot_tail_error": max_foot,
+                "head_cap_weighted_centroid_group": args.head_group,
+                "max_head_cap_centroid_error": max_cap,
+                "vertex_samples": sample_count},
+            "duplicate_consistency": {"max_pose_matrix_error": max_pose,
+                "max_foot_tail_error": max_foot, "max_head_cap_centroid_error": max_cap},
+            "foot_tracks_world": foot_tracks,
+            "head_cap_centroid_track_world": cap_positions,
+            "clean_constraints_removed_from_duplicates": sum(constraint_counts.values()),
+            "production_mutated": False,
+            "gate": "pass" if source_pose_error['error'] <= args.pose_tolerance and
+                max_vertex['error'] <= args.vertex_tolerance and max_foot <= args.pose_tolerance and
+                max_cap <= args.vertex_tolerance else "fail"}
+        os.makedirs(os.path.dirname(os.path.abspath(args.baseline_report)), exist_ok=True)
+        with open(args.baseline_report, 'w', encoding='utf-8') as f:
+            json.dump(report, f, indent=2, allow_nan=False)
+            f.write('\n')
         os.makedirs(os.path.dirname(os.path.abspath(args.preview)), exist_ok=True)
         bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(args.preview))
-        print("MG1_SEMANTIC_PREVIEW_NOOP=" + json.dumps(report))
+        print('MG1_VALIDATED_WALK_NOOP=' + json.dumps(report))
+        if report['gate'] != 'pass':
+            raise RuntimeError('clean-basis no-op does not match validated walk baseline')
     finally:
         scene.frame_set(old_frame, subframe=old_subframe)
-        # Do not save changes to the source scene; clean only the disposable IDs.
         for obj in list(bpy.data.objects):
-            if obj in original_objects:
+            if obj in old_objects:
                 continue
-            obj_type, data = obj.type, obj.data
+            data = obj.data
+            typ = obj.type
             bpy.data.objects.remove(obj, do_unlink=True)
             if data and data.users == 0:
-                if obj_type == "MESH":
-                    bpy.data.meshes.remove(data)
-                elif obj_type == "ARMATURE":
-                    bpy.data.armatures.remove(data)
-        for action in list(bpy.data.actions):
-            if action not in original_actions:
-                bpy.data.actions.remove(action, do_unlink=True)
-        for collection in list(bpy.data.collections):
-            if collection not in original_collections:
-                bpy.data.collections.remove(collection)
+                if typ == 'MESH': bpy.data.meshes.remove(data)
+                elif typ == 'ARMATURE': bpy.data.armatures.remove(data)
+        for act in list(bpy.data.actions):
+            if act not in old_actions: bpy.data.actions.remove(act, do_unlink=True)
+        for coll in list(bpy.data.collections):
+            if coll not in old_collections: bpy.data.collections.remove(coll)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
