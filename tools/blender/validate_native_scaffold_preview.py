@@ -6,6 +6,7 @@ import os
 import sys
 
 import bpy
+from mathutils import Matrix
 
 
 def main():
@@ -22,6 +23,10 @@ def main():
         raise RuntimeError("saved scaffold preview action is not assigned")
     if rig.animation_data.action.name != args.action:
         raise RuntimeError("saved scaffold action name differs")
+    fist_reference_raw = rig.get("mg1_closed_fist_basis", "")
+    if not fist_reference_raw:
+        raise RuntimeError("preview does not contain a fixed closed-fist reference pose")
+    fist_reference = json.loads(fist_reference_raw)
     meshes = [obj for obj in bpy.data.objects if obj.type == "MESH" and
               any(mod.type == "ARMATURE" and mod.object == rig
                   for mod in obj.modifiers)]
@@ -43,6 +48,7 @@ def main():
                          "visible_meshes": visible_mesh_names,
                          "expected_meshes": bound_mesh_names})
     scales = []
+    fist_errors = []
     vertex_counts = {obj.name: len(obj.data.vertices) for obj in meshes}
     for frame in range(61):
         bpy.context.scene.frame_set(frame)
@@ -54,6 +60,11 @@ def main():
                 failures.append({"frame": frame, "bone": pose_bone.name,
                                  "problem": "non-finite matrix"})
             scales.append(max(abs(float(v) - 1.0) for v in pose_bone.scale))
+        for name, expected_rows in fist_reference.items():
+            actual = evaluated_rig.pose.bones[name].matrix_basis
+            expected = Matrix(expected_rows)
+            fist_errors.append(max(abs(float(actual[r][c] - expected[r][c]))
+                                   for r in range(4) for c in range(4)))
         for obj in meshes:
             if obj.hide_get() or obj.hide_viewport or obj.hide_render:
                 failures.append({"frame": frame, "mesh": obj.name,
@@ -89,10 +100,13 @@ def main():
         "runtime_constraints": sum(len(pb.constraints) for pb in rig.pose.bones),
         "object_scale": [float(v) for v in rig.scale],
         "max_pose_scale_delta_from_one": max(scales, default=0.0),
+        "locked_finger_bone_count": len(fist_reference),
+        "max_closed_fist_basis_error": max(fist_errors, default=0.0),
         "frames_checked": list(range(61)),
         "failure_count": len(failures),
         "failures": failures[:50],
-        "passed": not failures and sum(len(pb.constraints) for pb in rig.pose.bones) == 0,
+        "passed": not failures and sum(len(pb.constraints) for pb in rig.pose.bones) == 0 and
+                  len(fist_reference) > 0 and max(fist_errors, default=math.inf) < 1e-6,
     }
     os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as stream:

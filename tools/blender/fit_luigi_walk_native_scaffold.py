@@ -359,7 +359,8 @@ def evaluate_scaffold(name, action, semantics, final_poses, descriptors, times,
 
 
 def write_preview(filepath, action_name, clean, baseline, baseline_rows,
-                  selected_pose_rows, meshes, walk_action, walk_slot):
+                  selected_pose_rows, meshes, walk_action, walk_slot,
+                  closed_fist_basis=None):
     scene = bpy.context.scene
     collection = bpy.data.collections.new("ScaffoldWalk_Waluigi_Preview")
     scene.collection.children.link(collection)
@@ -383,6 +384,10 @@ def write_preview(filepath, action_name, clean, baseline, baseline_rows,
             fit.set_frame(scene, float(frame))
             requested = {name: Matrix(value.tolist()) for name, value in wanted.items()}
             fit.assign_pose_matrices_hierarchical(target, requested)
+            if closed_fist_basis:
+                for name, basis in closed_fist_basis.items():
+                    target.pose.bones[name].matrix_basis = basis.copy()
+                bpy.context.view_layer.update()
             evaluated = evaluated_bone_matrices(target)
             bases_by_time.append((float(frame), basis_from_pose(target, evaluated)))
         baked = make_action(target, action_name, bases_by_time)
@@ -410,6 +415,10 @@ def write_preview(filepath, action_name, clean, baseline, baseline_rows,
         set_visible(target)
         for obj in rig_meshes:
             set_visible(obj)
+        if closed_fist_basis:
+            target["mg1_closed_fist_basis"] = json.dumps({
+                name: matrix_rows(matrix) for name, matrix in closed_fist_basis.items()},
+                separators=(",", ":"))
         scene.frame_set(0)
         bpy.context.view_layer.update()
         visible_armatures = [obj.name for obj in scene.objects
