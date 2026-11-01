@@ -134,6 +134,9 @@ def args_parse():
     parser.add_argument("--action-name", default="Waluigi_LuigiWalk_SemanticBothArms_RawANM_v1")
     parser.add_argument("--preview-rig-name", default="SemanticWalk_Waluigi_Target_Rig")
     parser.add_argument("--preview-collection-name", default="SemanticWalk_Waluigi_LeftArm_Preview")
+    parser.add_argument("--validated-noop-preview", default=os.path.join(
+        HERE, "reports", "luigi_walk_semantic_waluigi_left_arm_noop.blend"),
+        help="saved, visually validated no-op walk preview used as a geometry gate")
     parser.add_argument("--v1-report", default="tools/blender/reports/luigi_walk_semantic_waluigi_left_arm_fit.json")
     parser.add_argument("--comparison-report", default="",
                         help="optional prior fit report for feature-by-feature residual deltas")
@@ -469,6 +472,85 @@ def mesh_vertices(mesh_objects):
         finally:
             evaluated.to_mesh_clear()
     return output
+
+
+def append_noop_reference(filepath, collection_name):
+    """Append the validated no-op rig and its full mesh for preview comparison."""
+    if not os.path.isfile(filepath):
+        raise RuntimeError("validated no-op preview is missing: " + filepath)
+    with bpy.data.libraries.load(filepath, link=False) as (source, target):
+        rig_names = [name for name in source.objects
+                     if name == "ValidatedWalk_NoOp_Preview_Rig"]
+        mesh_names = [name for name in source.objects
+                      if name.startswith("ValidatedWalk_NoOp_Preview_ARMTEST_")]
+        if len(rig_names) != 1 or len(mesh_names) != 2:
+            raise RuntimeError("validated no-op preview does not contain its expected rig and two meshes")
+        target.objects = rig_names + mesh_names
+    objects = [obj for obj in target.objects if obj is not None]
+    rig = next((obj for obj in objects if obj.type == "ARMATURE"), None)
+    meshes = sorted((obj for obj in objects if obj.type == "MESH"), key=lambda obj: obj.name)
+    if rig is None or len(meshes) != 2:
+        raise RuntimeError("could not append the complete validated no-op reference")
+    collection = bpy.data.collections.new(collection_name)
+    bpy.context.scene.collection.children.link(collection)
+    for obj in objects:
+        collection.objects.link(obj)
+    if rig.animation_data is None or rig.animation_data.action is None:
+        raise RuntimeError("validated no-op reference rig has no baked walk action")
+    for mesh in meshes:
+        armature_modifiers = [modifier for modifier in mesh.modifiers
+                              if modifier.type == "ARMATURE"]
+        if (mesh.parent != rig or not armature_modifiers or
+            any(modifier.object != rig for modifier in armature_modifiers)):
+            raise RuntimeError("validated no-op reference mesh binding is invalid: " + mesh.name)
+    return rig, meshes, collection
+
+
+def preview_mesh_key(obj):
+    # Blender adds .001 suffixes when a previous preview object is still in
+    # the source scene. Topology is stable across those object-name changes.
+    return (len(obj.data.vertices), len(obj.data.edges), len(obj.data.polygons))
+
+
+def compare_preview_meshes(actual_meshes, reference_meshes, frames, tolerance):
+    actual_by_key = {preview_mesh_key(obj): obj for obj in actual_meshes}
+    reference_by_key = {preview_mesh_key(obj): obj for obj in reference_meshes}
+    if len(actual_by_key) != len(actual_meshes) or len(reference_by_key) != len(reference_meshes):
+        raise RuntimeError("preview mesh topology keys are not unique")
+    if actual_by_key.keys() != reference_by_key.keys():
+        raise RuntimeError("preview and validated no-op mesh identities differ")
+    max_error = {"error": 0.0}
+    samples = 0
+    per_frame = []
+    for frame in frames:
+        set_frame(bpy.context.scene, float(frame))
+        actual = mesh_vertices(actual_meshes)
+        reference = mesh_vertices(reference_meshes)
+        frame_max = {"error": 0.0}
+        for key in sorted(actual_by_key):
+            left = actual[actual_by_key[key].name]
+            right = reference[reference_by_key[key].name]
+            if len(left) != len(right):
+                raise RuntimeError(f"no-op mesh vertex count mismatch for {key}: {len(left)} vs {len(right)}")
+            for index, (a, b) in enumerate(zip(left, right)):
+                error = float((a - b).length)
+                samples += 1
+                if error > frame_max["error"]:
+                    frame_max = {"error": error, "frame": int(frame),
+                                 "mesh": key, "vertex": index}
+                if error > max_error["error"]:
+                    max_error = {"error": error, "frame": int(frame),
+                                 "mesh": key, "vertex": index}
+        per_frame.append(frame_max)
+    report = {"max_world_vertex_error": max_error,
+              "per_frame_max_world_vertex_error": per_frame,
+              "vertex_samples": samples,
+              "tolerance": float(tolerance),
+              "gate": "pass" if max_error["error"] <= tolerance else "fail"}
+    if report["gate"] != "pass":
+        raise RuntimeError("complete walk baseline differs from validated no-op preview: " +
+                           json.dumps(max_error, sort_keys=True))
+    return report
 
 
 def continuity(rig):
@@ -903,6 +985,10 @@ def main():
             "SemanticWalk_Waluigi_") for obj in mesh_sources]
         created_objects.extend(target_meshes)
         created_meshes.extend(target_meshes)
+        noop_rig, noop_meshes, noop_collection = append_noop_reference(
+            os.path.abspath(args.validated_noop_preview),
+            "_MG1_Temporary_Validated_NoOp_Reference")
+        collections.append(noop_collection)
 
         target_copy.animation_data_create()
         target_copy.animation_data.action = walk_action
@@ -925,7 +1011,43 @@ def main():
             baseline_vertices = mesh_vertices(target_meshes)
             walk_cap_rows.append(weighted_group_centroid(target_meshes,
                 [baseline_vertices[obj.name] for obj in target_meshes], "bone_53"))
+        # This is deliberately checked before any semantic arm pose is applied.
+        # It catches object-parent/bind errors that pose-matrix validation alone
+        # cannot see.
+        baseline_geometry_check = compare_preview_meshes(
+            target_meshes, noop_meshes, frames, tolerance=1e-4)
+        baseline_geometry_check["reference_file"] = os.path.abspath(args.validated_noop_preview)
+        baseline_geometry_check["preview_mesh_bindings"] = [{
+            "mesh": mesh.name,
+            "parent": mesh.parent.name if mesh.parent else None,
+            "object_scale": [float(v) for v in mesh.scale],
+            "parent_inverse": matrix_rows(mesh.matrix_parent_inverse),
+            "matrix_basis": matrix_rows(mesh.matrix_basis),
+            "armature_targets": [modifier.object.name if modifier.object else None
+                                 for modifier in mesh.modifiers if modifier.type == "ARMATURE"]}
+            for mesh in target_meshes]
         target_copy.animation_data.action = None
+
+        # The reference is temporary validation context, never part of the
+        # delivered preview. Remove it after its complete 0..60 comparison.
+        noop_action = noop_rig.animation_data.action if noop_rig.animation_data else None
+        noop_data = [obj.data for obj in [noop_rig] + noop_meshes]
+        for obj in [noop_rig] + noop_meshes:
+            bpy.data.objects.remove(obj, do_unlink=True)
+        for data in noop_data:
+            if data and data.users == 0:
+                if isinstance(data, bpy.types.Mesh):
+                    bpy.data.meshes.remove(data)
+                elif isinstance(data, bpy.types.Armature):
+                    bpy.data.armatures.remove(data)
+        if noop_action and noop_action not in old_actions and noop_action.users == 0:
+            bpy.data.actions.remove(noop_action, do_unlink=True)
+        if noop_collection.users == 0:
+            bpy.data.collections.remove(noop_collection)
+        else:
+            scene.collection.children.unlink(noop_collection)
+            bpy.data.collections.remove(noop_collection)
+        collections.remove(noop_collection)
 
         combined_pose_rows = []
         intended_pose_rows = []
@@ -1351,6 +1473,7 @@ def main():
             "preview": {"file": os.path.abspath(args.preview), "collection": preview_collection.name,
                 "root": None, "rig": target_copy.name, "action": baked_action.name,
                 "mesh_objects": [obj.name for obj in target_meshes],
+                "baseline_noop_geometry_check": baseline_geometry_check,
                 "object_scale_unchanged": [float(v) for v in target_copy.scale],
                 "rig_world_matrix": matrix_rows(target_copy.matrix_world),
                 "constraints_removed_from_duplicate": cleared_constraints,
@@ -1442,6 +1565,14 @@ def main():
             if not armature_modifiers or any(modifier.object != target_copy
                                              for modifier in armature_modifiers):
                 raise RuntimeError(f"preview mesh {obj.name} is not bound to the preview rig")
+            if obj.parent != target_copy:
+                raise RuntimeError(f"preview mesh {obj.name} is not parented to the preview rig")
+            if max(abs(float(value) - 1.0) for value in obj.scale) > 1e-4:
+                raise RuntimeError(f"preview mesh {obj.name} has an unexpected local object scale")
+            if any(not modifier.show_viewport or not modifier.show_render or
+                   not modifier.use_vertex_groups
+                   for modifier in armature_modifiers):
+                raise RuntimeError(f"preview mesh {obj.name} has disabled armature deformation")
             if preview_collection not in obj.users_collection:
                 raise RuntimeError(f"preview mesh {obj.name} is not linked to its preview collection")
         bpy.context.view_layer.objects.active = target_copy

@@ -52,12 +52,41 @@ def main():
     meshes = [bpy.data.objects.get(name) for name in fit_report["preview"]["mesh_objects"]]
     if not meshes or any(mesh is None for mesh in meshes):
         raise RuntimeError("complete target mesh set is missing")
+    binding_reference = {
+        row["mesh"]: row for row in fit_report["preview"].get(
+            "baseline_noop_geometry_check", {}).get("preview_mesh_bindings", [])}
+    mesh_binding_checks = []
     for mesh in meshes:
         if mesh.hide_viewport or mesh.hide_render or mesh.hide_get():
             raise RuntimeError(f"preview mesh is hidden: {mesh.name}")
         arm_mods = [m for m in mesh.modifiers if m.type == "ARMATURE"]
         if not arm_mods or any(m.object != rig for m in arm_mods):
             raise RuntimeError(f"preview mesh armature binding is invalid: {mesh.name}")
+        if mesh.parent != rig:
+            raise RuntimeError(f"preview mesh parent binding is invalid: {mesh.name}")
+        if any(not m.show_viewport or not m.show_render or not m.use_vertex_groups
+               for m in arm_mods):
+            raise RuntimeError(f"preview mesh deformation is disabled: {mesh.name}")
+        expected = binding_reference.get(mesh.name)
+        if expected is None:
+            raise RuntimeError(f"fit report has no pre-semantic bind reference for {mesh.name}")
+        basis_error = fit.matrix_error(mesh.matrix_basis, expected["matrix_basis"])
+        parent_inverse_error = fit.matrix_error(
+            mesh.matrix_parent_inverse, expected["parent_inverse"])
+        scale_error = max(abs(float(value) - 1.0) for value in mesh.scale)
+        mesh_binding_checks.append({
+            "mesh": mesh.name,
+            "parent": mesh.parent.name if mesh.parent else None,
+            "armature_modifier_targets": [m.object.name if m.object else None for m in arm_mods],
+            "local_scale": [float(value) for value in mesh.scale],
+            "matrix_basis_error_vs_presemantic_bind": basis_error,
+            "parent_inverse_error_vs_presemantic_bind": parent_inverse_error,
+            "world_scale": [float(value) for value in mesh.matrix_world.to_scale()],
+            "gate": "pass" if basis_error < 1e-5 and parent_inverse_error < 1e-5 and
+                scale_error < 1e-4 and mesh.parent == rig and
+                all(m.object == rig for m in arm_mods) else "fail"})
+    if any(row["gate"] != "pass" for row in mesh_binding_checks):
+        raise RuntimeError("saved preview mesh binding differs from the checked baseline bind")
     constraints = sum(len(rig.constraints) + sum(len(pb.constraints) for pb in rig.pose.bones)
                       for _ in (0,))
     if constraints:
@@ -295,6 +324,7 @@ def main():
         "action_slot": rig.animation_data.action_slot.identifier,
         "mesh_objects": [mesh.name for mesh in meshes],
         "mesh_vertex_samples": max_vertex_finite,
+        "post_save_mesh_binding_checks": mesh_binding_checks,
         "runtime_constraints": constraints,
         "object_scale": [float(v) for v in rig.scale],
         "bake_reference_comparison": {
@@ -360,7 +390,8 @@ def main():
             max_basis_reference_error < 1e-5 and
             max(abs(rmse[k] - fitted_rmse[k]) for k in rmse) < 1e-5 and
             max(abs(rmse_right[k] - fitted_rmse_right[k]) for k in rmse_right) < 1e-5 and
-            constraints == 0 and len(meshes) == 2 and all(float(v) > 0 for v in rig.scale) else "fail",
+            constraints == 0 and len(meshes) == 2 and all(float(v) > 0 for v in rig.scale) and
+            all(row["gate"] == "pass" for row in mesh_binding_checks) else "fail",
     }
     os.makedirs(os.path.dirname(os.path.abspath(args.report)), exist_ok=True)
     with open(args.report, "w", encoding="utf-8") as stream:

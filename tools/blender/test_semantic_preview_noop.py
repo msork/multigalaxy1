@@ -58,7 +58,19 @@ def duplicate_mesh(source, target_rig, collection, prefix):
     dup.parent_type = 'OBJECT'
     dup.parent_bone = ''
     dup.matrix_parent_inverse = source.matrix_parent_inverse.copy()
-    dup.matrix_world = source.matrix_world.copy()
+    # Preserve the mesh's authored parent-relative transform.  matrix_world
+    # can be stale in reopened workfiles when its original parent armature has
+    # the intentional 43.437 scale in matrix_basis but an identity evaluated
+    # matrix_world.  Copying that stale world matrix under the correctly scaled
+    # preview rig introduces a compensating 1/43.437 object scale and collapses
+    # the skinned character near the origin.
+    dup.matrix_basis = source.matrix_basis.copy()
+    # Evaluate skinned copies immediately.  A copied source object may inherit
+    # per-object hide state; Blender can leave its depsgraph transform stale
+    # until the final save-time visibility pass otherwise.
+    dup.hide_viewport = False
+    dup.hide_render = False
+    dup.hide_set(False)
     for mod in dup.modifiers:
         if mod.type == 'ARMATURE' and mod.object is not None:
             mod.object = target_rig
