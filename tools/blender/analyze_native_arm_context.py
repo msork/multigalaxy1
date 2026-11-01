@@ -101,7 +101,10 @@ def source_pose_from_curves(rig, action, slot, time):
     for name, channels in values.items():
         mode = rig.pose.bones[name].rotation_mode
         if mode == 'QUATERNION':
-            rotation = Quaternion(channels["rotation_quaternion"])
+            # Blender normalizes animated quaternion channels when it builds
+            # the evaluated pose. FCurve.evaluate() returns raw components, so
+            # normalize explicitly before composing the source hierarchy.
+            rotation = Quaternion(channels["rotation_quaternion"]).normalized()
         elif mode == 'AXIS_ANGLE':
             angle, x, y, z = channels["rotation_axis_angle"]
             axis = Vector((x, y, z))

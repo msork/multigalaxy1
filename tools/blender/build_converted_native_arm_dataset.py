@@ -195,11 +195,13 @@ def centroid_pairs(a, b, bones):
 
 def continuity_values(rig, pairs):
     out = {}
+    evaluated = rig.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    pose_bones = evaluated.pose.bones
     for label, (a, endpoint_a, b, endpoint_b) in pairs.items():
-        if not rig.pose.bones.get(a) or not rig.pose.bones.get(b):
+        if not pose_bones.get(a) or not pose_bones.get(b):
             continue
-        va = rig.matrix_world @ getattr(rig.pose.bones[a], endpoint_a)
-        vb = rig.matrix_world @ getattr(rig.pose.bones[b], endpoint_b)
+        va = evaluated.matrix_world @ getattr(pose_bones[a], endpoint_a)
+        vb = evaluated.matrix_world @ getattr(pose_bones[b], endpoint_b)
         out[label] = float((va - vb).length)
     return out
 
@@ -273,18 +275,21 @@ def arm_region_vertex_positions(meshes, depsgraph, region_bones):
     return output
 
 
-def extract_pose(target, bones, landmarks, relative_pairs, centroids):
+def extract_pose(target, bones, landmarks, relative_pairs, centroids, depsgraph=None):
+    depsgraph = depsgraph or bpy.context.evaluated_depsgraph_get()
+    evaluated = target.evaluated_get(depsgraph)
+    evaluated_pose = evaluated.pose
     pose_rows = {}
     for name in bones:
-        pb = target.pose.bones[name]
+        pb = evaluated_pose.bones[name]
         rest = target.data.bones[name].matrix_local
         delta = rest.inverted_safe() @ pb.matrix
         pose_rows[name] = {
             "local_basis": mat_rows(pb.matrix_basis),
             "armature_pose": mat_rows(pb.matrix),
             "armature_pose_rotation_quaternion": quat_values(pb.matrix.to_quaternion()),
-            "world_pose": mat_rows(target.matrix_world @ pb.matrix),
-            "world_pose_rotation_quaternion": quat_values((target.matrix_world @ pb.matrix).to_quaternion()),
+            "world_pose": mat_rows(evaluated.matrix_world @ pb.matrix),
+            "world_pose_rotation_quaternion": quat_values((evaluated.matrix_world @ pb.matrix).to_quaternion()),
             "rest_relative_se3": {"matrix": mat_rows(delta),
                 "translation": [float(v) for v in delta.translation],
                 "rotation_quaternion": quat_values(delta.to_quaternion()),
@@ -296,15 +301,15 @@ def extract_pose(target, bones, landmarks, relative_pairs, centroids):
     for label, (bone, endpoint) in landmarks.items():
         if bone not in pose_rows:
             continue
-        point = getattr(target.pose.bones[bone], endpoint)
+        point = getattr(evaluated_pose.bones[bone], endpoint)
         landmark_rows[label] = {"bone": bone, "endpoint": endpoint,
             "armature": [float(v) for v in point],
-            "world": [float(v) for v in target.matrix_world @ point]}
+            "world": [float(v) for v in evaluated.matrix_world @ point]}
     relative_rows = {}
     for a, b in relative_pairs:
         if a not in pose_rows or b not in pose_rows:
             continue
-        rel = target.pose.bones[a].matrix.inverted_safe() @ target.pose.bones[b].matrix
+        rel = evaluated_pose.bones[a].matrix.inverted_safe() @ evaluated_pose.bones[b].matrix
         relative_rows[f"{a}__{b}"] = {"matrix": mat_rows(rel),
             "rotation_quaternion": quat_values(rel.to_quaternion()),
             "translation": [float(v) for v in rel.translation]}
@@ -508,7 +513,8 @@ def main():
                     gaps = continuity_values(target, continuity_pairs)
                     for label, value in gaps.items():
                         gap_series[label].append(value)
-                    feature = extract_pose(target, bones, landmarks, relative_pairs, target_centroids)
+                    feature = extract_pose(target, bones, landmarks, relative_pairs,
+                                           target_centroids, depsgraph)
                     arm_region_vertices = arm_region_vertex_positions(target_meshes, depsgraph, region_bones)
                     rows.append({"time": float(time), **feature,
                         "arm_region_vertex_positions_world": arm_region_vertices,

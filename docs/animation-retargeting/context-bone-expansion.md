@@ -106,16 +106,33 @@ a Luigi semantic driver or a retargeted motion manifold.
 ## Full-character holdout overlay previews
 
 The arm-region PCA report alone is not a useful visual check: a character
-preview must retain the native pose context and every accessory. The preview
-builder evaluates each held-out native action on a disposable candidate-owner
-duplicate, converts the full pose to production basis, and duplicates the
-complete production character (both bound submeshes and their associated child
-objects) into separate native and PCA collections. The PCA copy starts from
-the full converted native pose; only the 38 profile bone transforms are
-replaced by the training-only PCA projection of that held-out pose. Root/object
-transforms, the intentional 43.437 scale, hat/cap, face, fingers, and all
-non-profile bone transforms remain native. No production object, rig, or
-action is written.
+preview must retain the native pose context and every accessory. These `.004`
+actions are orphaned layered actions. Rebinding their slot to a duplicate
+armature does not reproduce their stored channel curves reliably: direct
+duplicate evaluation differed from the stored `bone_48` transform by `4.53`
+matrix units for `sequence_26` at frame 0, and reached `6.22` on `bone_44` in
+`sequence_16.003`. The validated path reads the selected slot's FCurves,
+normalizes quaternion samples, and composes the pose through the `Armature.001`
+rest hierarchy before applying the candidate-to-production conversion. Across
+all 38 bones and 1,107 stored samples, this path agrees with the dataset to
+`5.73e-6` maximum matrix-element error. Rebuilding with the corrected
+dependency-graph serialization produced identical sample data, so the dataset
+did not need replacement.
+
+The comparison is repeatable with
+`tools/blender/audit_context_dataset_live.py`; its report keeps the failing
+duplicate-slot path and validated FCurve/hierarchy path side by side. It is
+read-only apart from a temporary armature duplicate and restores the scene
+frame before exit.
+
+The preview builder uses the same explicit FCurve and hierarchy path, then
+duplicates the complete production character (both bound submeshes and their
+associated child objects) into separate native and PCA collections. The PCA
+copy starts from the full converted native pose; only the 38 profile bone
+transforms are replaced by the training-only PCA projection of that held-out
+pose. Root/object transforms, the intentional 43.437 scale, hat/cap, face,
+fingers, and all non-profile bone transforms remain native. No production
+object, rig, or action is written.
 
 Each holdout is saved as an independent local `.blend` under
 `tools/blender/reports/native_waluigi_context_pca_holdouts/`. The PCA collection
@@ -124,18 +141,15 @@ is visible on open. To compare the native reference, show its
 `PCAOverlay_<action>`; showing both at once overlaps coincident geometry.
 `validate_context_pca_preview_file.py` reopens each saved file and compares
 world-space vertices at every action key and midpoint. All five holdouts pass;
-the largest saved-file vertex difference is `1.56e-4` world units across both
-submeshes (3,020 vertices per sampled time), with root and mesh object matrices
-matching exactly. This is an overlay/reconstruction check, not proof that the
-PCA projection is semantically suitable for a different source character.
-
-The live converted holdout context can differ from the stored dataset's
-selected-bone transforms (worst observed discrepancy: `bone_48` in
-`sequence_26`, about `4.57` matrix units at frame 0). The previews deliberately
-project the live native held-out profile into the training PCA subspace so the
-comparison isolates PCA reconstruction while retaining the live native
-context. Resolve this dataset/action-basis discrepancy before using the
-dataset for semantic source fitting.
+the largest saved-file PCA/native vertex difference is `2.11e-4` world units
+across both submeshes (3,020 vertices per sampled time), with root and mesh
+object matrices matching exactly. Identity replay was rerun and passed:
+maximum pose-matrix error `3.82e-6`, arm-region vertex error `1.73e-4`, centroid
+error `1.67e-4`, and landmark error `1.42e-4` world units. PCA was refit on the
+same 23 training actions (845 samples); all five complete holdouts (262
+samples) remained validation-only. Feature RMSE was `1.35e-8` train and
+`7.25e-8` holdout. These checks validate conversion consistency and linear
+reconstruction; they do not establish semantic source retarget quality.
 
 ## Reusable profile boundary
 

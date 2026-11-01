@@ -20,6 +20,7 @@ from convert_native_owner_actions import (
     basis_from_pose, converted_matrices, duplicate_rig, evaluated_bone_matrices,
     make_action, set_frame,
 )
+from analyze_native_arm_context import source_pose_from_curves
 from fit_native_context_pca import fit as fit_pca, predict as pca_predict
 
 DEFAULT_ARM_REGION = {f"bone_{n}" for n in (22, 23, 24, 25, 26, 27, 29, 30)}
@@ -306,7 +307,6 @@ def main():
             bpy.context.scene.collection.children.link(pca_collection)
             preview_objects, preview_actions = [], []
 
-            source = duplicate_rig(source_original, "_PreviewSource_" + name)
             native_rig = duplicate_rig(target_original, "NativeReference_" + name + "_Rig")
             pca_rig = duplicate_rig(target_original, "PCAOverlay_" + name + "_Rig")
             move_to_collection(native_rig, native_collection)
@@ -325,12 +325,9 @@ def main():
                 native_rig, native_collection, "NativeReference_" + name + "_")
             pca_meshes = duplicate_character_objects(mesh_sources, target_original,
                 pca_rig, pca_collection, "PCAOverlay_" + name + "_")
-            preview_objects.extend([source, native_rig, pca_rig, native_root, pca_root]
+            preview_objects.extend([native_rig, pca_rig, native_root, pca_root]
                                    + native_meshes + pca_meshes)
 
-            source.animation_data_create()
-            source.animation_data.action = source_action
-            source.animation_data.action_slot = source_slot
             native_samples, pca_samples = [], []
             overlay_max, overlay_sq, overlay_count = 0.0, 0.0, 0
             worst_overlay = {"error_world": 0.0}
@@ -343,8 +340,15 @@ def main():
             per_sample = []
             for time in source_times:
                 set_frame(bpy.context.scene, time)
-                source_pose = evaluated_bone_matrices(source)
-                native_poses = converted_matrices(source, target_original, source_pose, conversion)
+                # These orphaned layered actions do not reliably evaluate when
+                # rebound to a duplicate object. Read the selected slot's raw
+                # FCurves, normalize quaternion channels, and compose the
+                # candidate-owner hierarchy explicitly. This is the same
+                # source-space path used by the calibration analysis.
+                source_pose, _source_basis = source_pose_from_curves(
+                    source_original, source_action, source_slot, time)
+                native_poses = converted_matrices(source_original, target_original,
+                                                  source_pose, conversion)
                 native_basis = set_pose_matrices(native_rig, native_poses)
                 evaluated_native = evaluated_bone_matrices(native_rig)
                 native_error = max(max(abs(float(evaluated_native[bone][r][c]) - float(native_poses[bone][r][c]))
@@ -401,8 +405,6 @@ def main():
             native_rig.matrix_world = target_original.matrix_world.copy()
             pca_rig.matrix_world = target_original.matrix_world.copy()
             bpy.context.view_layer.update()
-            source.animation_data.action = None
-
             # Only the two overlay collections are visible when opened. Toggle
             # NativeReference in the Outliner to compare it with PCAOverlay.
             for obj in original_objects:
