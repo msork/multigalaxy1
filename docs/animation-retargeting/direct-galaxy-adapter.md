@@ -250,3 +250,6 @@ Preview: `tools/blender/reports/direct_luigi_walk_v3_trajectory.blend`.
 Inspect frames 0, 15, 30, 45, and 60, focusing on forward/back swing, elbow
 bend, forearm roll, glove attachment, and closed fists. This result is still
 limited to the walk action.
+# Latest walk leg follow-up
+
+V4's leg visualization failed from pelvis-vs-thigh origin mismatch, an object-only axis conversion, and incorrect foot helper-axis targeting. The read-only audit, rest-frame trajectory plots, and geometric V5 candidate are documented in [direct-walk-geometric-legs-v5.md](direct-walk-geometric-legs-v5.md). V5 retains the accepted V4 arm/fist curves and passes its saved/reopened numerical gates. Visual inspection is still required before the walk is accepted.
