@@ -1,0 +1,4339 @@
+{
+  "schema": "mg1.factorized-native-semantic-model.v1",
+  "read_only_source_and_production": true,
+  "source": {
+    "dataset": "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_waluigi_raw_anm_bilateral_v2.json.gz",
+    "schema": "mg1.raw-sluggies-native-calibration.v2",
+    "source_authority": "raw native .anm bank imported onto matching .sluggie skeleton by TrackId",
+    "training_actions": 118,
+    "holdout_actions": 27,
+    "training_samples_per_side": {
+      "left": 4116,
+      "right": 4116
+    },
+    "holdout_samples_per_side": {
+      "left": 1168,
+      "right": 1168
+    },
+    "holdout_names": [
+      "Waluigi_10_Catcher_seq0",
+      "Waluigi_11_Reactions_seq4",
+      "Waluigi_12_Various_seq3",
+      "Waluigi_12_Various_seq8",
+      "Waluigi_12_Various_seq13",
+      "Waluigi_12_Various_seq18",
+      "Waluigi_12_Various_seq23",
+      "Waluigi_14_Entrance_seq1",
+      "Waluigi_6_Fielding_seq4",
+      "Waluigi_6_Fielding_seq9",
+      "Waluigi_6_Fielding_seq14",
+      "Waluigi_6_Fielding_seq19",
+      "Waluigi_6_Fielding_seq24",
+      "Waluigi_6_Fielding_seq29",
+      "Waluigi_6_Fielding_seq34",
+      "Waluigi_6_Fielding_seq39",
+      "Waluigi_7_Batting_seq11",
+      "Waluigi_7_Batting_seq15",
+      "Waluigi_7_Batting_seq20",
+      "Waluigi_7_Batting_seq24",
+      "Waluigi_7_Batting_seq26",
+      "Waluigi_8_Running_seq2",
+      "Waluigi_8_Running_seq7",
+      "Waluigi_8_Running_seq12",
+      "Waluigi_9_Pitching_seq1",
+      "Waluigi_9_Pitching_seq6",
+      "Waluigi_9_Pitching_seq11"
+    ]
+  },
+  "target": {
+    "rig": "123475520_waluigi.gpl",
+    "rest_basis_verified": true,
+    "object_scale": [
+      43.4370002746582,
+      43.4370002746582,
+      43.4370002746582
+    ],
+    "arm_length_armature_units": 0.5434917211532593,
+    "arm_length_world_units": 23.607650041008583,
+    "arm_bones": {
+      "left": [
+        "bone_22",
+        "bone_23",
+        "bone_24",
+        "bone_25",
+        "bone_26",
+        "bone_27",
+        "bone_29",
+        "bone_30"
+      ],
+      "right": [
+        "bone_57",
+        "bone_58",
+        "bone_59",
+        "bone_60",
+        "bone_61",
+        "bone_62",
+        "bone_64",
+        "bone_65"
+      ]
+    },
+    "output_dimensions_per_side": 48,
+    "output_coordinates": "torso-rest-frame-relative per-bone rest-relative SE(3); translation normalized by upper-arm length",
+    "fixed_fist_source": {
+      "rig": "Waluigi_Arm_Test",
+      "action": "Waluigi_GalaxyWalk_Legs_Baked",
+      "frame": 0,
+      "finger_bone_count": 42
+    },
+    "glove_attachment": "hard wrist-tail to glove-root-head correction, moving the glove subtree as one unit"
+  },
+  "factorized_model": {
+    "main_factors": [
+      "shoulder_orientation",
+      "elbow_flexion",
+      "forearm_roll",
+      "wrist_orientation",
+      "arm_plane_hand_position"
+    ],
+    "within_factor_basis": "linear plus centered quadratic terms",
+    "cross_terms": [
+      "shoulder_orientation x elbow_flexion",
+      "shoulder_orientation x wrist_orientation",
+      "elbow_flexion x wrist_orientation",
+      "wrist_orientation x arm_plane_hand_position",
+      "elbow_flexion x hand_radial"
+    ],
+    "coefficient_contribution_summary": {
+      "left": {
+        "shoulder_orientation": {
+          "rms_target_standardized_contribution": 0.5779430452778126,
+          "coefficient_shape": [
+            9,
+            48
+          ]
+        },
+        "elbow_flexion": {
+          "rms_target_standardized_contribution": 0.12184979518199054,
+          "coefficient_shape": [
+            2,
+            48
+          ]
+        },
+        "forearm_roll": {
+          "rms_target_standardized_contribution": 0.05320984568812838,
+          "coefficient_shape": [
+            2,
+            48
+          ]
+        },
+        "wrist_orientation": {
+          "rms_target_standardized_contribution": 0.21608227756433046,
+          "coefficient_shape": [
+            9,
+            48
+          ]
+        },
+        "arm_plane_hand_position": {
+          "rms_target_standardized_contribution": 0.4989995630321303,
+          "coefficient_shape": [
+            9,
+            48
+          ]
+        },
+        "shoulder_orientation_x_elbow_flexion": {
+          "rms_target_standardized_contribution": 0.12491049461042232,
+          "coefficient_shape": [
+            3,
+            48
+          ]
+        },
+        "shoulder_orientation_x_wrist_orientation": {
+          "rms_target_standardized_contribution": 0.22572070189828097,
+          "coefficient_shape": [
+            9,
+            48
+          ]
+        },
+        "elbow_flexion_x_wrist_orientation": {
+          "rms_target_standardized_contribution": 0.14297170829331532,
+          "coefficient_shape": [
+            3,
+            48
+          ]
+        },
+        "wrist_orientation_x_arm_plane_hand_position": {
+          "rms_target_standardized_contribution": 0.2594553437633492,
+          "coefficient_shape": [
+            9,
+            48
+          ]
+        },
+        "elbow_flexion_x_hand_radial": {
+          "rms_target_standardized_contribution": 0.11288471638645507,
+          "coefficient_shape": [
+            1,
+            48
+          ]
+        }
+      },
+      "right": {
+        "shoulder_orientation": {
+          "rms_target_standardized_contribution": 0.5900009149612916,
+          "coefficient_shape": [
+            9,
+            48
+          ]
+        },
+        "elbow_flexion": {
+          "rms_target_standardized_contribution": 0.10445961640353765,
+          "coefficient_shape": [
+            2,
+            48
+          ]
+        },
+        "forearm_roll": {
+          "rms_target_standardized_contribution": 0.05700670994779285,
+          "coefficient_shape": [
+            2,
+            48
+          ]
+        },
+        "wrist_orientation": {
+          "rms_target_standardized_contribution": 0.18511842045453747,
+          "coefficient_shape": [
+            9,
+            48
+          ]
+        },
+        "arm_plane_hand_position": {
+          "rms_target_standardized_contribution": 0.5141253358711224,
+          "coefficient_shape": [
+            9,
+            48
+          ]
+        },
+        "shoulder_orientation_x_elbow_flexion": {
+          "rms_target_standardized_contribution": 0.12615024301406544,
+          "coefficient_shape": [
+            3,
+            48
+          ]
+        },
+        "shoulder_orientation_x_wrist_orientation": {
+          "rms_target_standardized_contribution": 0.2215569346814161,
+          "coefficient_shape": [
+            9,
+            48
+          ]
+        },
+        "elbow_flexion_x_wrist_orientation": {
+          "rms_target_standardized_contribution": 0.09333710921309657,
+          "coefficient_shape": [
+            3,
+            48
+          ]
+        },
+        "wrist_orientation_x_arm_plane_hand_position": {
+          "rms_target_standardized_contribution": 0.2482870262746665,
+          "coefficient_shape": [
+            9,
+            48
+          ]
+        },
+        "elbow_flexion_x_hand_radial": {
+          "rms_target_standardized_contribution": 0.05597226344242768,
+          "coefficient_shape": [
+            1,
+            48
+          ]
+        }
+      }
+    },
+    "factor_and_cross_term_support": {
+      "left": {
+        "shoulder_orientation": {
+          "features": [
+            0,
+            1,
+            2
+          ],
+          "outside_training_axis_range_count": 40,
+          "distance_mean": 1.6601342910989574,
+          "distance_p95": 3.6663964521146983,
+          "confidence_mean": 0.6409603674235981,
+          "confidence_p05": 0.10642933631986351
+        },
+        "elbow_flexion": {
+          "features": [
+            3
+          ],
+          "outside_training_axis_range_count": 0,
+          "distance_mean": 0.7607729695302606,
+          "distance_p95": 2.2153122357091557,
+          "confidence_mean": 0.7298696107354669,
+          "confidence_p05": 0.0859666478303895
+        },
+        "forearm_roll": {
+          "features": [
+            4
+          ],
+          "outside_training_axis_range_count": 0,
+          "distance_mean": 0.6163100064703914,
+          "distance_p95": 1.7038129705063245,
+          "confidence_mean": 0.7903678712055052,
+          "confidence_p05": 0.23422357081828254
+        },
+        "wrist_orientation": {
+          "features": [
+            5,
+            6,
+            7
+          ],
+          "outside_training_axis_range_count": 15,
+          "distance_mean": 1.5408900196226574,
+          "distance_p95": 3.3644816431828146,
+          "confidence_mean": 0.6718738083729348,
+          "confidence_p05": 0.15158340529210945
+        },
+        "arm_plane_hand_position": {
+          "features": [
+            8,
+            9,
+            10
+          ],
+          "outside_training_axis_range_count": 40,
+          "distance_mean": 1.6027341197852847,
+          "distance_p95": 3.3245201319779136,
+          "confidence_mean": 0.6545008470662803,
+          "confidence_p05": 0.15848933229497977
+        },
+        "cross_terms": {
+          "shoulder_orientation_x_elbow_flexion": {
+            "features": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "outside_training_axis_range_count": 40,
+            "distance_mean": 1.9362761409596487,
+            "distance_p95": 3.7342699210622734,
+            "confidence_mean": 0.6310970297716139,
+            "confidence_p05": 0.17500664748490238
+          },
+          "shoulder_orientation_x_wrist_orientation": {
+            "features": [
+              0,
+              1,
+              2,
+              5,
+              6,
+              7
+            ],
+            "outside_training_axis_range_count": 45,
+            "distance_mean": 2.382020776613312,
+            "distance_p95": 4.147017547505495,
+            "confidence_mean": 0.6274786878917109,
+            "confidence_p05": 0.23855736039829345
+          },
+          "elbow_flexion_x_wrist_orientation": {
+            "features": [
+              3,
+              5,
+              6,
+              7
+            ],
+            "outside_training_axis_range_count": 15,
+            "distance_mean": 1.8280377406116972,
+            "distance_p95": 3.446383961458764,
+            "confidence_mean": 0.6566957041217579,
+            "confidence_p05": 0.2265714117722886
+          },
+          "wrist_orientation_x_arm_plane_hand_position": {
+            "features": [
+              5,
+              6,
+              7,
+              8,
+              9,
+              10
+            ],
+            "outside_training_axis_range_count": 55,
+            "distance_mean": 2.3935077474723676,
+            "distance_p95": 3.896050903417968,
+            "confidence_mean": 0.6259680715998769,
+            "confidence_p05": 0.2822583366210714
+          },
+          "elbow_flexion_x_hand_radial": {
+            "features": [
+              3,
+              8
+            ],
+            "outside_training_axis_range_count": 32,
+            "distance_mean": 1.1855733840363867,
+            "distance_p95": 2.7496313889664097,
+            "confidence_mean": 0.7013539611546897,
+            "confidence_p05": 0.15106582193604395
+          }
+        }
+      },
+      "right": {
+        "shoulder_orientation": {
+          "features": [
+            0,
+            1,
+            2
+          ],
+          "outside_training_axis_range_count": 9,
+          "distance_mean": 1.6477110498318202,
+          "distance_p95": 2.9067013058690647,
+          "confidence_mean": 0.6350525763911777,
+          "confidence_p05": 0.2445953197022413
+        },
+        "elbow_flexion": {
+          "features": [
+            3
+          ],
+          "outside_training_axis_range_count": 1,
+          "distance_mean": 0.7966737670552143,
+          "distance_p95": 1.8505943948692112,
+          "confidence_mean": 0.7053892928752564,
+          "confidence_p05": 0.18044129213788948
+        },
+        "forearm_roll": {
+          "features": [
+            4
+          ],
+          "outside_training_axis_range_count": 0,
+          "distance_mean": 0.6278730854719718,
+          "distance_p95": 1.7676415892122028,
+          "confidence_mean": 0.7915103076196331,
+          "confidence_p05": 0.20965821806121995
+        },
+        "wrist_orientation": {
+          "features": [
+            5,
+            6,
+            7
+          ],
+          "outside_training_axis_range_count": 0,
+          "distance_mean": 1.4495380347494806,
+          "distance_p95": 2.9650256750731696,
+          "confidence_mean": 0.6982782500921035,
+          "confidence_p05": 0.2310251088958913
+        },
+        "arm_plane_hand_position": {
+          "features": [
+            8,
+            9,
+            10
+          ],
+          "outside_training_axis_range_count": 7,
+          "distance_mean": 1.4960451863924449,
+          "distance_p95": 2.6036531472261193,
+          "confidence_mean": 0.682680998105972,
+          "confidence_p05": 0.3230869788382747
+        },
+        "cross_terms": {
+          "shoulder_orientation_x_elbow_flexion": {
+            "features": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "outside_training_axis_range_count": 10,
+            "distance_mean": 1.9278893064797449,
+            "distance_p95": 3.0125444459183384,
+            "confidence_mean": 0.6268627204306315,
+            "confidence_p05": 0.32160699464129333
+          },
+          "shoulder_orientation_x_wrist_orientation": {
+            "features": [
+              0,
+              1,
+              2,
+              5,
+              6,
+              7
+            ],
+            "outside_training_axis_range_count": 9,
+            "distance_mean": 2.3041453820021154,
+            "distance_p95": 3.7656132123856536,
+            "confidence_mean": 0.6416701980271851,
+            "confidence_p05": 0.30677285114810243
+          },
+          "elbow_flexion_x_wrist_orientation": {
+            "features": [
+              3,
+              5,
+              6,
+              7
+            ],
+            "outside_training_axis_range_count": 1,
+            "distance_mean": 1.725118813564937,
+            "distance_p95": 3.1748185429648283,
+            "confidence_mean": 0.6831155202301692,
+            "confidence_p05": 0.2836768013572049
+          },
+          "wrist_orientation_x_arm_plane_hand_position": {
+            "features": [
+              5,
+              6,
+              7,
+              8,
+              9,
+              10
+            ],
+            "outside_training_axis_range_count": 7,
+            "distance_mean": 2.2069597608268703,
+            "distance_p95": 3.5906881654403904,
+            "confidence_mean": 0.6656933672538589,
+            "confidence_p05": 0.3414966333773609
+          },
+          "elbow_flexion_x_hand_radial": {
+            "features": [
+              3,
+              8
+            ],
+            "outside_training_axis_range_count": 8,
+            "distance_mean": 1.2752606250224379,
+            "distance_p95": 2.7466451661204667,
+            "confidence_mean": 0.6620091451724017,
+            "confidence_p05": 0.15167549072748487
+          }
+        }
+      }
+    }
+  },
+  "model_selection": {
+    "factorized": {
+      "left": {
+        "training_actions": 118,
+        "training_samples": 4116,
+        "holdout_actions": 27,
+        "holdout_samples": 1168,
+        "design_dimensions": 57,
+        "selected_ridge_alpha": 100.0,
+        "action_grouped_cv": [
+          {
+            "alpha": 0.01,
+            "action_grouped_cv_mse": 0.27727124399851466,
+            "fold_mse": [
+              0.22599412255204357,
+              0.31783346352136616,
+              0.3259002122343323,
+              0.315585373333383,
+              0.20104304835144807
+            ]
+          },
+          {
+            "alpha": 0.1,
+            "action_grouped_cv_mse": 0.27716711309825687,
+            "fold_mse": [
+              0.22589968423147444,
+              0.3177822506780336,
+              0.325732078793821,
+              0.31544010314035936,
+              0.20098144864759596
+            ]
+          },
+          {
+            "alpha": 1.0,
+            "action_grouped_cv_mse": 0.27627866598343276,
+            "fold_mse": [
+              0.2251240919198522,
+              0.31733569603282896,
+              0.32429017292917917,
+              0.31419440104353596,
+              0.20044896799176756
+            ]
+          },
+          {
+            "alpha": 10.0,
+            "action_grouped_cv_mse": 0.2721366891120136,
+            "fold_mse": [
+              0.2221384142147362,
+              0.3148436987021768,
+              0.31736336844799334,
+              0.30838358478782657,
+              0.19795437940733523
+            ]
+          },
+          {
+            "alpha": 100.0,
+            "action_grouped_cv_mse": 0.2645440138951113,
+            "fold_mse": [
+              0.21992120183433547,
+              0.30703152126316713,
+              0.3014732121763271,
+              0.29805935609698203,
+              0.19623477810474454
+            ]
+          },
+          {
+            "alpha": 1000.0,
+            "action_grouped_cv_mse": 0.29119643095311776,
+            "fold_mse": [
+              0.2536978839239316,
+              0.3213109523953515,
+              0.3267489792591924,
+              0.32333065546896106,
+              0.23089368371815225
+            ]
+          },
+          {
+            "alpha": 10000.0,
+            "action_grouped_cv_mse": 0.49645939354597246,
+            "fold_mse": [
+              0.4269453964745445,
+              0.48495133009862884,
+              0.5754484510735133,
+              0.5450726335530779,
+              0.4498791565300978
+            ]
+          }
+        ]
+      },
+      "right": {
+        "training_actions": 118,
+        "training_samples": 4116,
+        "holdout_actions": 27,
+        "holdout_samples": 1168,
+        "design_dimensions": 57,
+        "selected_ridge_alpha": 100.0,
+        "action_grouped_cv": [
+          {
+            "alpha": 0.01,
+            "action_grouped_cv_mse": 0.27957827331003837,
+            "fold_mse": [
+              0.3188511590061548,
+              0.20730882383385388,
+              0.2615914845376563,
+              0.3463978385764213,
+              0.2637420605961057
+            ]
+          },
+          {
+            "alpha": 0.1,
+            "action_grouped_cv_mse": 0.27947662099364434,
+            "fold_mse": [
+              0.31869395759772495,
+              0.20715358203071713,
+              0.26153577126725386,
+              0.34627167242564477,
+              0.26372812164688086
+            ]
+          },
+          {
+            "alpha": 1.0,
+            "action_grouped_cv_mse": 0.278623802610291,
+            "fold_mse": [
+              0.3174066796054296,
+              0.20587343520246373,
+              0.26105115336287943,
+              0.34519248105404,
+              0.2635952638266422
+            ]
+          },
+          {
+            "alpha": 10.0,
+            "action_grouped_cv_mse": 0.2749203731125084,
+            "fold_mse": [
+              0.3128738286938211,
+              0.20030011660683567,
+              0.2586085316977853,
+              0.3403326322328915,
+              0.2624867563312085
+            ]
+          },
+          {
+            "alpha": 100.0,
+            "action_grouped_cv_mse": 0.2694233299514012,
+            "fold_mse": [
+              0.31125484158611794,
+              0.18847117641003006,
+              0.2540005315288038,
+              0.3311695209083545,
+              0.2622205793236997
+            ]
+          },
+          {
+            "alpha": 1000.0,
+            "action_grouped_cv_mse": 0.2986057491658846,
+            "fold_mse": [
+              0.358746008018522,
+              0.20861870158849746,
+              0.27870989384953876,
+              0.3465350912202169,
+              0.30041905115264783
+            ]
+          },
+          {
+            "alpha": 10000.0,
+            "action_grouped_cv_mse": 0.4935108082082613,
+            "fold_mse": [
+              0.580817497410515,
+              0.37725006619566925,
+              0.48741404725895715,
+              0.5159039640751735,
+              0.5061684661009916
+            ]
+          }
+        ]
+      }
+    },
+    "global_quadratic": {
+      "left": {
+        "training_actions": 118,
+        "training_samples": 4116,
+        "holdout_actions": 27,
+        "holdout_samples": 1168,
+        "design_dimensions": 78,
+        "selected_ridge_alpha": 100.0,
+        "action_grouped_cv": [
+          {
+            "alpha": 0.01,
+            "action_grouped_cv_mse": 0.28384221769450074,
+            "fold_mse": [
+              0.2387908158433477,
+              0.33690563714654803,
+              0.3325652328268475,
+              0.30981855588940715,
+              0.20113084676635348
+            ]
+          },
+          {
+            "alpha": 0.1,
+            "action_grouped_cv_mse": 0.28365015962134266,
+            "fold_mse": [
+              0.23853270696279946,
+              0.3367386665685758,
+              0.33225300994447315,
+              0.3097328679327125,
+              0.20099354669815223
+            ]
+          },
+          {
+            "alpha": 1.0,
+            "action_grouped_cv_mse": 0.2820434269632437,
+            "fold_mse": [
+              0.23646454867995637,
+              0.3352425479435644,
+              0.3296813291863885,
+              0.308999582290468,
+              0.19982912671584116
+            ]
+          },
+          {
+            "alpha": 10.0,
+            "action_grouped_cv_mse": 0.2750442118964207,
+            "fold_mse": [
+              0.22836085843210052,
+              0.326804032085136,
+              0.3196769447703497,
+              0.30557316839676757,
+              0.19480605579774976
+            ]
+          },
+          {
+            "alpha": 100.0,
+            "action_grouped_cv_mse": 0.26167774458680026,
+            "fold_mse": [
+              0.2156073601828343,
+              0.30570952696103443,
+              0.30026673045714647,
+              0.2981183674739777,
+              0.18868673785900875
+            ]
+          },
+          {
+            "alpha": 1000.0,
+            "action_grouped_cv_mse": 0.28583157884010246,
+            "fold_mse": [
+              0.24911895126001513,
+              0.32012632644974626,
+              0.3170470074467429,
+              0.3193907665668458,
+              0.22347484247716232
+            ]
+          },
+          {
+            "alpha": 10000.0,
+            "action_grouped_cv_mse": 0.48121191428013865,
+            "fold_mse": [
+              0.4234243062564878,
+              0.47480390618011503,
+              0.5552005833366787,
+              0.5225736435429194,
+              0.43005713208449275
+            ]
+          }
+        ]
+      },
+      "right": {
+        "training_actions": 118,
+        "training_samples": 4116,
+        "holdout_actions": 27,
+        "holdout_samples": 1168,
+        "design_dimensions": 78,
+        "selected_ridge_alpha": 100.0,
+        "action_grouped_cv": [
+          {
+            "alpha": 0.01,
+            "action_grouped_cv_mse": 0.2923288059604367,
+            "fold_mse": [
+              0.3304172027230829,
+              0.21780742880812812,
+              0.2948075670805352,
+              0.34077811594971524,
+              0.2778337152407221
+            ]
+          },
+          {
+            "alpha": 0.1,
+            "action_grouped_cv_mse": 0.2921749021317987,
+            "fold_mse": [
+              0.33024286637448425,
+              0.21759078666606826,
+              0.29461512564723075,
+              0.3406638620686012,
+              0.27776186990260915
+            ]
+          },
+          {
+            "alpha": 1.0,
+            "action_grouped_cv_mse": 0.29084890147308473,
+            "fold_mse": [
+              0.32881926580649057,
+              0.21576758304226118,
+              0.2928934331445172,
+              0.33967229397692805,
+              0.2770919313952266
+            ]
+          },
+          {
+            "alpha": 10.0,
+            "action_grouped_cv_mse": 0.2842489891538333,
+            "fold_mse": [
+              0.3226836893801318,
+              0.20794760657221656,
+              0.28397585906606615,
+              0.3345332497473602,
+              0.2721045410033918
+            ]
+          },
+          {
+            "alpha": 100.0,
+            "action_grouped_cv_mse": 0.27124320888902526,
+            "fold_mse": [
+              0.31241873717389185,
+              0.19650943574111493,
+              0.2663474756588986,
+              0.32222719546949924,
+              0.25871320040172163
+            ]
+          },
+          {
+            "alpha": 1000.0,
+            "action_grouped_cv_mse": 0.2911295329743776,
+            "fold_mse": [
+              0.3506406297912994,
+              0.20888491711935386,
+              0.27261916961511323,
+              0.3363084986523555,
+              0.2871944496937659
+            ]
+          },
+          {
+            "alpha": 10000.0,
+            "action_grouped_cv_mse": 0.4742613951602707,
+            "fold_mse": [
+              0.5603404483980289,
+              0.36191989142075515,
+              0.4645181528071993,
+              0.5027944747077596,
+              0.48173400846761066
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "comparison": {
+    "global_supervised_inverse": "second-order polynomial ridge over all 11 features; comparative only",
+    "models_evaluated": {
+      "factorized": {
+        "mesh_deformation_evaluated": true,
+        "holdout_action_count": 27,
+        "holdout_sample_count": 1168,
+        "pose_translation_normalized": {
+          "count": 18688,
+          "rmse": 0.15514638092582272,
+          "p95": 0.29921160696252763,
+          "max": 1.0630117064021574
+        },
+        "pose_rotation_rad": {
+          "count": 18688,
+          "rmse": 0.5414092117402893,
+          "p95": 1.0952018972350346,
+          "max": 3.1322842291152293
+        },
+        "semantic_absolute_error": {
+          "count": 25696,
+          "rmse": 0.6953067866757497,
+          "p95": 1.5982028384603626,
+          "max": 5.746565104639924
+        },
+        "landmark_normalized": {
+          "count": 14016,
+          "rmse": 0.293736188311457,
+          "p95": 0.6410358492312369,
+          "max": 2.0650498080004915
+        },
+        "weighted_centroid_world": {
+          "count": 49056,
+          "rmse": 15.311848123476114,
+          "p95": 32.7511610974925,
+          "max": 69.94206185052427
+        },
+        "per_bone": {
+          "bone_22": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 9.82826859366074e-07,
+              "p95": 1.7468192710453852e-06,
+              "max": 3.6506424520299105e-06
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.27240598067192767,
+              "p95": 0.4962126934888455,
+              "max": 1.15378543922435
+            }
+          },
+          "bone_23": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.09142253960721276,
+              "p95": 0.1676945138541799,
+              "max": 0.3573024220231689
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.06880892476462869,
+              "p95": 0.13428871658527608,
+              "max": 0.31265590035650775
+            }
+          },
+          "bone_24": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.11103696497305372,
+              "p95": 0.20460136828635053,
+              "max": 0.4438963417721858
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.12951854339879001,
+              "p95": 0.28457065359568556,
+              "max": 0.4487310324989302
+            }
+          },
+          "bone_25": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.09142261920300421,
+              "p95": 0.16769490063607398,
+              "max": 0.3573039366940369
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.24339540180163535,
+              "p95": 0.5242230843278556,
+              "max": 0.8869080074150242
+            }
+          },
+          "bone_26": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.15053640901061602,
+              "p95": 0.28100399115017327,
+              "max": 0.7527618198407816
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.6297294471461695,
+              "p95": 1.467924068194677,
+              "max": 3.0957728492247027
+            }
+          },
+          "bone_27": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.15510881715844588,
+              "p95": 0.32062324181494606,
+              "max": 0.6762300692382085
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.7718796923167741,
+              "p95": 1.892563692623666,
+              "max": 3.1095365090625875
+            }
+          },
+          "bone_29": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.1509734344383826,
+              "p95": 0.2902703015561272,
+              "max": 0.7763797834248188
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.5999387984265572,
+              "p95": 1.4112362881674783,
+              "max": 3.086396429754329
+            }
+          },
+          "bone_30": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.3154079764022941,
+              "p95": 0.7481521635493178,
+              "max": 1.0630117064021574
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 1.1705895002628721,
+              "p95": 2.711786653494651,
+              "max": 3.1322842291152293
+            }
+          },
+          "bone_57": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 1.3681067223870628e-06,
+              "p95": 2.581028149371903e-06,
+              "max": 4.31805372080343e-06
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.3698621156446736,
+              "p95": 0.7018010650743399,
+              "max": 0.9668775818337247
+            }
+          },
+          "bone_58": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.1230924102150045,
+              "p95": 0.23469464683451807,
+              "max": 0.32569831852835684
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.06543706822937838,
+              "p95": 0.12618985033631963,
+              "max": 0.24892510615555605
+            }
+          },
+          "bone_59": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.12910681230768853,
+              "p95": 0.2400892314925665,
+              "max": 0.3695454942332819
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.14697179090866125,
+              "p95": 0.31039948555128816,
+              "max": 0.6291302332800088
+            }
+          },
+          "bone_60": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.12309247751945555,
+              "p95": 0.23469505261991952,
+              "max": 0.32569846662054985
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.2846309662461956,
+              "p95": 0.6161818447719468,
+              "max": 1.2536847949460208
+            }
+          },
+          "bone_61": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.15267960361198268,
+              "p95": 0.2893212194144107,
+              "max": 0.4477337342706013
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.362199185386492,
+              "p95": 0.6890063503114292,
+              "max": 2.129964068104673
+            }
+          },
+          "bone_62": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.15380563325079016,
+              "p95": 0.3215299964377148,
+              "max": 0.4012474077626055
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.5097912884521104,
+              "p95": 0.9669121958256489,
+              "max": 2.6881581666086305
+            }
+          },
+          "bone_64": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.1559665758509816,
+              "p95": 0.30046769280247365,
+              "max": 0.4541507915079118
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.35394627691176345,
+              "p95": 0.6402933693030027,
+              "max": 2.1118337539834284
+            }
+          },
+          "bone_65": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.26233758420039743,
+              "p95": 0.58040388611129,
+              "max": 0.8424689903008745
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 1.025872434764892,
+              "p95": 2.576901926546274,
+              "max": 3.1275768632506664
+            }
+          }
+        },
+        "per_semantic_signed_rmse": {
+          "left": {
+            "shoulder_rot_x": 0.056498010771482365,
+            "shoulder_rot_y": 0.03251859455677498,
+            "shoulder_rot_z": 0.030303358194356488,
+            "elbow_flexion": 0.20559663876489498,
+            "forearm_roll": 0.9550902587950822,
+            "wrist_rot_x": 0.7145217804111474,
+            "wrist_rot_y": 0.7826160885835954,
+            "wrist_rot_z": 0.45455168012688507,
+            "hand_radial": 1.7384501963252046,
+            "hand_tangential": 0.8272895290253126,
+            "hand_depth": 0.74163507656947
+          },
+          "right": {
+            "shoulder_rot_x": 0.05625244376030081,
+            "shoulder_rot_y": 0.02701676780770888,
+            "shoulder_rot_z": 0.026702621529893385,
+            "elbow_flexion": 0.1446452499100175,
+            "forearm_roll": 1.2534900022775541,
+            "wrist_rot_x": 0.5091693515570763,
+            "wrist_rot_y": 0.8626544410906374,
+            "wrist_rot_z": 0.43839857050449244,
+            "hand_radial": 0.146311650611882,
+            "hand_tangential": 0.8764430786787708,
+            "hand_depth": 0.7127878851192577
+          }
+        },
+        "per_landmark_normalized": {
+          "shoulder": {
+            "count": 1168,
+            "rmse": 3.257550147473698e-06,
+            "p95": 4.0883880809404535e-06,
+            "max": 5.266696261984538e-06
+          },
+          "elbow_main": {
+            "count": 1168,
+            "rmse": 0.15053643713802062,
+            "p95": 0.28100287175062455,
+            "max": 0.7527601806447538
+          },
+          "elbow_overlap": {
+            "count": 1168,
+            "rmse": 0.15097340904244222,
+            "p95": 0.290267574143355,
+            "max": 0.7763777053741779
+          },
+          "wrist_main": {
+            "count": 1168,
+            "rmse": 0.3154077839639868,
+            "p95": 0.7481510687372864,
+            "max": 1.0630108770312148
+          },
+          "glove_wrist": {
+            "count": 1168,
+            "rmse": 0.31540774836418745,
+            "p95": 0.7481505010637637,
+            "max": 1.0630107590599924
+          },
+          "glove_tip": {
+            "count": 1168,
+            "rmse": 0.613023154868737,
+            "p95": 1.3528370575264093,
+            "max": 2.0650498080004915
+          },
+          "shoulder_right": {
+            "count": 1168,
+            "rmse": 0.12309220923329212,
+            "p95": 0.2346954626349092,
+            "max": 0.32569529413985204
+          },
+          "elbow_main_right": {
+            "count": 1168,
+            "rmse": 0.15267971614047948,
+            "p95": 0.2893230492940594,
+            "max": 0.44773413959041214
+          },
+          "elbow_overlap_right": {
+            "count": 1168,
+            "rmse": 0.1559665689895514,
+            "p95": 0.3004669931300248,
+            "max": 0.4541512834469171
+          },
+          "wrist_right": {
+            "count": 1168,
+            "rmse": 0.26233645210041884,
+            "p95": 0.5803994345400512,
+            "max": 0.8424688160124475
+          },
+          "glove_wrist_right": {
+            "count": 1168,
+            "rmse": 0.2623371510577016,
+            "p95": 0.5804043444969039,
+            "max": 0.8424703099492119
+          },
+          "glove_tip_right": {
+            "count": 1168,
+            "rmse": 0.46338551029245484,
+            "p95": 0.9313239602767307,
+            "max": 1.800807801451381
+          }
+        },
+        "per_weighted_centroid_bone_world": {
+          "bone_22": {
+            "count": 1168,
+            "rmse": 1.3909888311706873,
+            "p95": 2.549729391594531,
+            "max": 5.614058620565209
+          },
+          "bone_23": {
+            "count": 1168,
+            "rmse": 2.2042378002034737,
+            "p95": 4.1406606668511525,
+            "max": 8.578221026515676
+          },
+          "bone_24": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_25": {
+            "count": 1168,
+            "rmse": 3.161424035711489,
+            "p95": 6.108560366550423,
+            "max": 10.186535119089097
+          },
+          "bone_26": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_27": {
+            "count": 1168,
+            "rmse": 7.548584033378891,
+            "p95": 18.044669283581133,
+            "max": 25.80681414203531
+          },
+          "bone_29": {
+            "count": 1168,
+            "rmse": 5.582378977796175,
+            "p95": 12.658386622636451,
+            "max": 23.182697272287577
+          },
+          "bone_30": {
+            "count": 1168,
+            "rmse": 10.803308111714482,
+            "p95": 25.060129114048983,
+            "max": 38.45737476061168
+          },
+          "bone_57": {
+            "count": 1168,
+            "rmse": 1.8749216432607325,
+            "p95": 3.5124581321108956,
+            "max": 4.879606124502575
+          },
+          "bone_58": {
+            "count": 1168,
+            "rmse": 2.8940936835078808,
+            "p95": 5.173854673543512,
+            "max": 7.309449144861572
+          },
+          "bone_59": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_60": {
+            "count": 1168,
+            "rmse": 3.9785247771150254,
+            "p95": 6.972628595708474,
+            "max": 17.01440448135021
+          },
+          "bone_61": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_62": {
+            "count": 1168,
+            "rmse": 6.249562363544237,
+            "p95": 13.444047342186979,
+            "max": 20.240796490608698
+          },
+          "bone_64": {
+            "count": 1168,
+            "rmse": 4.165090086897707,
+            "p95": 8.16984833484408,
+            "max": 15.423104830363283
+          },
+          "bone_65": {
+            "count": 1168,
+            "rmse": 8.136750444503166,
+            "p95": 15.205230179702202,
+            "max": 32.413652682836464
+          },
+          "bone_31": {
+            "count": 1168,
+            "rmse": 15.095258249723962,
+            "p95": 33.20972664817775,
+            "max": 49.68073271258235
+          },
+          "bone_36": {
+            "count": 1168,
+            "rmse": 20.233662631457136,
+            "p95": 43.47607220173234,
+            "max": 63.23010542818143
+          },
+          "bone_46": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_48": {
+            "count": 1168,
+            "rmse": 18.62692140240276,
+            "p95": 39.695921323596565,
+            "max": 57.06552737055444
+          },
+          "bone_37": {
+            "count": 1168,
+            "rmse": 23.558402983169884,
+            "p95": 48.70331924465869,
+            "max": 69.43373066832095
+          },
+          "bone_38": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_33": {
+            "count": 1168,
+            "rmse": 20.055000387251457,
+            "p95": 41.547840471924566,
+            "max": 60.90631303245439
+          },
+          "bone_41": {
+            "count": 1168,
+            "rmse": 24.30560917332414,
+            "p95": 49.96380858853978,
+            "max": 69.94206185052427
+          },
+          "bone_49": {
+            "count": 1168,
+            "rmse": 21.15010886406017,
+            "p95": 43.68813007274838,
+            "max": 62.30359858730352
+          },
+          "bone_43": {
+            "count": 1168,
+            "rmse": 17.01097785953197,
+            "p95": 37.21786347478538,
+            "max": 54.9833183954584
+          },
+          "bone_32": {
+            "count": 1168,
+            "rmse": 17.419393524201404,
+            "p95": 37.39319378016388,
+            "max": 55.35560819263767
+          },
+          "bone_47": {
+            "count": 1168,
+            "rmse": 16.479802851509103,
+            "p95": 35.56001282419845,
+            "max": 51.87081685475479
+          },
+          "bone_45": {
+            "count": 1168,
+            "rmse": 23.3764800557728,
+            "p95": 47.70053035032215,
+            "max": 66.64472589983863
+          },
+          "bone_50": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_35": {
+            "count": 1168,
+            "rmse": 17.292302440868447,
+            "p95": 37.883905071724065,
+            "max": 56.36238052049543
+          },
+          "bone_34": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_39": {
+            "count": 1168,
+            "rmse": 17.439143710877,
+            "p95": 38.80230687923974,
+            "max": 56.89172385180925
+          },
+          "bone_51": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_44": {
+            "count": 1168,
+            "rmse": 20.088866493099875,
+            "p95": 42.894541066340125,
+            "max": 61.465306711412005
+          },
+          "bone_42": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_40": {
+            "count": 1168,
+            "rmse": 20.744796939799624,
+            "p95": 44.29910264305044,
+            "max": 63.989577307620415
+          },
+          "bone_86": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_70": {
+            "count": 1168,
+            "rmse": 13.40677941012266,
+            "p95": 25.75168791524362,
+            "max": 52.45917318893181
+          },
+          "bone_75": {
+            "count": 1168,
+            "rmse": 15.922088906349556,
+            "p95": 29.204266798916283,
+            "max": 57.2309058533019
+          },
+          "bone_67": {
+            "count": 1168,
+            "rmse": 14.252198768918879,
+            "p95": 28.48033818584244,
+            "max": 43.91683488669704
+          },
+          "bone_79": {
+            "count": 1168,
+            "rmse": 15.27796042191876,
+            "p95": 32.090310104793694,
+            "max": 52.35581817333469
+          },
+          "bone_83": {
+            "count": 1168,
+            "rmse": 14.102017831712358,
+            "p95": 30.889776106948272,
+            "max": 49.54696445068208
+          },
+          "bone_81": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_74": {
+            "count": 1168,
+            "rmse": 13.045932795572517,
+            "p95": 25.7414702279898,
+            "max": 52.29298531508
+          },
+          "bone_72": {
+            "count": 1168,
+            "rmse": 19.313982172655734,
+            "p95": 34.16193518233177,
+            "max": 59.96964902330884
+          },
+          "bone_73": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_71": {
+            "count": 1168,
+            "rmse": 15.760370696744454,
+            "p95": 29.560824903943953,
+            "max": 56.66781409718892
+          },
+          "bone_80": {
+            "count": 1168,
+            "rmse": 19.20591655104359,
+            "p95": 34.38126178679161,
+            "max": 55.188733921866934
+          },
+          "bone_69": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_68": {
+            "count": 1168,
+            "rmse": 16.16173689221517,
+            "p95": 30.511222033327734,
+            "max": 48.42611469226659
+          },
+          "bone_66": {
+            "count": 1168,
+            "rmse": 12.5782856033701,
+            "p95": 26.138236063878068,
+            "max": 39.81746665466054
+          },
+          "bone_78": {
+            "count": 1168,
+            "rmse": 12.546605447328107,
+            "p95": 27.813918583677847,
+            "max": 49.584566059570186
+          },
+          "bone_84": {
+            "count": 1168,
+            "rmse": 17.005244744499812,
+            "p95": 33.73784680346763,
+            "max": 50.75901986588439
+          },
+          "bone_85": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_82": {
+            "count": 1168,
+            "rmse": 12.263336753549682,
+            "p95": 27.277504384980663,
+            "max": 47.0125529195949
+          },
+          "bone_77": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_76": {
+            "count": 1168,
+            "rmse": 20.05148499977669,
+            "p95": 33.30773929278056,
+            "max": 60.62268799263389
+          }
+        },
+        "pre_attachment_glove_gap_normalized": {
+          "left": {
+            "count": 1168,
+            "rmse": 0.2742331764236642,
+            "p95": 0.6798453636704821,
+            "max": 1.3704440336780672
+          },
+          "right": {
+            "count": 1168,
+            "rmse": 0.1936486103948403,
+            "p95": 0.40518307246139373,
+            "max": 0.9263771378835834
+          }
+        },
+        "attachment_correction_normalized": {
+          "left": {
+            "count": 1168,
+            "rmse": 0.2742331764236642,
+            "p95": 0.6798453636704821,
+            "max": 1.3704440336780672
+          },
+          "right": {
+            "count": 1168,
+            "rmse": 0.1936486103948403,
+            "p95": 0.40518307246139373,
+            "max": 0.9263771378835834
+          }
+        },
+        "post_attachment_glove_gap_max_normalized": 2.607430187384047e-06,
+        "fixed_fist_local_max_abs_error": 2.6645352591003757e-15,
+        "branch_relative_angle_error_rad": {
+          "left_23_25": {
+            "count": 1168,
+            "rmse": 0.17233901950326663,
+            "p95": 0.2964457857883583,
+            "max": 0.617148390607242
+          },
+          "left_26_29": {
+            "count": 1168,
+            "rmse": 0.1765171670224585,
+            "p95": 0.27999544772940227,
+            "max": 1.1027882936581108
+          },
+          "right_58_60": {
+            "count": 1168,
+            "rmse": 0.2003652763509751,
+            "p95": 0.26308230557923773,
+            "max": 0.8153258244361039
+          },
+          "right_61_64": {
+            "count": 1168,
+            "rmse": 0.05647570810706053,
+            "p95": 0.06287086039462403,
+            "max": 0.3352087082804005
+          }
+        },
+        "per_action": {
+          "Waluigi_10_Catcher_seq0": {
+            "sample_count": 38,
+            "translation_normalized": {
+              "count": 608,
+              "rmse": 0.07049508903747828,
+              "p95": 0.13773190401578278,
+              "max": 0.17795977111731556
+            },
+            "rotation_rad": {
+              "count": 608,
+              "rmse": 0.23300242282078826,
+              "p95": 0.45624985929222395,
+              "max": 0.5783292999031844
+            },
+            "semantic_abs_error": {
+              "count": 836,
+              "rmse": 0.42610136270478083,
+              "p95": 0.8885492094961178,
+              "max": 1.1023859945563832
+            },
+            "landmark_normalized": {
+              "count": 456,
+              "rmse": 0.15644643260879593,
+              "p95": 0.3745404596162689,
+              "max": 0.4068039265736075
+            },
+            "weighted_centroid_world": {
+              "count": 1596,
+              "rmse": 8.887153777709672,
+              "p95": 15.069890465485539,
+              "max": 18.077130945997602
+            },
+            "max_glove_gap_before_attachment_normalized": 0.14349069437819892,
+            "max_attachment_correction_normalized": 0.14349069437819892
+          },
+          "Waluigi_11_Reactions_seq4": {
+            "sample_count": 61,
+            "translation_normalized": {
+              "count": 976,
+              "rmse": 0.2047374156317839,
+              "p95": 0.47563217252219886,
+              "max": 0.7484658959926281
+            },
+            "rotation_rad": {
+              "count": 976,
+              "rmse": 0.6956603836580654,
+              "p95": 1.5266038856608444,
+              "max": 3.1322842291152293
+            },
+            "semantic_abs_error": {
+              "count": 1342,
+              "rmse": 0.7237902912556688,
+              "p95": 1.7380446800907783,
+              "max": 2.476468301282474
+            },
+            "landmark_normalized": {
+              "count": 732,
+              "rmse": 0.47369477686361233,
+              "p95": 0.9381824494929862,
+              "max": 1.8902643550497862
+            },
+            "weighted_centroid_world": {
+              "count": 2562,
+              "rmse": 24.971819014209974,
+              "p95": 54.46496905839891,
+              "max": 66.02467524775905
+            },
+            "max_glove_gap_before_attachment_normalized": 0.7892465979293697,
+            "max_attachment_correction_normalized": 0.7892465979293697
+          },
+          "Waluigi_12_Various_seq3": {
+            "sample_count": 79,
+            "translation_normalized": {
+              "count": 1264,
+              "rmse": 0.10662339119515654,
+              "p95": 0.19646907671539324,
+              "max": 0.46858442155423896
+            },
+            "rotation_rad": {
+              "count": 1264,
+              "rmse": 0.457462151983735,
+              "p95": 0.6597892084550055,
+              "max": 3.0998974676262963
+            },
+            "semantic_abs_error": {
+              "count": 1738,
+              "rmse": 0.600375776873184,
+              "p95": 1.3801696423256755,
+              "max": 2.968578861740114
+            },
+            "landmark_normalized": {
+              "count": 948,
+              "rmse": 0.21127175796778586,
+              "p95": 0.4369040867502382,
+              "max": 0.9334599523551053
+            },
+            "weighted_centroid_world": {
+              "count": 3318,
+              "rmse": 12.667636188146144,
+              "p95": 28.204770911982862,
+              "max": 36.33514714280298
+            },
+            "max_glove_gap_before_attachment_normalized": 0.2636361727964146,
+            "max_attachment_correction_normalized": 0.2636361727964146
+          },
+          "Waluigi_12_Various_seq8": {
+            "sample_count": 31,
+            "translation_normalized": {
+              "count": 496,
+              "rmse": 0.0934668304223622,
+              "p95": 0.1770311707823229,
+              "max": 0.27384651459253057
+            },
+            "rotation_rad": {
+              "count": 496,
+              "rmse": 0.35482060670826937,
+              "p95": 0.5325731586378037,
+              "max": 2.28015807005365
+            },
+            "semantic_abs_error": {
+              "count": 682,
+              "rmse": 0.5682756772687143,
+              "p95": 1.3032777880097268,
+              "max": 1.9829539201339859
+            },
+            "landmark_normalized": {
+              "count": 372,
+              "rmse": 0.1504845666598569,
+              "p95": 0.2648761881705856,
+              "max": 0.8840933672413326
+            },
+            "weighted_centroid_world": {
+              "count": 1302,
+              "rmse": 10.364701198475894,
+              "p95": 22.60201912997871,
+              "max": 30.4418970826383
+            },
+            "max_glove_gap_before_attachment_normalized": 0.2711440282556513,
+            "max_attachment_correction_normalized": 0.2711440282556513
+          },
+          "Waluigi_12_Various_seq13": {
+            "sample_count": 21,
+            "translation_normalized": {
+              "count": 336,
+              "rmse": 0.09583755977884946,
+              "p95": 0.18423449658541713,
+              "max": 0.2298118402387245
+            },
+            "rotation_rad": {
+              "count": 336,
+              "rmse": 0.22448999933307723,
+              "p95": 0.3786726595959107,
+              "max": 1.930703704182947
+            },
+            "semantic_abs_error": {
+              "count": 462,
+              "rmse": 0.49818631319723533,
+              "p95": 1.1481800707136336,
+              "max": 1.678995269294908
+            },
+            "landmark_normalized": {
+              "count": 252,
+              "rmse": 0.12729379333517177,
+              "p95": 0.21306836341236765,
+              "max": 0.48928763703412964
+            },
+            "weighted_centroid_world": {
+              "count": 882,
+              "rmse": 8.45511358783648,
+              "p95": 16.578305880607896,
+              "max": 25.410353223342632
+            },
+            "max_glove_gap_before_attachment_normalized": 0.06520574412019592,
+            "max_attachment_correction_normalized": 0.06520574412019592
+          },
+          "Waluigi_12_Various_seq18": {
+            "sample_count": 24,
+            "translation_normalized": {
+              "count": 384,
+              "rmse": 0.11220261951888078,
+              "p95": 0.16800118748237963,
+              "max": 0.17679127142601292
+            },
+            "rotation_rad": {
+              "count": 384,
+              "rmse": 0.16857545001502006,
+              "p95": 0.2920864912886763,
+              "max": 0.3777702008427835
+            },
+            "semantic_abs_error": {
+              "count": 528,
+              "rmse": 0.5593266575571365,
+              "p95": 1.1126319928976385,
+              "max": 1.8894233418752706
+            },
+            "landmark_normalized": {
+              "count": 288,
+              "rmse": 0.145389000457823,
+              "p95": 0.24523892153076432,
+              "max": 0.27233974361529045
+            },
+            "weighted_centroid_world": {
+              "count": 1008,
+              "rmse": 8.714170188337391,
+              "p95": 17.586768335850348,
+              "max": 19.95144620242234
+            },
+            "max_glove_gap_before_attachment_normalized": 0.06919726833363389,
+            "max_attachment_correction_normalized": 0.06919726833363389
+          },
+          "Waluigi_12_Various_seq23": {
+            "sample_count": 53,
+            "translation_normalized": {
+              "count": 848,
+              "rmse": 0.06672489108130913,
+              "p95": 0.1081370644618241,
+              "max": 0.18408977734770463
+            },
+            "rotation_rad": {
+              "count": 848,
+              "rmse": 0.14544914355886412,
+              "p95": 0.33276443968871,
+              "max": 0.49603865930782304
+            },
+            "semantic_abs_error": {
+              "count": 1166,
+              "rmse": 0.3935743878710766,
+              "p95": 0.8963476269055299,
+              "max": 1.1458239263832337
+            },
+            "landmark_normalized": {
+              "count": 636,
+              "rmse": 0.08745375925118587,
+              "p95": 0.1620468403882142,
+              "max": 0.196536039690673
+            },
+            "weighted_centroid_world": {
+              "count": 2226,
+              "rmse": 8.400342541822171,
+              "p95": 16.21779494050146,
+              "max": 19.28678337501075
+            },
+            "max_glove_gap_before_attachment_normalized": 0.12066173925071373,
+            "max_attachment_correction_normalized": 0.12066173925071373
+          },
+          "Waluigi_14_Entrance_seq1": {
+            "sample_count": 41,
+            "translation_normalized": {
+              "count": 656,
+              "rmse": 0.07280005697110135,
+              "p95": 0.12061896902387763,
+              "max": 0.1872504617287243
+            },
+            "rotation_rad": {
+              "count": 656,
+              "rmse": 0.749204404581666,
+              "p95": 2.606005229083393,
+              "max": 2.9785762481677653
+            },
+            "semantic_abs_error": {
+              "count": 902,
+              "rmse": 1.026756247923181,
+              "p95": 2.1318867471204928,
+              "max": 2.505215925675254
+            },
+            "landmark_normalized": {
+              "count": 492,
+              "rmse": 0.29740225531426995,
+              "p95": 0.8037206049914684,
+              "max": 0.8388401253541901
+            },
+            "weighted_centroid_world": {
+              "count": 1722,
+              "rmse": 20.99626058205005,
+              "p95": 32.44606501749863,
+              "max": 35.682141092038606
+            },
+            "max_glove_gap_before_attachment_normalized": 0.2337423375723336,
+            "max_attachment_correction_normalized": 0.2337423375723336
+          },
+          "Waluigi_6_Fielding_seq4": {
+            "sample_count": 61,
+            "translation_normalized": {
+              "count": 976,
+              "rmse": 0.08952561131618031,
+              "p95": 0.1630144659675676,
+              "max": 0.22127042811828476
+            },
+            "rotation_rad": {
+              "count": 976,
+              "rmse": 0.2549536958650824,
+              "p95": 0.5489897695247121,
+              "max": 0.7785353722718704
+            },
+            "semantic_abs_error": {
+              "count": 1342,
+              "rmse": 0.7124834299573256,
+              "p95": 1.7510255434578692,
+              "max": 2.171965712199569
+            },
+            "landmark_normalized": {
+              "count": 732,
+              "rmse": 0.16768681829256515,
+              "p95": 0.3309466527808276,
+              "max": 0.4729799704426426
+            },
+            "weighted_centroid_world": {
+              "count": 2562,
+              "rmse": 8.984413260222247,
+              "p95": 16.093959721226287,
+              "max": 20.843983505913304
+            },
+            "max_glove_gap_before_attachment_normalized": 0.11605131685733822,
+            "max_attachment_correction_normalized": 0.11605131685733822
+          },
+          "Waluigi_6_Fielding_seq9": {
+            "sample_count": 21,
+            "translation_normalized": {
+              "count": 336,
+              "rmse": 0.085752761072607,
+              "p95": 0.16072467908887042,
+              "max": 0.21853673897957282
+            },
+            "rotation_rad": {
+              "count": 336,
+              "rmse": 0.23393399165663414,
+              "p95": 0.46877841589000935,
+              "max": 0.9810699016687093
+            },
+            "semantic_abs_error": {
+              "count": 462,
+              "rmse": 0.38428136459358303,
+              "p95": 0.9406430782509206,
+              "max": 1.372415564711182
+            },
+            "landmark_normalized": {
+              "count": 252,
+              "rmse": 0.12415507578401945,
+              "p95": 0.2109710567322539,
+              "max": 0.316894834675299
+            },
+            "weighted_centroid_world": {
+              "count": 882,
+              "rmse": 5.672210152044243,
+              "p95": 10.28330806522654,
+              "max": 14.751203757535276
+            },
+            "max_glove_gap_before_attachment_normalized": 0.12727327989146614,
+            "max_attachment_correction_normalized": 0.12727327989146614
+          },
+          "Waluigi_6_Fielding_seq14": {
+            "sample_count": 21,
+            "translation_normalized": {
+              "count": 336,
+              "rmse": 0.1474436918569723,
+              "p95": 0.23716227064832307,
+              "max": 0.31881278737530033
+            },
+            "rotation_rad": {
+              "count": 336,
+              "rmse": 0.24467552800278608,
+              "p95": 0.518388033007031,
+              "max": 0.9289948056925893
+            },
+            "semantic_abs_error": {
+              "count": 462,
+              "rmse": 0.3675876540041052,
+              "p95": 0.8966673836497651,
+              "max": 1.4950843074914142
+            },
+            "landmark_normalized": {
+              "count": 252,
+              "rmse": 0.1828841319478256,
+              "p95": 0.2985090928812231,
+              "max": 0.39062245278728325
+            },
+            "weighted_centroid_world": {
+              "count": 882,
+              "rmse": 8.808693889559656,
+              "p95": 16.734824842899496,
+              "max": 21.181141273917696
+            },
+            "max_glove_gap_before_attachment_normalized": 0.1163419011793497,
+            "max_attachment_correction_normalized": 0.1163419011793497
+          },
+          "Waluigi_6_Fielding_seq19": {
+            "sample_count": 16,
+            "translation_normalized": {
+              "count": 256,
+              "rmse": 0.21003437184402207,
+              "p95": 0.5597850258903172,
+              "max": 0.6813467368378902
+            },
+            "rotation_rad": {
+              "count": 256,
+              "rmse": 0.9312456277526061,
+              "p95": 2.493541369393779,
+              "max": 2.9380275652301484
+            },
+            "semantic_abs_error": {
+              "count": 352,
+              "rmse": 0.9868889804721178,
+              "p95": 2.1786103439638773,
+              "max": 3.503891432933501
+            },
+            "landmark_normalized": {
+              "count": 192,
+              "rmse": 0.494684597023505,
+              "p95": 0.9765730122292382,
+              "max": 1.5209000274660713
+            },
+            "weighted_centroid_world": {
+              "count": 672,
+              "rmse": 24.703713620292262,
+              "p95": 44.619242650524995,
+              "max": 56.82057081146328
+            },
+            "max_glove_gap_before_attachment_normalized": 0.6851979200377897,
+            "max_attachment_correction_normalized": 0.6851979200377897
+          },
+          "Waluigi_6_Fielding_seq24": {
+            "sample_count": 31,
+            "translation_normalized": {
+              "count": 496,
+              "rmse": 0.13892070142938714,
+              "p95": 0.25050052407287804,
+              "max": 0.42727790365544077
+            },
+            "rotation_rad": {
+              "count": 496,
+              "rmse": 0.39260580421776176,
+              "p95": 0.6489774150622176,
+              "max": 3.03650980356842
+            },
+            "semantic_abs_error": {
+              "count": 682,
+              "rmse": 0.6427885038248712,
+              "p95": 1.447226018154601,
+              "max": 2.8751825585107422
+            },
+            "landmark_normalized": {
+              "count": 372,
+              "rmse": 0.2208590399965846,
+              "p95": 0.41332778172207574,
+              "max": 0.8682148673318589
+            },
+            "weighted_centroid_world": {
+              "count": 1302,
+              "rmse": 11.426730600475336,
+              "p95": 23.831066719417205,
+              "max": 38.92243402236616
+            },
+            "max_glove_gap_before_attachment_normalized": 0.21978898147808162,
+            "max_attachment_correction_normalized": 0.21978898147808162
+          },
+          "Waluigi_6_Fielding_seq29": {
+            "sample_count": 46,
+            "translation_normalized": {
+              "count": 736,
+              "rmse": 0.25660529202295695,
+              "p95": 0.5021745380195899,
+              "max": 1.0561121160731997
+            },
+            "rotation_rad": {
+              "count": 736,
+              "rmse": 0.5306467427923062,
+              "p95": 1.2546922570877121,
+              "max": 1.9791974437861664
+            },
+            "semantic_abs_error": {
+              "count": 1012,
+              "rmse": 0.5789203527353,
+              "p95": 1.2942862339292927,
+              "max": 3.6544162831258786
+            },
+            "landmark_normalized": {
+              "count": 552,
+              "rmse": 0.42475815942099104,
+              "p95": 0.956733148148656,
+              "max": 1.5075935847304542
+            },
+            "weighted_centroid_world": {
+              "count": 1932,
+              "rmse": 17.599615364878293,
+              "p95": 37.69157743338075,
+              "max": 50.148282306278965
+            },
+            "max_glove_gap_before_attachment_normalized": 0.8531436810738106,
+            "max_attachment_correction_normalized": 0.8531436810738106
+          },
+          "Waluigi_6_Fielding_seq34": {
+            "sample_count": 29,
+            "translation_normalized": {
+              "count": 464,
+              "rmse": 0.28310845705449345,
+              "p95": 0.5938151723205187,
+              "max": 0.7121302120150579
+            },
+            "rotation_rad": {
+              "count": 464,
+              "rmse": 0.8332176509911678,
+              "p95": 1.370908727600271,
+              "max": 2.0518063013605135
+            },
+            "semantic_abs_error": {
+              "count": 638,
+              "rmse": 0.6033216546381196,
+              "p95": 1.0986419220691686,
+              "max": 1.2704384656986383
+            },
+            "landmark_normalized": {
+              "count": 348,
+              "rmse": 0.4490398682528303,
+              "p95": 0.7103638102556288,
+              "max": 0.7523510718046472
+            },
+            "weighted_centroid_world": {
+              "count": 1218,
+              "rmse": 17.10462063560638,
+              "p95": 26.861115953079544,
+              "max": 35.14045460784241
+            },
+            "max_glove_gap_before_attachment_normalized": 0.6180622290997805,
+            "max_attachment_correction_normalized": 0.6180622290997805
+          },
+          "Waluigi_6_Fielding_seq39": {
+            "sample_count": 46,
+            "translation_normalized": {
+              "count": 736,
+              "rmse": 0.08028010285951982,
+              "p95": 0.13888730966300994,
+              "max": 0.23761515483985668
+            },
+            "rotation_rad": {
+              "count": 736,
+              "rmse": 0.23318152055447314,
+              "p95": 0.46202161557068533,
+              "max": 0.836020702339981
+            },
+            "semantic_abs_error": {
+              "count": 1012,
+              "rmse": 0.7353538421792347,
+              "p95": 1.7472124204909425,
+              "max": 2.6370940278835837
+            },
+            "landmark_normalized": {
+              "count": 552,
+              "rmse": 0.11754240109721324,
+              "p95": 0.2264149749974994,
+              "max": 0.5156530559104691
+            },
+            "weighted_centroid_world": {
+              "count": 1932,
+              "rmse": 6.249809120592477,
+              "p95": 11.580801911654989,
+              "max": 18.392173033647857
+            },
+            "max_glove_gap_before_attachment_normalized": 0.10943059128957573,
+            "max_attachment_correction_normalized": 0.10943059128957573
+          },
+          "Waluigi_7_Batting_seq11": {
+            "sample_count": 41,
+            "translation_normalized": {
+              "count": 656,
+              "rmse": 0.15777033734159066,
+              "p95": 0.24848174124150985,
+              "max": 0.37093690992977263
+            },
+            "rotation_rad": {
+              "count": 656,
+              "rmse": 0.4914009144036028,
+              "p95": 0.9685270546881164,
+              "max": 1.9561317740332593
+            },
+            "semantic_abs_error": {
+              "count": 902,
+              "rmse": 0.6171332444120242,
+              "p95": 1.4193933630307116,
+              "max": 2.3779549353233174
+            },
+            "landmark_normalized": {
+              "count": 492,
+              "rmse": 0.24617993199542967,
+              "p95": 0.4945743250407066,
+              "max": 0.8324664157074612
+            },
+            "weighted_centroid_world": {
+              "count": 1722,
+              "rmse": 13.33579877348166,
+              "p95": 26.013479353348927,
+              "max": 35.67382049145579
+            },
+            "max_glove_gap_before_attachment_normalized": 0.3798798940839413,
+            "max_attachment_correction_normalized": 0.3798798940839413
+          },
+          "Waluigi_7_Batting_seq15": {
+            "sample_count": 31,
+            "translation_normalized": {
+              "count": 496,
+              "rmse": 0.20267793624621144,
+              "p95": 0.3499879343874861,
+              "max": 0.8816021534261042
+            },
+            "rotation_rad": {
+              "count": 496,
+              "rmse": 0.8971094950030718,
+              "p95": 2.355660197325223,
+              "max": 3.1275768632506664
+            },
+            "semantic_abs_error": {
+              "count": 682,
+              "rmse": 0.7805176656920227,
+              "p95": 1.6456577675728568,
+              "max": 5.746565104639924
+            },
+            "landmark_normalized": {
+              "count": 372,
+              "rmse": 0.4250019620858679,
+              "p95": 0.881120577892155,
+              "max": 1.6381250310614583
+            },
+            "weighted_centroid_world": {
+              "count": 1302,
+              "rmse": 21.63620572779346,
+              "p95": 47.25249899232912,
+              "max": 53.43439316594943
+            },
+            "max_glove_gap_before_attachment_normalized": 0.8401248704793836,
+            "max_attachment_correction_normalized": 0.8401248704793836
+          },
+          "Waluigi_7_Batting_seq20": {
+            "sample_count": 61,
+            "translation_normalized": {
+              "count": 976,
+              "rmse": 0.17424987395842706,
+              "p95": 0.3423276908870978,
+              "max": 0.5293026640848152
+            },
+            "rotation_rad": {
+              "count": 976,
+              "rmse": 0.38135173440403825,
+              "p95": 0.6504198776873253,
+              "max": 2.8534178184521135
+            },
+            "semantic_abs_error": {
+              "count": 1342,
+              "rmse": 0.8296986563300912,
+              "p95": 1.8524090027686313,
+              "max": 4.5638727946550794
+            },
+            "landmark_normalized": {
+              "count": 732,
+              "rmse": 0.29403980318200307,
+              "p95": 0.5126041054905158,
+              "max": 1.21292002376111
+            },
+            "weighted_centroid_world": {
+              "count": 2562,
+              "rmse": 14.016891331623212,
+              "p95": 29.966170171207942,
+              "max": 43.58677214344366
+            },
+            "max_glove_gap_before_attachment_normalized": 0.36553380333415764,
+            "max_attachment_correction_normalized": 0.36553380333415764
+          },
+          "Waluigi_7_Batting_seq24": {
+            "sample_count": 63,
+            "translation_normalized": {
+              "count": 1008,
+              "rmse": 0.24631459130770741,
+              "p95": 0.5543567414660571,
+              "max": 1.0630117064021574
+            },
+            "rotation_rad": {
+              "count": 1008,
+              "rmse": 1.1209388728114678,
+              "p95": 2.689957243819947,
+              "max": 3.1300858081815695
+            },
+            "semantic_abs_error": {
+              "count": 1386,
+              "rmse": 1.1991012954266524,
+              "p95": 2.992344538328564,
+              "max": 4.633512088521535
+            },
+            "landmark_normalized": {
+              "count": 756,
+              "rmse": 0.5167580472994387,
+              "p95": 1.0430128344485672,
+              "max": 2.0650498080004915
+            },
+            "weighted_centroid_world": {
+              "count": 2646,
+              "rmse": 27.08351667482132,
+              "p95": 50.75574536007991,
+              "max": 69.94206185052427
+            },
+            "max_glove_gap_before_attachment_normalized": 1.3704440336780672,
+            "max_attachment_correction_normalized": 1.3704440336780672
+          },
+          "Waluigi_7_Batting_seq26": {
+            "sample_count": 66,
+            "translation_normalized": {
+              "count": 1056,
+              "rmse": 0.1750516709164415,
+              "p95": 0.28629935284401775,
+              "max": 0.8424689903008745
+            },
+            "rotation_rad": {
+              "count": 1056,
+              "rmse": 0.7005117048242605,
+              "p95": 1.6900103145339116,
+              "max": 3.1255622022518246
+            },
+            "semantic_abs_error": {
+              "count": 1452,
+              "rmse": 0.8895366110510211,
+              "p95": 1.9685968595027044,
+              "max": 4.703209329642772
+            },
+            "landmark_normalized": {
+              "count": 792,
+              "rmse": 0.373678776261445,
+              "p95": 0.8277854421593152,
+              "max": 1.6580105008748571
+            },
+            "weighted_centroid_world": {
+              "count": 2772,
+              "rmse": 19.512897470609374,
+              "p95": 41.769399044974335,
+              "max": 58.48368007014787
+            },
+            "max_glove_gap_before_attachment_normalized": 0.9156624403166617,
+            "max_attachment_correction_normalized": 0.9156624403166617
+          },
+          "Waluigi_8_Running_seq2": {
+            "sample_count": 14,
+            "translation_normalized": {
+              "count": 224,
+              "rmse": 0.18170478282845187,
+              "p95": 0.28748745657804997,
+              "max": 0.36000481287579866
+            },
+            "rotation_rad": {
+              "count": 224,
+              "rmse": 0.3664502634650759,
+              "p95": 0.751489823174282,
+              "max": 1.1288097785506135
+            },
+            "semantic_abs_error": {
+              "count": 308,
+              "rmse": 0.6317695839570544,
+              "p95": 1.3887672401411284,
+              "max": 2.813903609070399
+            },
+            "landmark_normalized": {
+              "count": 168,
+              "rmse": 0.2342439042342544,
+              "p95": 0.4012267913303921,
+              "max": 0.5478699406128139
+            },
+            "weighted_centroid_world": {
+              "count": 588,
+              "rmse": 12.055595062385185,
+              "p95": 21.12297668028932,
+              "max": 26.28722975579238
+            },
+            "max_glove_gap_before_attachment_normalized": 0.3369458185487553,
+            "max_attachment_correction_normalized": 0.3369458185487553
+          },
+          "Waluigi_8_Running_seq7": {
+            "sample_count": 36,
+            "translation_normalized": {
+              "count": 576,
+              "rmse": 0.10742005801122134,
+              "p95": 0.18936127708787132,
+              "max": 0.3128576157363476
+            },
+            "rotation_rad": {
+              "count": 576,
+              "rmse": 0.2580850460575234,
+              "p95": 0.49174840266576547,
+              "max": 1.3106161602321917
+            },
+            "semantic_abs_error": {
+              "count": 792,
+              "rmse": 0.5379690959800179,
+              "p95": 1.2365707233893548,
+              "max": 3.359541542145926
+            },
+            "landmark_normalized": {
+              "count": 432,
+              "rmse": 0.1487279451626739,
+              "p95": 0.2843969221657661,
+              "max": 0.47619286091132895
+            },
+            "weighted_centroid_world": {
+              "count": 1512,
+              "rmse": 7.300040663411024,
+              "p95": 14.259147463999149,
+              "max": 21.064767989632436
+            },
+            "max_glove_gap_before_attachment_normalized": 0.22239281857732712,
+            "max_attachment_correction_normalized": 0.22239281857732712
+          },
+          "Waluigi_8_Running_seq12": {
+            "sample_count": 111,
+            "translation_normalized": {
+              "count": 1776,
+              "rmse": 0.11206396102054847,
+              "p95": 0.21872764914012904,
+              "max": 0.44480103350782324
+            },
+            "rotation_rad": {
+              "count": 1776,
+              "rmse": 0.24651168975784296,
+              "p95": 0.5029139469292078,
+              "max": 2.0975352793375914
+            },
+            "semantic_abs_error": {
+              "count": 2442,
+              "rmse": 0.4801295334765287,
+              "p95": 1.1248249102991532,
+              "max": 2.7438481399555266
+            },
+            "landmark_normalized": {
+              "count": 1332,
+              "rmse": 0.18122242601752317,
+              "p95": 0.37182201328084047,
+              "max": 1.0492516900631288
+            },
+            "weighted_centroid_world": {
+              "count": 4662,
+              "rmse": 10.32084236953361,
+              "p95": 19.544893764536404,
+              "max": 35.37553396820992
+            },
+            "max_glove_gap_before_attachment_normalized": 0.39913347558045315,
+            "max_attachment_correction_normalized": 0.39913347558045315
+          },
+          "Waluigi_9_Pitching_seq1": {
+            "sample_count": 31,
+            "translation_normalized": {
+              "count": 496,
+              "rmse": 0.0816417351526924,
+              "p95": 0.14925897648706482,
+              "max": 0.19389346015135944
+            },
+            "rotation_rad": {
+              "count": 496,
+              "rmse": 0.23078556021957597,
+              "p95": 0.49761023814507227,
+              "max": 0.9046382247747381
+            },
+            "semantic_abs_error": {
+              "count": 682,
+              "rmse": 0.47552097429931295,
+              "p95": 1.1990537940666046,
+              "max": 1.609486669867883
+            },
+            "landmark_normalized": {
+              "count": 372,
+              "rmse": 0.13128040663278004,
+              "p95": 0.295133739535082,
+              "max": 0.41642460219676625
+            },
+            "weighted_centroid_world": {
+              "count": 1302,
+              "rmse": 8.02626621795578,
+              "p95": 15.995774095740037,
+              "max": 23.21604274900146
+            },
+            "max_glove_gap_before_attachment_normalized": 0.10898779509602544,
+            "max_attachment_correction_normalized": 0.10898779509602544
+          },
+          "Waluigi_9_Pitching_seq6": {
+            "sample_count": 41,
+            "translation_normalized": {
+              "count": 656,
+              "rmse": 0.17108589541255403,
+              "p95": 0.30924109678073275,
+              "max": 0.8499146172722608
+            },
+            "rotation_rad": {
+              "count": 656,
+              "rmse": 0.5778479537444161,
+              "p95": 1.298606208036014,
+              "max": 2.935228230002609
+            },
+            "semantic_abs_error": {
+              "count": 902,
+              "rmse": 0.591919882637209,
+              "p95": 1.5226795043192434,
+              "max": 3.9991299411338614
+            },
+            "landmark_normalized": {
+              "count": 492,
+              "rmse": 0.31993325806062395,
+              "p95": 0.6522813307281279,
+              "max": 1.800807801451381
+            },
+            "weighted_centroid_world": {
+              "count": 1722,
+              "rmse": 15.683988673075614,
+              "p95": 39.63802959041654,
+              "max": 60.62268799263389
+            },
+            "max_glove_gap_before_attachment_normalized": 0.9263771378835834,
+            "max_attachment_correction_normalized": 0.9263771378835834
+          },
+          "Waluigi_9_Pitching_seq11": {
+            "sample_count": 54,
+            "translation_normalized": {
+              "count": 864,
+              "rmse": 0.16823292173453883,
+              "p95": 0.34366473269955405,
+              "max": 0.9552890506644536
+            },
+            "rotation_rad": {
+              "count": 864,
+              "rmse": 0.6416099115393968,
+              "p95": 1.5062420634638134,
+              "max": 2.9970500812862695
+            },
+            "semantic_abs_error": {
+              "count": 1188,
+              "rmse": 0.6771654286878738,
+              "p95": 1.4787743123314965,
+              "max": 5.120587255126775
+            },
+            "landmark_normalized": {
+              "count": 648,
+              "rmse": 0.2969367708094209,
+              "p95": 0.5947969830850964,
+              "max": 1.3164719988351299
+            },
+            "weighted_centroid_world": {
+              "count": 2268,
+              "rmse": 15.572471293138781,
+              "p95": 32.417407216384845,
+              "max": 52.94804243460693
+            },
+            "max_glove_gap_before_attachment_normalized": 0.7443623539809936,
+            "max_attachment_correction_normalized": 0.7443623539809936
+          }
+        },
+        "worst_action_by_landmark_p95": "Waluigi_7_Batting_seq24",
+        "worst_action_by_centroid_p95": "Waluigi_11_Reactions_seq4"
+      },
+      "global_quadratic": {
+        "mesh_deformation_evaluated": false,
+        "holdout_action_count": 27,
+        "holdout_sample_count": 1168,
+        "pose_translation_normalized": {
+          "count": 18688,
+          "rmse": 0.14846732215364666,
+          "p95": 0.27743680852859226,
+          "max": 1.2958764364908153
+        },
+        "pose_rotation_rad": {
+          "count": 18688,
+          "rmse": 0.5069837308556864,
+          "p95": 0.9889839258911651,
+          "max": 3.141436957702079
+        },
+        "semantic_absolute_error": {
+          "count": 25696,
+          "rmse": 0.6999994383890785,
+          "p95": 1.599371195444877,
+          "max": 6.023960017886898
+        },
+        "landmark_normalized": {
+          "count": 14016,
+          "rmse": 0.27751407574892273,
+          "p95": 0.6054227627872425,
+          "max": 1.9970556198781935
+        },
+        "weighted_centroid_world": {
+          "count": 0,
+          "rmse": null,
+          "p95": null,
+          "max": null
+        },
+        "per_bone": {
+          "bone_22": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 9.452616477179265e-07,
+              "p95": 1.6905350369851779e-06,
+              "max": 3.4138863536017174e-06
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.2667762677117456,
+              "p95": 0.48386301233736084,
+              "max": 1.0931467385887592
+            }
+          },
+          "bone_23": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.08956847124164666,
+              "p95": 0.16095032931151823,
+              "max": 0.34941280845950284
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.07129568648669493,
+              "p95": 0.13702788091069806,
+              "max": 0.3367280343858237
+            }
+          },
+          "bone_24": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.1059769761043873,
+              "p95": 0.19515179744705072,
+              "max": 0.39507895317478714
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.10340928407433407,
+              "p95": 0.2233104307112202,
+              "max": 0.4293541144296424
+            }
+          },
+          "bone_25": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.08956851568009869,
+              "p95": 0.1609509312115414,
+              "max": 0.34941406599572417
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.1892279682961995,
+              "p95": 0.4303081253339284,
+              "max": 0.9479828149624094
+            }
+          },
+          "bone_26": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.13912073951755316,
+              "p95": 0.2907228052144872,
+              "max": 0.47449392032723653
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.5293232293773081,
+              "p95": 1.2264258669195862,
+              "max": 3.0230927378467305
+            }
+          },
+          "bone_27": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.1532108150991247,
+              "p95": 0.3023242566188425,
+              "max": 0.7704577633239024
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.6952700336862597,
+              "p95": 1.3964264539459075,
+              "max": 3.117138348647009
+            }
+          },
+          "bone_29": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.13813243586525106,
+              "p95": 0.2833508807001098,
+              "max": 0.4460549044896055
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.49855788828461406,
+              "p95": 1.2298567915598242,
+              "max": 2.9867035098468797
+            }
+          },
+          "bone_30": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.29919699690198914,
+              "p95": 0.6795560103473046,
+              "max": 1.2958764364908153
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 1.1433564401835148,
+              "p95": 2.6440534552772545,
+              "max": 3.140273860321914
+            }
+          },
+          "bone_57": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 1.3177593544876227e-06,
+              "p95": 2.517629350238863e-06,
+              "max": 4.113075564839206e-06
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.36080533159532424,
+              "p95": 0.6499701646637007,
+              "max": 1.0399026039874062
+            }
+          },
+          "bone_58": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.12017201659030444,
+              "p95": 0.2145626267004781,
+              "max": 0.35723781705422736
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.05843477205658722,
+              "p95": 0.11717490619162592,
+              "max": 0.2327555603654197
+            }
+          },
+          "bone_59": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.12347992807127572,
+              "p95": 0.2166601310639169,
+              "max": 0.3702285437517583
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.11062634709152548,
+              "p95": 0.2698437204709829,
+              "max": 0.38721130923930275
+            }
+          },
+          "bone_60": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.12017202719656209,
+              "p95": 0.2145634460742886,
+              "max": 0.35723817273099007
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.22379197440764165,
+              "p95": 0.531066782079514,
+              "max": 0.9030112405001341
+            }
+          },
+          "bone_61": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.139522378395578,
+              "p95": 0.2535704735186304,
+              "max": 0.45545714147315214
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.33481323882430347,
+              "p95": 0.5981466527086212,
+              "max": 2.773110910667063
+            }
+          },
+          "bone_62": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.14348903287454223,
+              "p95": 0.28930209349844505,
+              "max": 0.3639004251175454
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.5296260977635128,
+              "p95": 1.027185857528742,
+              "max": 3.138435416396312
+            }
+          },
+          "bone_64": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.14308262765975951,
+              "p95": 0.26115711699572347,
+              "max": 0.4618521337913139
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.3210494236779451,
+              "p95": 0.5920287141691712,
+              "max": 2.684728158972246
+            }
+          },
+          "bone_65": {
+            "translation_normalized": {
+              "count": 1168,
+              "rmse": 0.2632847856137857,
+              "p95": 0.5879577948664817,
+              "max": 0.9844202072124036
+            },
+            "rotation_rad": {
+              "count": 1168,
+              "rmse": 0.9893263831374901,
+              "p95": 2.509862861745141,
+              "max": 3.141436957702079
+            }
+          }
+        },
+        "per_semantic_signed_rmse": {
+          "left": {
+            "shoulder_rot_x": 0.04940282869249073,
+            "shoulder_rot_y": 0.04455377805506665,
+            "shoulder_rot_z": 0.03637962559102801,
+            "elbow_flexion": 0.162942931884356,
+            "forearm_roll": 0.974577174340492,
+            "wrist_rot_x": 0.7218301399261067,
+            "wrist_rot_y": 0.7411193461031473,
+            "wrist_rot_z": 0.43937197716740867,
+            "hand_radial": 1.7659843146479939,
+            "hand_tangential": 0.8347485486919374,
+            "hand_depth": 0.7390942205183679
+          },
+          "right": {
+            "shoulder_rot_x": 0.04253421109878333,
+            "shoulder_rot_y": 0.0333887823779002,
+            "shoulder_rot_z": 0.02930060023743893,
+            "elbow_flexion": 0.14345104340594259,
+            "forearm_roll": 1.2797053765965283,
+            "wrist_rot_x": 0.5078604619341733,
+            "wrist_rot_y": 0.8663097661692432,
+            "wrist_rot_z": 0.4545397624550455,
+            "hand_radial": 0.14437543670385478,
+            "hand_tangential": 0.8718328211747334,
+            "hand_depth": 0.7175009159989814
+          }
+        },
+        "per_landmark_normalized": {
+          "shoulder": {
+            "count": 1168,
+            "rmse": 3.2250394399062156e-06,
+            "p95": 4.072466866530609e-06,
+            "max": 5.266756175898299e-06
+          },
+          "elbow_main": {
+            "count": 1168,
+            "rmse": 0.13912072523845154,
+            "p95": 0.2907201985788654,
+            "max": 0.4744973283741352
+          },
+          "elbow_overlap": {
+            "count": 1168,
+            "rmse": 0.13813232323098198,
+            "p95": 0.2833482332021797,
+            "max": 0.4460565654673241
+          },
+          "wrist_main": {
+            "count": 1168,
+            "rmse": 0.29919664611358865,
+            "p95": 0.6795572370200215,
+            "max": 1.2958780172415956
+          },
+          "glove_wrist": {
+            "count": 1168,
+            "rmse": 0.2991966557678097,
+            "p95": 0.6795568275895361,
+            "max": 1.295878872772287
+          },
+          "glove_tip": {
+            "count": 1168,
+            "rmse": 0.5526101107298591,
+            "p95": 1.1333139145853923,
+            "max": 1.9970556198781935
+          },
+          "shoulder_right": {
+            "count": 1168,
+            "rmse": 0.12017178822639774,
+            "p95": 0.2145643308051078,
+            "max": 0.3572347624740922
+          },
+          "elbow_main_right": {
+            "count": 1168,
+            "rmse": 0.1395223150898917,
+            "p95": 0.2535705628186744,
+            "max": 0.45545895551720406
+          },
+          "elbow_overlap_right": {
+            "count": 1168,
+            "rmse": 0.14308245300443145,
+            "p95": 0.26115890087768034,
+            "max": 0.4618539200357415
+          },
+          "wrist_right": {
+            "count": 1168,
+            "rmse": 0.2632836371535431,
+            "p95": 0.5879519187167543,
+            "max": 0.984417713294132
+          },
+          "glove_wrist_right": {
+            "count": 1168,
+            "rmse": 0.2632842884774683,
+            "p95": 0.5879555728570115,
+            "max": 0.984417741883547
+          },
+          "glove_tip_right": {
+            "count": 1168,
+            "rmse": 0.4564002760631633,
+            "p95": 0.8786727846957886,
+            "max": 1.9826986620115394
+          }
+        },
+        "per_weighted_centroid_bone_world": {
+          "bone_22": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_23": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_24": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_25": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_26": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_27": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_29": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_30": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_57": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_58": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_59": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_60": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_61": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_62": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_64": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_65": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_31": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_36": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_46": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_48": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_37": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_38": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_33": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_41": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_49": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_43": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_32": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_47": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_45": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_50": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_35": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_34": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_39": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_51": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_44": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_42": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_40": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_86": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_70": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_75": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_67": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_79": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_83": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_81": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_74": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_72": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_73": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_71": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_80": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_69": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_68": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_66": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_78": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_84": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_85": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_82": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_77": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          },
+          "bone_76": {
+            "count": 0,
+            "rmse": null,
+            "p95": null,
+            "max": null
+          }
+        },
+        "pre_attachment_glove_gap_normalized": {
+          "left": {
+            "count": 1168,
+            "rmse": 0.23559497003852986,
+            "p95": 0.5791279615166559,
+            "max": 1.1067508346407442
+          },
+          "right": {
+            "count": 1168,
+            "rmse": 0.1979061539426231,
+            "p95": 0.4052571648110011,
+            "max": 1.0461699645382865
+          }
+        },
+        "attachment_correction_normalized": {
+          "left": {
+            "count": 1168,
+            "rmse": 0.23559497003852986,
+            "p95": 0.5791279615166559,
+            "max": 1.1067508346407442
+          },
+          "right": {
+            "count": 1168,
+            "rmse": 0.1979061539426231,
+            "p95": 0.4052571648110011,
+            "max": 1.0461699645382865
+          }
+        },
+        "post_attachment_glove_gap_max_normalized": 2.616213759711047e-06,
+        "fixed_fist_local_max_abs_error": 3.1431020980354774e-15,
+        "branch_relative_angle_error_rad": {
+          "left_23_25": {
+            "count": 1168,
+            "rmse": 0.1555876458501929,
+            "p95": 0.2920250159465913,
+            "max": 0.9486338058441791
+          },
+          "left_26_29": {
+            "count": 1168,
+            "rmse": 0.18503546416036729,
+            "p95": 0.3515353967142492,
+            "max": 1.333146270576831
+          },
+          "right_58_60": {
+            "count": 1168,
+            "rmse": 0.18130990100084224,
+            "p95": 0.22731660836847625,
+            "max": 0.8086384904483843
+          },
+          "right_61_64": {
+            "count": 1168,
+            "rmse": 0.05970432133501526,
+            "p95": 0.06893293843988879,
+            "max": 0.3329055691779362
+          }
+        },
+        "per_action": {
+          "Waluigi_10_Catcher_seq0": {
+            "sample_count": 38,
+            "translation_normalized": {
+              "count": 608,
+              "rmse": 0.06776121033760424,
+              "p95": 0.12693430704709713,
+              "max": 0.15084017203807978
+            },
+            "rotation_rad": {
+              "count": 608,
+              "rmse": 0.1801946297211148,
+              "p95": 0.381191051317322,
+              "max": 0.4284550316059158
+            },
+            "semantic_abs_error": {
+              "count": 836,
+              "rmse": 0.41866479719254496,
+              "p95": 0.8775015228221732,
+              "max": 1.0794079506022474
+            },
+            "landmark_normalized": {
+              "count": 456,
+              "rmse": 0.12770077576568656,
+              "p95": 0.2922007452548289,
+              "max": 0.29980049327416564
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.11526152100724263,
+            "max_attachment_correction_normalized": 0.11526152100724263
+          },
+          "Waluigi_11_Reactions_seq4": {
+            "sample_count": 61,
+            "translation_normalized": {
+              "count": 976,
+              "rmse": 0.19508399495314346,
+              "p95": 0.37030039083756333,
+              "max": 0.7398318215785672
+            },
+            "rotation_rad": {
+              "count": 976,
+              "rmse": 0.5897071148135761,
+              "p95": 1.2707565469311177,
+              "max": 2.7665593994801836
+            },
+            "semantic_abs_error": {
+              "count": 1342,
+              "rmse": 0.73628029558232,
+              "p95": 1.6795019479408326,
+              "max": 2.609839319501374
+            },
+            "landmark_normalized": {
+              "count": 732,
+              "rmse": 0.38240183813047723,
+              "p95": 0.7374559094092042,
+              "max": 1.5279325763061469
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.5655535367368468,
+            "max_attachment_correction_normalized": 0.5655535367368468
+          },
+          "Waluigi_12_Various_seq3": {
+            "sample_count": 79,
+            "translation_normalized": {
+              "count": 1264,
+              "rmse": 0.10343863333817559,
+              "p95": 0.19511025992284423,
+              "max": 0.3779689203925212
+            },
+            "rotation_rad": {
+              "count": 1264,
+              "rmse": 0.429922782034795,
+              "p95": 0.6386300880881393,
+              "max": 3.1074805016182325
+            },
+            "semantic_abs_error": {
+              "count": 1738,
+              "rmse": 0.6165310003808466,
+              "p95": 1.3660609036397382,
+              "max": 2.94663893832824
+            },
+            "landmark_normalized": {
+              "count": 948,
+              "rmse": 0.19265632852039882,
+              "p95": 0.3657635458138074,
+              "max": 0.9184842714252796
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.2541119535407149,
+            "max_attachment_correction_normalized": 0.2541119535407149
+          },
+          "Waluigi_12_Various_seq8": {
+            "sample_count": 31,
+            "translation_normalized": {
+              "count": 496,
+              "rmse": 0.09049379121044789,
+              "p95": 0.17075277462381838,
+              "max": 0.26087120831101285
+            },
+            "rotation_rad": {
+              "count": 496,
+              "rmse": 0.32645710675989603,
+              "p95": 0.4870796202446148,
+              "max": 2.0929135593814383
+            },
+            "semantic_abs_error": {
+              "count": 682,
+              "rmse": 0.5605433532329983,
+              "p95": 1.288899667716924,
+              "max": 1.8772982801768983
+            },
+            "landmark_normalized": {
+              "count": 372,
+              "rmse": 0.14033303987152607,
+              "p95": 0.2230750906683341,
+              "max": 0.7013963267258052
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.14875632705757036,
+            "max_attachment_correction_normalized": 0.14875632705757036
+          },
+          "Waluigi_12_Various_seq13": {
+            "sample_count": 21,
+            "translation_normalized": {
+              "count": 336,
+              "rmse": 0.0917885105830168,
+              "p95": 0.1773943758231967,
+              "max": 0.22632888175943983
+            },
+            "rotation_rad": {
+              "count": 336,
+              "rmse": 0.20820045360556722,
+              "p95": 0.3197377460132541,
+              "max": 1.8827054015546922
+            },
+            "semantic_abs_error": {
+              "count": 462,
+              "rmse": 0.5019188784544509,
+              "p95": 1.1579900041895606,
+              "max": 1.7145062950302794
+            },
+            "landmark_normalized": {
+              "count": 252,
+              "rmse": 0.1180312464281176,
+              "p95": 0.1943863366167441,
+              "max": 0.4532819672358407
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.07972875133546901,
+            "max_attachment_correction_normalized": 0.07972875133546901
+          },
+          "Waluigi_12_Various_seq18": {
+            "sample_count": 24,
+            "translation_normalized": {
+              "count": 384,
+              "rmse": 0.09086573698284316,
+              "p95": 0.12251106252658814,
+              "max": 0.12389264242533157
+            },
+            "rotation_rad": {
+              "count": 384,
+              "rmse": 0.12271497574327421,
+              "p95": 0.23808258604494906,
+              "max": 0.27168559367717154
+            },
+            "semantic_abs_error": {
+              "count": 528,
+              "rmse": 0.5586104850225754,
+              "p95": 1.076297068707347,
+              "max": 1.922304249889948
+            },
+            "landmark_normalized": {
+              "count": 288,
+              "rmse": 0.10546027084726986,
+              "p95": 0.14397590787085643,
+              "max": 0.1583342004820843
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.044081340289669035,
+            "max_attachment_correction_normalized": 0.044081340289669035
+          },
+          "Waluigi_12_Various_seq23": {
+            "sample_count": 53,
+            "translation_normalized": {
+              "count": 848,
+              "rmse": 0.058306202964856446,
+              "p95": 0.09886617578176807,
+              "max": 0.1161289410833147
+            },
+            "rotation_rad": {
+              "count": 848,
+              "rmse": 0.1396801412922352,
+              "p95": 0.3071136378829247,
+              "max": 0.5517016933686458
+            },
+            "semantic_abs_error": {
+              "count": 1166,
+              "rmse": 0.3865250757505534,
+              "p95": 0.8278108998246572,
+              "max": 1.1564700284019378
+            },
+            "landmark_normalized": {
+              "count": 636,
+              "rmse": 0.08326830464445764,
+              "p95": 0.15786478520711883,
+              "max": 0.20029092458369122
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.07615952066367143,
+            "max_attachment_correction_normalized": 0.07615952066367143
+          },
+          "Waluigi_14_Entrance_seq1": {
+            "sample_count": 41,
+            "translation_normalized": {
+              "count": 656,
+              "rmse": 0.06768396820436477,
+              "p95": 0.10709405971769395,
+              "max": 0.11344383749532941
+            },
+            "rotation_rad": {
+              "count": 656,
+              "rmse": 0.7234446680085296,
+              "p95": 2.589694389904632,
+              "max": 2.950824135602194
+            },
+            "semantic_abs_error": {
+              "count": 902,
+              "rmse": 1.0309519143694563,
+              "p95": 2.0846048758232434,
+              "max": 2.714607881646422
+            },
+            "landmark_normalized": {
+              "count": 492,
+              "rmse": 0.27376540832258967,
+              "p95": 0.8032519344616884,
+              "max": 0.82756611116363
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.20294101576580356,
+            "max_attachment_correction_normalized": 0.20294101576580356
+          },
+          "Waluigi_6_Fielding_seq4": {
+            "sample_count": 61,
+            "translation_normalized": {
+              "count": 976,
+              "rmse": 0.0671065335442572,
+              "p95": 0.113765991420471,
+              "max": 0.1607288318497633
+            },
+            "rotation_rad": {
+              "count": 976,
+              "rmse": 0.2139434286759047,
+              "p95": 0.4974089405362966,
+              "max": 0.6249665977331147
+            },
+            "semantic_abs_error": {
+              "count": 1342,
+              "rmse": 0.719331512437545,
+              "p95": 1.673101592542967,
+              "max": 2.2032617287225387
+            },
+            "landmark_normalized": {
+              "count": 732,
+              "rmse": 0.14301015771687636,
+              "p95": 0.3388361534358708,
+              "max": 0.38152776175724884
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.09055631706580802,
+            "max_attachment_correction_normalized": 0.09055631706580802
+          },
+          "Waluigi_6_Fielding_seq9": {
+            "sample_count": 21,
+            "translation_normalized": {
+              "count": 336,
+              "rmse": 0.07388463834727502,
+              "p95": 0.1332546858686981,
+              "max": 0.1820703292569372
+            },
+            "rotation_rad": {
+              "count": 336,
+              "rmse": 0.21549095834430343,
+              "p95": 0.42997376697235706,
+              "max": 0.9541612766863263
+            },
+            "semantic_abs_error": {
+              "count": 462,
+              "rmse": 0.38405380756683166,
+              "p95": 0.9402388577471518,
+              "max": 1.3878172850306374
+            },
+            "landmark_normalized": {
+              "count": 252,
+              "rmse": 0.12250549812456847,
+              "p95": 0.24914429117930442,
+              "max": 0.347496951009016
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.14457180194463654,
+            "max_attachment_correction_normalized": 0.14457180194463654
+          },
+          "Waluigi_6_Fielding_seq14": {
+            "sample_count": 21,
+            "translation_normalized": {
+              "count": 336,
+              "rmse": 0.15736597207161293,
+              "p95": 0.24624150611271323,
+              "max": 0.4235570540199112
+            },
+            "rotation_rad": {
+              "count": 336,
+              "rmse": 0.25576603612643334,
+              "p95": 0.5785182310186564,
+              "max": 0.7345075699750773
+            },
+            "semantic_abs_error": {
+              "count": 462,
+              "rmse": 0.3727046558417469,
+              "p95": 0.8563711097459157,
+              "max": 1.5289732483287284
+            },
+            "landmark_normalized": {
+              "count": 252,
+              "rmse": 0.20899537579863997,
+              "p95": 0.39718939801529324,
+              "max": 0.5221516945679723
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.23501819882493896,
+            "max_attachment_correction_normalized": 0.23501819882493896
+          },
+          "Waluigi_6_Fielding_seq19": {
+            "sample_count": 16,
+            "translation_normalized": {
+              "count": 256,
+              "rmse": 0.20640033715555303,
+              "p95": 0.5659747679575208,
+              "max": 0.695013399435209
+            },
+            "rotation_rad": {
+              "count": 256,
+              "rmse": 1.0043385498556252,
+              "p95": 2.8486457037706177,
+              "max": 3.138435416396312
+            },
+            "semantic_abs_error": {
+              "count": 352,
+              "rmse": 0.9930394122607028,
+              "p95": 2.238490171430121,
+              "max": 3.7150103505308216
+            },
+            "landmark_normalized": {
+              "count": 192,
+              "rmse": 0.5030592182012146,
+              "p95": 0.9730424145358277,
+              "max": 1.4195765989338742
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.6838073164842375,
+            "max_attachment_correction_normalized": 0.6838073164842375
+          },
+          "Waluigi_6_Fielding_seq24": {
+            "sample_count": 31,
+            "translation_normalized": {
+              "count": 496,
+              "rmse": 0.13388794927826822,
+              "p95": 0.25366602934394106,
+              "max": 0.40757645382762264
+            },
+            "rotation_rad": {
+              "count": 496,
+              "rmse": 0.3922501327843521,
+              "p95": 0.6987092783659284,
+              "max": 3.0841143440960392
+            },
+            "semantic_abs_error": {
+              "count": 682,
+              "rmse": 0.6674697368229305,
+              "p95": 1.4675279282987643,
+              "max": 2.9347909741810065
+            },
+            "landmark_normalized": {
+              "count": 372,
+              "rmse": 0.22872481664803493,
+              "p95": 0.3956834431496749,
+              "max": 0.9702480360289344
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.2630444489255495,
+            "max_attachment_correction_normalized": 0.2630444489255495
+          },
+          "Waluigi_6_Fielding_seq29": {
+            "sample_count": 46,
+            "translation_normalized": {
+              "count": 736,
+              "rmse": 0.22971474096879899,
+              "p95": 0.44078369004848333,
+              "max": 0.8895782314591237
+            },
+            "rotation_rad": {
+              "count": 736,
+              "rmse": 0.486266595455586,
+              "p95": 1.0727535937320838,
+              "max": 2.442411335257281
+            },
+            "semantic_abs_error": {
+              "count": 1012,
+              "rmse": 0.5747726124804672,
+              "p95": 1.3497617474692372,
+              "max": 3.432659360962821
+            },
+            "landmark_normalized": {
+              "count": 552,
+              "rmse": 0.3827564642487106,
+              "p95": 0.8504629156895083,
+              "max": 1.4423208359152873
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.6317330073306783,
+            "max_attachment_correction_normalized": 0.6317330073306783
+          },
+          "Waluigi_6_Fielding_seq34": {
+            "sample_count": 29,
+            "translation_normalized": {
+              "count": 464,
+              "rmse": 0.2621037234290294,
+              "p95": 0.5790683852994585,
+              "max": 0.6155408148319395
+            },
+            "rotation_rad": {
+              "count": 464,
+              "rmse": 0.8483922417471599,
+              "p95": 1.6234092822599675,
+              "max": 2.4285806878548213
+            },
+            "semantic_abs_error": {
+              "count": 638,
+              "rmse": 0.6547572912069578,
+              "p95": 1.2549963441446792,
+              "max": 1.7097616567790588
+            },
+            "landmark_normalized": {
+              "count": 348,
+              "rmse": 0.4256163356616658,
+              "p95": 0.615081915714635,
+              "max": 0.8852952074540873
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.6006599992284832,
+            "max_attachment_correction_normalized": 0.6006599992284832
+          },
+          "Waluigi_6_Fielding_seq39": {
+            "sample_count": 46,
+            "translation_normalized": {
+              "count": 736,
+              "rmse": 0.07523286799277727,
+              "p95": 0.12968330061942104,
+              "max": 0.19033032328013155
+            },
+            "rotation_rad": {
+              "count": 736,
+              "rmse": 0.19760821840370071,
+              "p95": 0.39839019712202867,
+              "max": 0.7178429205496689
+            },
+            "semantic_abs_error": {
+              "count": 1012,
+              "rmse": 0.7331136350563005,
+              "p95": 1.7116606046480753,
+              "max": 2.6324928077244594
+            },
+            "landmark_normalized": {
+              "count": 552,
+              "rmse": 0.10636785491570197,
+              "p95": 0.18643059291134506,
+              "max": 0.4284913678929442
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.1209809820106034,
+            "max_attachment_correction_normalized": 0.1209809820106034
+          },
+          "Waluigi_7_Batting_seq11": {
+            "sample_count": 41,
+            "translation_normalized": {
+              "count": 656,
+              "rmse": 0.13240878098242437,
+              "p95": 0.2023109249780685,
+              "max": 0.36763987990052865
+            },
+            "rotation_rad": {
+              "count": 656,
+              "rmse": 0.4433772249210549,
+              "p95": 0.8414369633460018,
+              "max": 2.002574213362597
+            },
+            "semantic_abs_error": {
+              "count": 902,
+              "rmse": 0.599715608131476,
+              "p95": 1.407922050102533,
+              "max": 2.3196236241009713
+            },
+            "landmark_normalized": {
+              "count": 492,
+              "rmse": 0.22363028621981437,
+              "p95": 0.42573335704875226,
+              "max": 0.8234178159518665
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.4022038570515457,
+            "max_attachment_correction_normalized": 0.4022038570515457
+          },
+          "Waluigi_7_Batting_seq15": {
+            "sample_count": 31,
+            "translation_normalized": {
+              "count": 496,
+              "rmse": 0.1978498249658125,
+              "p95": 0.3463471716197957,
+              "max": 0.7297621665594315
+            },
+            "rotation_rad": {
+              "count": 496,
+              "rmse": 0.845844271737287,
+              "p95": 2.184226101855333,
+              "max": 3.1210930688586713
+            },
+            "semantic_abs_error": {
+              "count": 682,
+              "rmse": 0.7865856686812788,
+              "p95": 1.7028514210883638,
+              "max": 6.023960017886898
+            },
+            "landmark_normalized": {
+              "count": 372,
+              "rmse": 0.40151372188976797,
+              "p95": 0.8208874835386281,
+              "max": 1.4249237159947528
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.6628187486792951,
+            "max_attachment_correction_normalized": 0.6628187486792951
+          },
+          "Waluigi_7_Batting_seq20": {
+            "sample_count": 61,
+            "translation_normalized": {
+              "count": 976,
+              "rmse": 0.15536936727074477,
+              "p95": 0.3043771987104542,
+              "max": 0.5793267403582981
+            },
+            "rotation_rad": {
+              "count": 976,
+              "rmse": 0.3694381366809933,
+              "p95": 0.679299701753723,
+              "max": 3.1355614286116325
+            },
+            "semantic_abs_error": {
+              "count": 1342,
+              "rmse": 0.8055527994580075,
+              "p95": 1.7610506423540386,
+              "max": 4.533867677603157
+            },
+            "landmark_normalized": {
+              "count": 732,
+              "rmse": 0.2679478042992765,
+              "p95": 0.48758048893394307,
+              "max": 1.0943495184686491
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.3951507213197085,
+            "max_attachment_correction_normalized": 0.3951507213197085
+          },
+          "Waluigi_7_Batting_seq24": {
+            "sample_count": 63,
+            "translation_normalized": {
+              "count": 1008,
+              "rmse": 0.2572884970720056,
+              "p95": 0.5235590856979028,
+              "max": 1.2958764364908153
+            },
+            "rotation_rad": {
+              "count": 1008,
+              "rmse": 0.9931861229449802,
+              "p95": 2.5849664496191576,
+              "max": 3.1413183413645354
+            },
+            "semantic_abs_error": {
+              "count": 1386,
+              "rmse": 1.227599110143357,
+              "p95": 3.0101877865170312,
+              "max": 5.726091054463977
+            },
+            "landmark_normalized": {
+              "count": 756,
+              "rmse": 0.5033240864170463,
+              "p95": 1.0441695952351209,
+              "max": 1.9970556198781935
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 1.1067508346407442,
+            "max_attachment_correction_normalized": 1.1067508346407442
+          },
+          "Waluigi_7_Batting_seq26": {
+            "sample_count": 66,
+            "translation_normalized": {
+              "count": 1056,
+              "rmse": 0.16485114926590133,
+              "p95": 0.2327422227409055,
+              "max": 0.836765584807717
+            },
+            "rotation_rad": {
+              "count": 1056,
+              "rmse": 0.6987567005152727,
+              "p95": 1.7212357114345553,
+              "max": 3.117138348647009
+            },
+            "semantic_abs_error": {
+              "count": 1452,
+              "rmse": 0.8917011120315055,
+              "p95": 1.8572710088191544,
+              "max": 4.850353185024145
+            },
+            "landmark_normalized": {
+              "count": 792,
+              "rmse": 0.3650603068090936,
+              "p95": 0.7931726083728556,
+              "max": 1.5766434069975666
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.920736324591186,
+            "max_attachment_correction_normalized": 0.920736324591186
+          },
+          "Waluigi_8_Running_seq2": {
+            "sample_count": 14,
+            "translation_normalized": {
+              "count": 224,
+              "rmse": 0.16855692196676664,
+              "p95": 0.27472927802465413,
+              "max": 0.35238776066244837
+            },
+            "rotation_rad": {
+              "count": 224,
+              "rmse": 0.3358506841436567,
+              "p95": 0.6901477436278256,
+              "max": 1.0247075280275284
+            },
+            "semantic_abs_error": {
+              "count": 308,
+              "rmse": 0.6477979677687886,
+              "p95": 1.468090231234977,
+              "max": 2.8788090350778646
+            },
+            "landmark_normalized": {
+              "count": 168,
+              "rmse": 0.2328989595398122,
+              "p95": 0.35936295551248,
+              "max": 0.7642576288114497
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.26994081924660873,
+            "max_attachment_correction_normalized": 0.26994081924660873
+          },
+          "Waluigi_8_Running_seq7": {
+            "sample_count": 36,
+            "translation_normalized": {
+              "count": 576,
+              "rmse": 0.12167915904600234,
+              "p95": 0.2634101831984864,
+              "max": 0.384377443577906
+            },
+            "rotation_rad": {
+              "count": 576,
+              "rmse": 0.20079893340940902,
+              "p95": 0.418672731457033,
+              "max": 0.9003738133645964
+            },
+            "semantic_abs_error": {
+              "count": 792,
+              "rmse": 0.5292878918752268,
+              "p95": 1.2501210443365174,
+              "max": 3.356674808015535
+            },
+            "landmark_normalized": {
+              "count": 432,
+              "rmse": 0.1588573162441348,
+              "p95": 0.3150102245925958,
+              "max": 0.38437581770476925
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.1687872843786636,
+            "max_attachment_correction_normalized": 0.1687872843786636
+          },
+          "Waluigi_8_Running_seq12": {
+            "sample_count": 111,
+            "translation_normalized": {
+              "count": 1776,
+              "rmse": 0.1080504500199343,
+              "p95": 0.20208953371857857,
+              "max": 0.5103192519692031
+            },
+            "rotation_rad": {
+              "count": 1776,
+              "rmse": 0.2207499413221924,
+              "p95": 0.44622017391428354,
+              "max": 2.0144384059257714
+            },
+            "semantic_abs_error": {
+              "count": 2442,
+              "rmse": 0.49277855124562364,
+              "p95": 1.1752745808976748,
+              "max": 2.907115241503467
+            },
+            "landmark_normalized": {
+              "count": 1332,
+              "rmse": 0.1770592337751939,
+              "p95": 0.3338860995134974,
+              "max": 0.9269851264259293
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.3754246613865552,
+            "max_attachment_correction_normalized": 0.3754246613865552
+          },
+          "Waluigi_9_Pitching_seq1": {
+            "sample_count": 31,
+            "translation_normalized": {
+              "count": 496,
+              "rmse": 0.07545663931395179,
+              "p95": 0.15706245645950048,
+              "max": 0.1997384340376315
+            },
+            "rotation_rad": {
+              "count": 496,
+              "rmse": 0.20430659140590343,
+              "p95": 0.4248500122585347,
+              "max": 0.9039239361014532
+            },
+            "semantic_abs_error": {
+              "count": 682,
+              "rmse": 0.47186183744458104,
+              "p95": 1.2037478121060157,
+              "max": 1.6028625429223704
+            },
+            "landmark_normalized": {
+              "count": 372,
+              "rmse": 0.13055237723475996,
+              "p95": 0.3145566626362047,
+              "max": 0.42003128027024744
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.12699732528538488,
+            "max_attachment_correction_normalized": 0.12699732528538488
+          },
+          "Waluigi_9_Pitching_seq6": {
+            "sample_count": 41,
+            "translation_normalized": {
+              "count": 656,
+              "rmse": 0.17041522814683624,
+              "p95": 0.263156100222232,
+              "max": 0.9844202072124036
+            },
+            "rotation_rad": {
+              "count": 656,
+              "rmse": 0.5894654163615526,
+              "p95": 1.3035465379070876,
+              "max": 3.141436957702079
+            },
+            "semantic_abs_error": {
+              "count": 902,
+              "rmse": 0.5916464687286632,
+              "p95": 1.5188956777507885,
+              "max": 3.888832148174978
+            },
+            "landmark_normalized": {
+              "count": 492,
+              "rmse": 0.35424527780589626,
+              "p95": 0.7699623590758625,
+              "max": 1.9826986620115394
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 1.0461699645382865,
+            "max_attachment_correction_normalized": 1.0461699645382865
+          },
+          "Waluigi_9_Pitching_seq11": {
+            "sample_count": 54,
+            "translation_normalized": {
+              "count": 864,
+              "rmse": 0.17310044125086374,
+              "p95": 0.3079248267154628,
+              "max": 1.03529912020264
+            },
+            "rotation_rad": {
+              "count": 864,
+              "rmse": 0.6022645249753741,
+              "p95": 1.3916976652803608,
+              "max": 3.0770712930532045
+            },
+            "semantic_abs_error": {
+              "count": 1188,
+              "rmse": 0.6656631988511514,
+              "p95": 1.5536086068390214,
+              "max": 5.017302029463196
+            },
+            "landmark_normalized": {
+              "count": 648,
+              "rmse": 0.31036902322191234,
+              "p95": 0.7029400097305218,
+              "max": 1.4544906694773612
+            },
+            "weighted_centroid_world": {
+              "count": 0,
+              "rmse": null,
+              "p95": null,
+              "max": null
+            },
+            "max_glove_gap_before_attachment_normalized": 0.8746335959234774,
+            "max_attachment_correction_normalized": 0.8746335959234774
+          }
+        },
+        "worst_action_by_landmark_p95": "Waluigi_7_Batting_seq24",
+        "worst_action_by_centroid_p95": "Waluigi_10_Catcher_seq0"
+      }
+    }
+  },
+  "identity_replay": {
+    "sample_action": "Waluigi_10_Catcher_seq0",
+    "sample_time": 0.0,
+    "max_pose_matrix_error": 1.028836557170898e-06,
+    "max_weighted_centroid_error_world": 3.6038291221029635e-05,
+    "encode_decode_max_arm_matrix_error": 1.2456120281889582e-06
+  },
+  "gate": {
+    "passed": false,
+    "checks": {
+      "arm_rotation_rmse_at_most_5_degrees": false,
+      "arm_translation_rmse_at_most_0_02_lengths": false,
+      "landmark_p95_at_most_0_02_lengths": false,
+      "centroid_p95_at_most_0_02_lengths": false,
+      "post_attachment_glove_gap_at_most_0_02_lengths": true,
+      "fixed_fist_local_error_below_1e-6": true,
+      "all_action_landmark_p95_pass": false,
+      "all_action_centroid_p95_pass": false,
+      "attachment_correction_p95_at_most_0_02_lengths": false,
+      "branch_relative_angle_p95_at_most_0_05_rad": false
+    },
+    "failed": [
+      "arm_rotation_rmse_at_most_5_degrees",
+      "arm_translation_rmse_at_most_0_02_lengths",
+      "landmark_p95_at_most_0_02_lengths",
+      "centroid_p95_at_most_0_02_lengths",
+      "all_action_landmark_p95_pass",
+      "all_action_centroid_p95_pass",
+      "attachment_correction_p95_at_most_0_02_lengths",
+      "branch_relative_angle_p95_at_most_0_05_rad"
+    ]
+  },
+  "preview": null,
+  "solver_or_luigi_fit_run": false,
+  "production_mutation": false
+}
