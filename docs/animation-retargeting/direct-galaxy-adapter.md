@@ -21,17 +21,16 @@ background mode; copying it into a new object-target slot also failed to
 evaluate. The prototype therefore samples the selected original channelbag's
 FCurves at frames 0-60 and applies those values to a disposable Luigi control
 clone. This preserves source timing at the sampled frame rate while avoiding
-guessed action-owner rebinding. The deform adapter converts each source bone's
-rest-relative orientation through character object frames and target rest
-frames. The output action is baked onto a disposable 92-bone duplicate and has
-no runtime constraints.
+guessed action-owner rebinding. Source joint rotations are converted through
+the source and target rest frames, composed on Waluigi-proportion virtual
+controls, then distributed to the target deform branches. The output action is
+baked onto a disposable 92-bone duplicate and has no runtime constraints.
 
-The first experiment maps only the bilateral arm branches. It uses a source
-control clone as the sampled driver, not yet a dedicated Waluigi-shaped
-intermediate control skeleton. Legs, torso, root,
-head/cap, and fingers stay on the approved Waluigi walk baseline. Fingers retain
-the baseline closed-fist transforms. A later adapter can provide Waluigi
-control bones and corrective outputs without changing source animation curves.
+The prototype maps only the bilateral arm branches through a virtual
+Waluigi-proportioned control chain. One semantic control transform drives every
+deform branch for that segment. Legs, torso, root, head/cap, and fingers stay on
+the approved Waluigi walk baseline. Fingers retain the baseline closed-fist
+transforms.
 
 ## Safety and artifact policy
 
@@ -43,8 +42,9 @@ control bones and corrective outputs without changing source animation curves.
   disposable control-rig duplicate.
 - Use a unique action name. Never replace `Waluigi_GalaxyWalk_Legs_Baked`.
 - Keep constraints off the final baked target. Reject non-finite matrices,
-  changed root scale, modified baseline bones, detached wrist/glove landmarks,
-  opened fists, or discontinuous output.
+  changed root scale, modified baseline bones, mesh-space elbow/wrist seam
+  gaps beyond the authored scale-aware tolerance, opened fists, or
+  discontinuous output.
 - Save diagnostics separately from the preview. Never save over the input
   workfile or any previously approved preview.
 
@@ -57,12 +57,12 @@ control bones and corrective outputs without changing source animation curves.
    channels intact.
 4. At every integer frame 0-60, evaluate the original source curves on the
    control clone and compute its pose matrices from rest and local basis data.
-   For each
-   mapped bone, form the source armature-space rotational delta
-   `D_s = R_pose_s * inverse(R_rest_s)`. Convert `D_s` through source and target
-   object rotations, then apply it to the target bone's rest orientation. Keep
-   target bone head positions and lengths controlled by the Waluigi hierarchy.
-5. Bake the mapped target transforms into a new action and remove temporary
+   Conjugate each source local channel delta through source and target rest
+   frames. Compose a Waluigi-proportion shoulder → upper arm → forearm → hand
+   chain. Distribute each segment as `P_control * inverse(R_control_rest) *
+   R_output_rest` to every overlapping deform output. This preserves target
+   rest offsets and drives structural bones with the weighted branches.
+5. Bake the composed target transforms into a new action and remove temporary
    constraints/helpers from the final duplicate.
 6. Reopen the output and compare target matrices, non-arm baseline transforms,
    mesh binding, scale, glove/wrist attachment, hand state, and frame-to-frame
@@ -76,9 +76,12 @@ this preserves Waluigi's authored proportions and avoids applying 43.437 twice.
 
 Numerical gates cover unchanged scale and non-arm matrices, finite values, no
 runtime constraints, reopened action reproduction, branch-relative angular
-motion, shoulder/elbow/wrist landmarks, weighted mesh centroids, glove gap,
-finger pose, and frame-to-frame jumps. A candidate is saved for visual review
-only when these checks pass. Visual review remains required for shoulder,
+motion, actual armature-evaluated mesh vertices, elbow/wrist surface gaps and
+cross-weight edge lengths, closed fist pose, and frame-to-frame jumps. The
+candidate compares actual mesh seams to the approved walk baseline in
+armature-local coordinates; the 0.02 armature-unit tolerance is converted to
+world units using the intentional object scale. A candidate is saved for visual
+review only when these checks pass. Visual review remains required for shoulder,
 elbow, forearm roll, wrist/glove seam, fists, cap, and walk-cycle transitions.
 No right-arm/full-body promotion or new animation is permitted until the walk
 candidate is accepted.
@@ -149,3 +152,54 @@ baked directly onto the deform rig. The integer-frame bake does not preserve
 arbitrary subframe interpolation exactly. Inspect frames 0, 15, 30, 45, and 60
 before extending this approach or building the analogous Mario-to-Wario
 profile.
+
+## Mesh continuity correction (current result)
+
+The first direct-per-bone candidate failed visually because it applied Galaxy
+rotations independently to deform bones sharing weighted regions. This gave
+Waluigi's overlapping branches inconsistent transforms; the largest measured
+forearm-to-glove gap reached about 0.20 armature-local units against 0.039 in
+the approved walk baseline.
+
+Mesh weights confirmed the actual deformation set. Left bones `23/25/29/27/30`
+influence 49/29/59/54/104 vertices; right homologs `58/60/64/62/65` have the
+same counts. The glove shells are separate connected mesh components weighted
+across wrist and hand bones, while forearm weights belong to the main body
+component. Mesh checks now compare evaluated vertices in each bound armature's
+local coordinates, eliminating the previous 43.437 object-transform mismatch.
+
+The corrected action `Waluigi_DirectGalaxyWalk_ArmAdapter_v2_ControlChain`
+composes shoulder → upper arm → forearm → hand using Waluigi rest offsets, then
+distributes each segment transform to all overlapping outputs:
+
+| Control | Waluigi output bones |
+| --- | --- |
+| Left shoulder | `22` |
+| Left upper arm | `23, 24, 25` |
+| Left forearm | `26, 27, 29` |
+| Left hand | `30` |
+| Right shoulder | `57` |
+| Right upper arm | `58, 59, 60` |
+| Right forearm | `61, 62, 64` |
+| Right hand | `65` |
+
+Armature-local evaluated mesh gaps at frames 0/15/30/45/60:
+
+| Seam | Failed v1 | Corrected v2 | Walk baseline |
+| --- | ---: | ---: | ---: |
+| Left elbow | 0.0239–0.0351 | 0.0276–0.0337 | 0.0276 |
+| Left forearm/glove | 0.1570–0.1993 | 0.0355–0.0399 | 0.0393 |
+| Right elbow | 0.0239–0.0352 | 0.0277–0.0336 | 0.0277 |
+| Right forearm/glove | 0.1571–0.2003 | 0.0369–0.0393 | 0.0391 |
+
+Across all frames, maximum seam surface-gap deviation from baseline is 0.00735
+armature-local units (0.319 world units), below the 0.02 local tolerance.
+Cross-weight edge p95 relative change stays below 20%. Maximum angular frame
+step is 0.09437 rad. Non-arm and fist channels remain unchanged, object scale
+remains 43.437, and the baked rig has zero constraints. Reopened pose matrices
+match within 1.67e-6 maximum element error. Reopen checks find one visible
+armature and two visible meshes bound to it.
+
+Preview: `tools/blender/reports/direct_luigi_walk_meshfixed.blend`. Inspect
+frames 0, 15, 30, 45, and 60. This remains a walk-only prototype; other Luigi
+animations, subframe interpolation, and Mario-to-Wario require separate tests.

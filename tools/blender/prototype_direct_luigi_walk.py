@@ -18,25 +18,25 @@ import re
 import sys
 
 import bpy
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from convert_native_owner_actions import duplicate_rig
-from direct_galaxy_adapter import rest_calibrated_rotation, validate_mapping
+from direct_galaxy_adapter import validate_mapping
 from test_semantic_preview_noop import copy_action_slot, duplicate_mesh
 
 
 LEFT = {
-    "ShoulderL": ("bone_22", "bone_23"),
-    "ArmL1": ("bone_25", "bone_26"),
-    "ArmL2": ("bone_27", "bone_29"),
+    "ShoulderL": ("bone_22",),
+    "ArmL1": ("bone_23", "bone_24", "bone_25"),
+    "ArmL2": ("bone_26", "bone_27", "bone_29"),
     "HandL": ("bone_30",),
 }
 RIGHT = {
-    "ShoulderR": ("bone_57", "bone_58"),
-    "ArmR1": ("bone_60", "bone_61"),
-    "ArmR2": ("bone_62", "bone_64"),
+    "ShoulderR": ("bone_57",),
+    "ArmR1": ("bone_58", "bone_59", "bone_60"),
+    "ArmR2": ("bone_61", "bone_62", "bone_64"),
     "HandR": ("bone_65",),
 }
 ARM_OUTPUTS = tuple(dict.fromkeys(t for m in (LEFT, RIGHT)
@@ -198,10 +198,204 @@ def branch_relative_excursion(pose_by_frame, bone_a, bone_b):
     return max((quat_angle(relatives[0], q) for q in relatives[1:]), default=0.0)
 
 
+CONTROL_SKELETON = {
+    "left": {"source": ("ShoulderL", "ArmL1", "ArmL2", "HandL"),
+             "rests": ("bone_22", "bone_25", "bone_26", "bone_30"),
+             "deforms": {"shoulder": ("bone_22",),
+                         "upper": ("bone_23", "bone_24", "bone_25"),
+                         "forearm": ("bone_26", "bone_27", "bone_29"),
+                         "hand": ("bone_30",)}},
+    "right": {"source": ("ShoulderR", "ArmR1", "ArmR2", "HandR"),
+              "rests": ("bone_57", "bone_60", "bone_61", "bone_65"),
+              "deforms": {"shoulder": ("bone_57",),
+                          "upper": ("bone_58", "bone_59", "bone_60"),
+                          "forearm": ("bone_61", "bone_62", "bone_64"),
+                          "hand": ("bone_65",)}},
+}
+
+
+def calibrated_local_delta(source_rig, source_name, control, source_object_rotation,
+                           target_object_rotation, target_parent_rest, target_rest):
+    """Translate one Galaxy local rotation channel into a Waluigi control basis."""
+    source_bone = source_rig.data.bones[source_name]
+    source_parent = source_bone.parent
+    source_local_rest = (source_parent.matrix_local.inverted_safe() @ source_bone.matrix_local
+                         if source_parent else source_bone.matrix_local)
+    source_basis = control.pose.bones[source_name].matrix_basis.to_quaternion()
+    source_parent_delta = (source_local_rest.to_quaternion() @ source_basis @
+                           source_local_rest.to_quaternion().inverted())
+    world_delta = (source_object_rotation @ source_parent_delta.to_matrix() @
+                   source_object_rotation.inverted())
+    target_parent_delta = (target_object_rotation.inverted() @ world_delta @
+                           target_object_rotation)
+    target_local_rest = target_parent_rest.inverted_safe() @ target_rest
+    target_basis = (target_local_rest.to_quaternion().inverted() @
+                    target_parent_delta.to_quaternion() @ target_local_rest.to_quaternion())
+    return Matrix.LocRotScale(Vector((0.0, 0.0, 0.0)), target_basis, (1.0, 1.0, 1.0))
+
+
+def build_control_pose(source_rig, source_control, target, baseline_pose, source_object_rotation,
+                       target_object_rotation, side):
+    """Build a Waluigi-proportion control chain, then rigidly distribute it.
+
+    Upper, forearm, and hand controls use the Waluigi rest offsets. Every
+    deform branch representing one segment receives the same composed control
+    transform plus its own measured rest offset. This keeps branch endpoints
+    together while retaining Waluigi's segment lengths and overlap structure.
+    """
+    profile = CONTROL_SKELETON[side]
+    shoulder_src, upper_src, forearm_src, hand_src = profile["source"]
+    shoulder_rest_name, upper_rest_name, forearm_rest_name, hand_rest_name = profile["rests"]
+    target_names = target.data.bones
+    torso_rest = target_names["bone_21"].matrix_local.copy()
+    shoulder_rest = target_names[shoulder_rest_name].matrix_local.copy()
+    upper_rest = target_names[upper_rest_name].matrix_local.copy()
+    forearm_rest = target_names[forearm_rest_name].matrix_local.copy()
+    hand_rest = target_names[hand_rest_name].matrix_local.copy()
+
+    # The virtual control parents are torso -> shoulder -> upper -> forearm -> hand.
+    shoulder_basis = calibrated_local_delta(
+        source_rig, shoulder_src, source_control, source_object_rotation,
+        target_object_rotation, torso_rest, shoulder_rest)
+    upper_basis = calibrated_local_delta(
+        source_rig, upper_src, source_control, source_object_rotation,
+        target_object_rotation, shoulder_rest, upper_rest)
+    forearm_basis = calibrated_local_delta(
+        source_rig, forearm_src, source_control, source_object_rotation,
+        target_object_rotation, upper_rest, forearm_rest)
+    hand_basis = calibrated_local_delta(
+        source_rig, hand_src, source_control, source_object_rotation,
+        target_object_rotation, forearm_rest, hand_rest)
+
+    torso_pose = baseline_pose["bone_21"]
+    shoulder_pose = torso_pose @ torso_rest.inverted_safe() @ shoulder_rest @ shoulder_basis
+    upper_pose = shoulder_pose @ shoulder_rest.inverted_safe() @ upper_rest @ upper_basis
+    forearm_pose = upper_pose @ upper_rest.inverted_safe() @ forearm_rest @ forearm_basis
+    hand_pose = forearm_pose @ forearm_rest.inverted_safe() @ hand_rest @ hand_basis
+    return {"shoulder": shoulder_pose, "upper": upper_pose,
+            "forearm": forearm_pose, "hand": hand_pose}, {
+                "shoulder": shoulder_rest, "upper": upper_rest,
+                "forearm": forearm_rest, "hand": hand_rest}
+
+
+def distribute_control_pose(target, target_pose_matrices, control_pose, control_rest, side):
+    profile = CONTROL_SKELETON[side]
+    segment_for_bone = {bone: segment for segment, bones in profile["deforms"].items()
+                        for bone in bones}
+    ordered = profile["deforms"]["shoulder"] + profile["deforms"]["upper"] + \
+              profile["deforms"]["forearm"] + profile["deforms"]["hand"]
+    for name in ordered:
+        segment = segment_for_bone[name]
+        target_rest = target.data.bones[name].matrix_local.copy()
+        desired = control_pose[segment] @ control_rest[segment].inverted_safe() @ target_rest
+        set_pose_rotation_from_armature_matrix(target, name, desired, target_pose_matrices)
+        target_pose_matrices.clear()
+        target_pose_matrices.update(pose_matrices_from_basis(target))
+    return target_pose_matrices
+
+
+MESH_SEAMS = {
+    "left_shoulder": ("bone_23", "bone_25"),
+    "left_elbow": ("bone_25", "bone_29"),
+    "left_wrist_forearm": ("bone_29", "bone_27"),
+    "right_shoulder": ("bone_58", "bone_60"),
+    "right_elbow": ("bone_60", "bone_64"),
+    "right_wrist_forearm": ("bone_64", "bone_62"),
+}
+
+
+def evaluated_world_vertices(obj):
+    ev = obj.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    mesh = ev.to_mesh()
+    try:
+        return [ev.matrix_world @ v.co for v in mesh.vertices]
+    finally:
+        ev.to_mesh_clear()
+
+
+def mesh_group_weights(obj):
+    names = {g.index: g.name for g in obj.vertex_groups}
+    return [{names[a.group]: float(a.weight) for a in v.groups if a.weight > 0.01}
+            for v in obj.data.vertices]
+
+
+def mesh_nearest_gap(points_a, points_b):
+    if not points_a or not points_b:
+        return None
+    from mathutils.kdtree import KDTree
+    tree = KDTree(len(points_b))
+    for i, p in enumerate(points_b):
+        tree.insert(p, i)
+    tree.balance()
+    return min(tree.find(p)[2] for p in points_a)
+
+
+def mesh_seam_report(meshes):
+    result = {}
+    for obj in meshes:
+        verts, weights = evaluated_world_vertices(obj), mesh_group_weights(obj)
+        row = {}
+        for seam, (group_a, group_b) in MESH_SEAMS.items():
+            points_a = [p for p, w in zip(verts, weights)
+                        if w and max(w, key=w.get) == group_a]
+            points_b = [p for p, w in zip(verts, weights)
+                        if w and max(w, key=w.get) == group_b]
+            crossing = []
+            for edge in obj.data.edges:
+                a, b = edge.vertices
+                wa, wb = weights[a], weights[b]
+                da = max(wa, key=wa.get) if wa else ""
+                db = max(wb, key=wb.get) if wb else ""
+                if {da, db} == {group_a, group_b}:
+                    crossing.append((verts[a] - verts[b]).length)
+            crossing.sort()
+            row[seam] = {"min_surface_gap": mesh_nearest_gap(points_a, points_b),
+                         "cross_weight_edge_p95": (crossing[min(int(0.95 * (len(crossing)-1)),
+                                                                 len(crossing)-1)]
+                                                    if crossing else None),
+                         "vertices_a": len(points_a), "vertices_b": len(points_b)}
+        result[obj.name] = row
+    return result
+
+
+def max_seam_delta(candidate_rows, baseline_rows):
+    max_gap_delta = 0.0
+    max_edge_ratio_delta = 0.0
+    worst_gap = {"delta": 0.0, "mesh": None, "seam": None}
+    worst_edge = {"relative_delta": 0.0, "mesh": None, "seam": None}
+    candidate_names = sorted(candidate_rows)
+    baseline_names = sorted(baseline_rows)
+    for name, base_name in zip(candidate_names, baseline_names):
+        seams = candidate_rows[name]
+        for seam, data in seams.items():
+            base = baseline_rows[base_name][seam]["min_surface_gap"]
+            gap = data["min_surface_gap"]
+            if gap is None and base is None:
+                continue
+            delta = abs(gap - base) if gap is not None and base is not None else 1.0e9
+            if delta > max_gap_delta:
+                max_gap_delta = delta
+                worst_gap = {"delta": delta, "mesh": name, "seam": seam,
+                         "candidate_gap": gap, "baseline_gap": base}
+            edge_base = baseline_rows[base_name][seam]["cross_weight_edge_p95"]
+            edge_candidate = data["cross_weight_edge_p95"]
+            if edge_candidate is None and edge_base is None:
+                continue
+            edge_ratio_delta = (abs(edge_candidate - edge_base) / max(abs(edge_base), 1.0e-9)
+                                if edge_candidate is not None and edge_base is not None else 1.0e9)
+            if edge_ratio_delta > max_edge_ratio_delta:
+                max_edge_ratio_delta = edge_ratio_delta
+                worst_edge = {"relative_delta": edge_ratio_delta, "mesh": name,
+                              "seam": seam, "candidate_edge_p95": edge_candidate,
+                              "baseline_edge_p95": edge_base}
+    return max_gap_delta, worst_gap, max_edge_ratio_delta, worst_edge
+
+
 def hide_reference_objects(visible_set):
     for obj in bpy.data.objects:
         show = obj in visible_set
         obj.hide_render = not show
+        obj.hide_viewport = not show
         obj.hide_set(not show)
 
 
@@ -265,7 +459,7 @@ def main():
     target.matrix_basis = object_basis(target_base)
     target.data.name = target.name + "_Data"
     target_action = copy_action_slot(walk_action, walk_slot, target,
-                                     "Waluigi_DirectGalaxyWalk_ArmAdapter_v1")
+                                     "Waluigi_DirectGalaxyWalk_ArmAdapter_v2_ControlChain")
     target_baseline_curves = curves_for_slot(target_action, target.animation_data.action_slot)
     collection = bpy.data.collections.new("DirectGalaxyWalk_Candidate")
     scene.collection.children.link(collection)
@@ -276,10 +470,26 @@ def main():
     target_meshes = [duplicate_mesh(o, target, collection, "DirectWalk_")
                      for o in mesh_sources]
     target_mesh_names = [o.name for o in target_meshes]
+    baseline_probe = duplicate_rig(target_base, "DirectWalk_Baseline_MeshProbe")
+    baseline_probe.matrix_basis = object_basis(target_base)
+    baseline_probe.animation_data_clear()
+    baseline_meshes = [duplicate_mesh(o, baseline_probe, collection, "_DirectWalk_Baseline_")
+                       for o in mesh_sources]
+    for mesh in baseline_meshes:
+        mesh.hide_render = True
+        mesh.hide_set(True)
+    baseline_probe.hide_render = True
+    baseline_probe.hide_set(True)
+    probe_modifier_states = {
+        obj.name: [(modifier, modifier.show_viewport) for modifier in obj.modifiers]
+        for obj in baseline_meshes + target_meshes
+    }
 
     srot = object_basis(control).to_3x3().to_quaternion().to_matrix()
     trot = object_basis(target).to_3x3().to_quaternion().to_matrix()
     desired_by_frame = {}
+    baseline_basis_by_frame = {}
+    mesh_gaps_by_frame = {}
     jumps = {name: 0.0 for name in ARM_OUTPUTS}
     previous = {}
     semantic_bones = ("ShoulderL", "ArmL1", "ArmL2", "HandL",
@@ -308,32 +518,23 @@ def main():
             target_pose_matrices = pose_matrices_from_basis(target)
             pose_snapshot = {n: target.pose.bones[n].matrix_basis.copy()
                              for n in target.data.bones.keys()}
-            for mapping in (LEFT, RIGHT):
-                for source_name, target_names in mapping.items():
-                    src_pose = source_pose_matrices[source_name]
-                    src_rest = control.data.bones[source_name].matrix_local.copy()
-                    for target_name in target_names:
-                        rest = target.data.bones[target_name].matrix_local.copy()
-                        rot = rest_calibrated_rotation(src_pose, src_rest,
-                                                       srot, rest, trot)
-                        # Start from the target's evaluated baseline pose. Only
-                        # rotation is transferred; head position/length remain
-                        # owned by the target's own hierarchy and walk action.
-                        current = target_pose_matrices[target_name]
-                        desired = Matrix.LocRotScale(current.translation,
-                            rot.to_quaternion(), (1, 1, 1))
-                        set_pose_rotation_from_armature_matrix(
-                            target, target_name, desired, target_pose_matrices)
-                        target_pose_matrices = pose_matrices_from_basis(target)
-                        bpy.context.view_layer.update()
-                        q = target_pose_matrices[target_name].to_quaternion()
-                        if target_name in previous:
-                            step = quat_angle(previous[target_name], q)
-                            jumps[target_name] = max(jumps[target_name], step)
-                            if step > worst_step["radians"]:
-                                worst_step = {"radians": step, "frame": frame,
-                                              "bone": target_name}
-                        previous[target_name] = q.copy()
+            baseline_basis_by_frame[frame] = pose_snapshot
+            for side in ("left", "right"):
+                controls, rests = build_control_pose(
+                    control, control, target, target_pose_matrices,
+                    srot, trot, side)
+                target_pose_matrices = distribute_control_pose(
+                    target, target_pose_matrices, controls, rests, side)
+            bpy.context.view_layer.update()
+            for target_name in ARM_OUTPUTS:
+                q = target_pose_matrices[target_name].to_quaternion()
+                if target_name in previous:
+                    step = quat_angle(previous[target_name], q)
+                    jumps[target_name] = max(jumps[target_name], step)
+                    if step > worst_step["radians"]:
+                        worst_step = {"radians": step, "frame": frame,
+                                      "bone": target_name}
+                previous[target_name] = q.copy()
             bpy.context.view_layer.update()
             for name in ARM_OUTPUTS:
                 pb = target.pose.bones[name]
@@ -346,10 +547,28 @@ def main():
                                    group="Direct Galaxy Adapter")
             desired_by_frame[frame] = {n: target_pose_matrices[n].copy()
                                        for n in ARM_OUTPUTS}
+            # Verify actual armature-skinned mesh seams against the unchanged
+            # walk baseline for every frame, using temporary duplicate meshes.
+            for name, basis in pose_snapshot.items():
+                baseline_probe.pose.bones[name].matrix_basis = basis
+            bpy.context.view_layer.update()
+            for obj in baseline_meshes + target_meshes:
+                for modifier in obj.modifiers:
+                    if modifier.type != 'ARMATURE':
+                        modifier.show_viewport = False
+            mesh_gaps_by_frame[str(frame)] = {
+                "baseline": mesh_seam_report(baseline_meshes),
+                "candidate": mesh_seam_report(target_meshes),
+            }
+            for states in probe_modifier_states.values():
+                for modifier, was_visible in states:
+                    modifier.show_viewport = was_visible
             for semantic_bone in semantic_bones:
                 src_rest = control.data.bones[semantic_bone].matrix_local
                 delta = source_pose_matrices[semantic_bone].to_3x3() @ src_rest.to_3x3().inverted()
                 source_rest_deltas[semantic_bone].append(delta.to_quaternion())
+            # Keep old endpoint diagnostics for comparison only; they are not
+            # used as the glove attachment acceptance criterion.
             glove_gaps["left"].append(float(matrix_joint_gap(
                 target, target_pose_matrices, "bone_27", "bone_30")))
             glove_gaps["right"].append(float(matrix_joint_gap(
@@ -410,6 +629,26 @@ def main():
         scale_error = max(abs(float(a) - float(b)) for a, b in
             zip(target.matrix_basis.to_scale(), target_base.matrix_basis.to_scale()))
         fist_unchanged = max(baseline_fingers.values(), default=0.0) < 1e-6
+        mesh_continuity = {}
+        max_mesh_seam_delta = 0.0
+        worst_mesh_seam = None
+        max_mesh_edge_relative_delta = 0.0
+        worst_mesh_edge = None
+        for frame, pair in mesh_gaps_by_frame.items():
+            delta, worst, edge_delta, edge_worst = max_seam_delta(
+                pair["candidate"], pair["baseline"])
+            mesh_continuity[frame] = {"max_surface_gap_delta": delta,
+                                      "worst_surface_gap": worst,
+                                      "max_cross_weight_edge_p95_relative_delta": edge_delta,
+                                      "worst_cross_weight_edge": edge_worst}
+            if delta > max_mesh_seam_delta:
+                max_mesh_seam_delta = delta
+                worst_mesh_seam = {"frame": int(frame), **worst}
+            if edge_delta > max_mesh_edge_relative_delta:
+                max_mesh_edge_relative_delta = edge_delta
+                worst_mesh_edge = {"frame": int(frame), **edge_worst}
+        armature_world_scale = max(abs(float(s)) for s in target.matrix_basis.to_scale())
+        mesh_gap_tolerance_world = args.max_glove_gap_delta * armature_world_scale
         numerical_gates = {
             "finite": finite,
             "target_scale_unchanged": scale_error < 1e-6,
@@ -418,7 +657,8 @@ def main():
             "no_runtime_constraints": runtime_constraints == 0,
             "bake_replay_error": bake_pose_error < 1e-5,
             "pose_jump": max_step < args.max_jump_radians,
-            "glove_gap": max_glove_gap < args.max_glove_gap_delta,
+            "mesh_space_elbow_wrist_continuity": max_mesh_seam_delta < mesh_gap_tolerance_world,
+            "mesh_space_cross_weight_edges": max_mesh_edge_relative_delta < 0.20,
         }
         passed = all(numerical_gates.values())
         report = {
@@ -464,6 +704,16 @@ def main():
             "max_per_bone_rotation_step_radians": jumps,
             "wrist_glove_gap_armature_units": {k: {"max": max(v), "min": min(v)}
                                                 for k, v in glove_gaps.items()},
+            "mesh_space_seam_measurements": mesh_gaps_by_frame,
+            "mesh_space_continuity_summary": {
+                "max_surface_gap_delta_vs_walk_baseline_world_units": max_mesh_seam_delta,
+                "worst_surface_gap": worst_mesh_seam,
+                "max_cross_weight_edge_p95_relative_delta": max_mesh_edge_relative_delta,
+                "worst_cross_weight_edge": worst_mesh_edge,
+                "surface_gap_tolerance_world_units": mesh_gap_tolerance_world,
+                "surface_gap_tolerance_armature_units": args.max_glove_gap_delta,
+                "per_frame": mesh_continuity,
+            },
             "baseline_non_arm_basis_error": baseline_other_errors,
             "fist_basis_error": baseline_fingers,
             "bake_replay_matrix_error": bake_pose_error,
@@ -473,9 +723,9 @@ def main():
             "passed": passed,
             "preview": os.path.abspath(args.preview) if passed else None,
             "limitations": [
-                "This is a first direct-transfer map, not visual acceptance.",
+                "This control chain retargets only the Luigi walk, not a complete move set.",
                 "The source action has no independently authored finger channels; target fists remain at baseline.",
-                "Waluigi's arm branches are independently mapped but not yet represented by a dedicated corrective control rig.",
+                "Mesh seam checks use actual armature-evaluated vertices and nearest surfaces; they do not replace visual review.",
             ],
         }
         os.makedirs(os.path.dirname(os.path.abspath(args.report)), exist_ok=True)
@@ -483,8 +733,30 @@ def main():
             json.dump(report, f, indent=2, allow_nan=False)
             f.write("\n")
         if passed:
+            # The baseline geometry probe is disposable and must not be visible
+            # or saved in the sign-off file.
+            for obj in baseline_meshes:
+                data = obj.data
+                bpy.data.objects.remove(obj, do_unlink=True)
+                if data.users == 0:
+                    bpy.data.meshes.remove(data)
+            rig_data = baseline_probe.data
+            bpy.data.objects.remove(baseline_probe, do_unlink=True)
+            if rig_data.users == 0:
+                bpy.data.armatures.remove(rig_data)
             visible = {target, *target_meshes}
             hide_reference_objects(visible)
+            visible_armatures = [o.name for o in bpy.data.objects
+                                 if o.type == 'ARMATURE' and not o.hide_get() and not o.hide_viewport]
+            visible_meshes = [o.name for o in bpy.data.objects
+                              if o.type == 'MESH' and not o.hide_get() and not o.hide_viewport]
+            if visible_armatures != [target.name] or set(visible_meshes) != set(target_mesh_names):
+                raise RuntimeError("preview visibility validation found duplicate/hidden character geometry: "
+                                   f"armatures={visible_armatures}, meshes={visible_meshes}, "
+                                   f"expected_meshes={target_mesh_names}")
+            for obj in target_meshes:
+                if not any(m.type == 'ARMATURE' and m.object == target for m in obj.modifiers):
+                    raise RuntimeError(f"preview mesh lost its target armature binding: {obj.name}")
             scene.frame_set(0)
             bpy.context.view_layer.update()
             # Save to a new path only; never save over the source workfile.
@@ -493,7 +765,8 @@ def main():
             print("Direct walk prototype rejected by numerical gates; preview not saved.")
         print(json.dumps({"report": os.path.abspath(args.report), "passed": passed,
                           "gates": numerical_gates,
-                          "max_step": max_step, "max_glove_gap": max_glove_gap}))
+                          "max_step": max_step, "max_mesh_gap_delta": max_mesh_seam_delta,
+                          "worst_mesh_seam": worst_mesh_seam}))
     finally:
         scene.frame_set(original_frame, subframe=original_subframe)
         bpy.context.view_layer.update()

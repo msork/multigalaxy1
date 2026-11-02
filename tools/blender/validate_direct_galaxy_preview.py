@@ -14,7 +14,7 @@ def args_parse():
     p.add_argument("--report", required=True)
     p.add_argument("--output", required=True)
     p.add_argument("--rig", default="DirectWalk_Waluigi_Target")
-    p.add_argument("--action", default="Waluigi_DirectGalaxyWalk_ArmAdapter_v1")
+    p.add_argument("--action", default="Waluigi_DirectGalaxyWalk_ArmAdapter_v2_ControlChain")
     return p.parse_args(argv)
 
 
