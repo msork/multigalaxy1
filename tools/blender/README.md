@@ -150,3 +150,25 @@ discontinuity, see
 [`semantic-walk-save-reload-fix.md`](../../docs/animation-retargeting/semantic-walk-save-reload-fix.md).
 The joint 0–60 semantic continuity fit and v11 preview validation are recorded
 in [`semantic-walk-joint-continuity.md`](../../docs/animation-retargeting/semantic-walk-joint-continuity.md).
+
+## Direct Galaxy walk adapter probe
+
+The direct transfer probe samples the original Luigi walk action's selected
+Blender 5.x channelbag onto a disposable source control clone, then applies a
+rest-calibrated bilateral mapping to a duplicate 92-bone Waluigi rig. It keeps
+`Waluigi_GalaxyWalk_Legs_Baked` as the base and saves a new preview only if the
+numerical checks pass. The source action, production rig, and baseline action
+are not saved or modified. Because the saved validation scene's assigned
+layered action stays at frame-zero pose in background mode, the probe evaluates
+the original FCurves directly at integer samples; arbitrary subframe fidelity
+and visual anatomy still need review.
+
+From this worktree, run:
+
+```powershell
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background 'tools\blender\reports\luigi_walk_semantic_waluigi_both_arms_v7_texture_repaired.blend' --python 'tools\blender\prototype_direct_luigi_walk.py' -- --report 'tools\blender\reports\direct_luigi_walk_probe.json' --preview 'tools\blender\reports\direct_luigi_walk_candidate.blend'
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background 'tools\blender\reports\direct_luigi_walk_candidate.blend' --python 'tools\blender\validate_direct_galaxy_preview.py' -- --report 'tools\blender\reports\direct_luigi_walk_probe.json' --output 'tools\blender\reports\direct_luigi_walk_reopen_validation.json'
+```
+
+See [`direct-galaxy-adapter.md`](../../docs/animation-retargeting/direct-galaxy-adapter.md)
+for mapping, numerical results, and current feasibility limits.

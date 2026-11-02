@@ -50,3 +50,6 @@ dist/
 /tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_raw_anm_v*.blend
 /tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_raw_anm_v*_fit.json
 /tools/blender/reports/luigi_walk_semantic_waluigi_both_arms_raw_anm_v*_saved_validation.json
+/tools/blender/reports/direct_luigi_walk_candidate.blend
+/tools/blender/reports/direct_luigi_walk_probe.json
+/tools/blender/reports/direct_luigi_walk_reopen_validation.json
