@@ -57,3 +57,6 @@ dist/
 /tools/blender/reports/direct_luigi_walk_meshfixed.json
 /tools/blender/reports/direct_luigi_walk_meshfixed_reopen.json
 /tools/blender/reports/direct_arm_mesh_*.json
+/tools/blender/reports/direct_luigi_walk_v3_trajectory.blend
+/tools/blender/reports/direct_luigi_walk_v3_trajectory.json
+/tools/blender/reports/direct_luigi_walk_v3_trajectory_reopen.json

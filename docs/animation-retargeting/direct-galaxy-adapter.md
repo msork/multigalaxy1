@@ -203,3 +203,50 @@ armature and two visible meshes bound to it.
 Preview: `tools/blender/reports/direct_luigi_walk_meshfixed.blend`. Inspect
 frames 0, 15, 30, 45, and 60. This remains a walk-only prototype; other Luigi
 animations, subframe interpolation, and Mario-to-Wario require separate tests.
+
+## Geometric trajectory adapter (current motion result)
+
+Visual review of the v2 control chain found the mesh seams coherent but the
+motion incorrect: its local-axis rotational transfer produced diagonal
+windshield-wiper swings. Luigi and Waluigi use different armature object
+orientations (Galaxy is Z-up; Waluigi's intentional object rotation maps its
+armature to Y-up), and their torso rest-bone axes/rolls also differ. Copying a
+rest-calibrated local rotation preserved branch continuity but did not
+guarantee the shoulder → elbow → wrist paths or forward/back swing.
+
+The v3 walk adapter now measures Luigi's evaluated shoulder, elbow, and wrist
+positions from the `ArmL1/ArmL2/HandL` and `ArmR1/ArmR2/HandR` pose matrices,
+expresses them relative to `Spine2`, maps torso-rest anatomical coordinates to
+Waluigi `bone_21`, and scales the two segment lengths independently to Waluigi
+rest proportions. It aims the target upper arm and forearm from those geometric
+segments, carries the source axial twist, and maps the source hand's wrist
+orientation. Both real sides are solved independently; no reflection or
+training data is used. The resulting control transforms still use v2's
+rest-offset distribution to all deform branches.
+
+Validation over frames 0-60:
+
+| Measure | Left | Right |
+| --- | ---: | ---: |
+| Elbow flexion range (source → target) | 0.124–0.832 → 0.124–0.832 rad | 0.124–0.832 → 0.124–0.832 rad |
+| Elbow flexion RMSE | 1.12e-6 rad | 1.35e-6 rad |
+| Elbow excursion retained | 100.0% | 100.0% |
+| Forward/back wrist excursion retained | 99.92% | 99.93% |
+| Normalized wrist trajectory RMSE | 0.00602 | 0.00592 |
+| Arm-plane orientation RMSE | 0.00017 rad | 0.00023 rad |
+| Forearm roll motion RMSE from frame 0 | 0.0486 rad | 0.0498 rad |
+| Forearm roll excursion retained | 92.6% | 116.2% |
+| Wrist relative orientation RMSE | 0 | 0.00013 rad |
+
+Mesh checks retain v2's connected branch distribution: worst evaluated seam
+gap deviation over the whole cycle is 0.00727 armature-local units from the
+walk baseline (limit 0.02); cross-weight edge p95 changes by at most 15.8%.
+Frame-to-frame arm rotation step is at most 0.08181 rad. Fist and all
+non-arm channels remain at baseline, scale remains 43.437, and no runtime
+constraints remain. After reopening, matrix error is at most 1.20e-6. One
+visible Waluigi armature and its two bound meshes are present.
+
+Preview: `tools/blender/reports/direct_luigi_walk_v3_trajectory.blend`.
+Inspect frames 0, 15, 30, 45, and 60, focusing on forward/back swing, elbow
+bend, forearm roll, glove attachment, and closed fists. This result is still
+limited to the walk action.

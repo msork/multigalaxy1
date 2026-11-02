@@ -154,9 +154,10 @@ in [`semantic-walk-joint-continuity.md`](../../docs/animation-retargeting/semant
 ## Direct Galaxy walk adapter probe
 
 The direct transfer probe samples the original Luigi walk action's selected
-Blender 5.x channelbag onto a disposable source control clone, composes a
-Waluigi-proportioned bilateral arm control chain, and distributes it to every
-overlapping deform branch on a duplicate 92-bone Waluigi rig. It keeps
+Blender 5.x channelbag onto a disposable source control clone, measures
+torso-relative shoulder/elbow/wrist trajectories, solves Waluigi segment
+directions geometrically, and distributes them through the bilateral control
+chain to every overlapping deform branch on a duplicate 92-bone Waluigi rig. It keeps
 `Waluigi_GalaxyWalk_Legs_Baked` as the base and saves a new preview only if the
 numerical checks pass. The source action, production rig, and baseline action
 are not saved or modified. Because the saved validation scene's assigned
@@ -167,9 +168,9 @@ and visual anatomy still need review.
 From this worktree, run:
 
 ```powershell
-& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background 'tools\blender\reports\luigi_walk_semantic_waluigi_both_arms_v7_texture_repaired.blend' --python 'tools\blender\prototype_direct_luigi_walk.py' -- --report 'tools\blender\reports\direct_luigi_walk_meshfixed.json' --preview 'tools\blender\reports\direct_luigi_walk_meshfixed.blend'
-& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background 'tools\blender\reports\direct_luigi_walk_meshfixed.blend' --python 'tools\blender\validate_direct_galaxy_preview.py' -- --report 'tools\blender\reports\direct_luigi_walk_meshfixed.json' --output 'tools\blender\reports\direct_luigi_walk_meshfixed_reopen.json'
-& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background 'tools\blender\reports\direct_luigi_walk_meshfixed.blend' --python 'tools\blender\analyze_direct_arm_mesh_continuity.py' -- --output 'tools\blender\reports\direct_arm_mesh_continuity.json' --frames 0 15 30 45 60
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background 'tools\blender\reports\luigi_walk_semantic_waluigi_both_arms_v7_texture_repaired.blend' --python 'tools\blender\prototype_direct_luigi_walk.py' -- --report 'tools\blender\reports\direct_luigi_walk_v3_trajectory.json' --preview 'tools\blender\reports\direct_luigi_walk_v3_trajectory.blend'
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background 'tools\blender\reports\direct_luigi_walk_v3_trajectory.blend' --python 'tools\blender\validate_direct_galaxy_preview.py' -- --report 'tools\blender\reports\direct_luigi_walk_v3_trajectory.json' --output 'tools\blender\reports\direct_luigi_walk_v3_trajectory_reopen.json'
+& 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background 'tools\blender\reports\direct_luigi_walk_v3_trajectory.blend' --python 'tools\blender\analyze_direct_arm_mesh_continuity.py' -- --output 'tools\blender\reports\direct_arm_mesh_continuity.json' --frames 0 15 30 45 60
 ```
 
 See [`direct-galaxy-adapter.md`](../../docs/animation-retargeting/direct-galaxy-adapter.md)

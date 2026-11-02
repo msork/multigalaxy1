@@ -18,7 +18,7 @@ import re
 import sys
 
 import bpy
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Quaternion, Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -234,50 +234,6 @@ def calibrated_local_delta(source_rig, source_name, control, source_object_rotat
     return Matrix.LocRotScale(Vector((0.0, 0.0, 0.0)), target_basis, (1.0, 1.0, 1.0))
 
 
-def build_control_pose(source_rig, source_control, target, baseline_pose, source_object_rotation,
-                       target_object_rotation, side):
-    """Build a Waluigi-proportion control chain, then rigidly distribute it.
-
-    Upper, forearm, and hand controls use the Waluigi rest offsets. Every
-    deform branch representing one segment receives the same composed control
-    transform plus its own measured rest offset. This keeps branch endpoints
-    together while retaining Waluigi's segment lengths and overlap structure.
-    """
-    profile = CONTROL_SKELETON[side]
-    shoulder_src, upper_src, forearm_src, hand_src = profile["source"]
-    shoulder_rest_name, upper_rest_name, forearm_rest_name, hand_rest_name = profile["rests"]
-    target_names = target.data.bones
-    torso_rest = target_names["bone_21"].matrix_local.copy()
-    shoulder_rest = target_names[shoulder_rest_name].matrix_local.copy()
-    upper_rest = target_names[upper_rest_name].matrix_local.copy()
-    forearm_rest = target_names[forearm_rest_name].matrix_local.copy()
-    hand_rest = target_names[hand_rest_name].matrix_local.copy()
-
-    # The virtual control parents are torso -> shoulder -> upper -> forearm -> hand.
-    shoulder_basis = calibrated_local_delta(
-        source_rig, shoulder_src, source_control, source_object_rotation,
-        target_object_rotation, torso_rest, shoulder_rest)
-    upper_basis = calibrated_local_delta(
-        source_rig, upper_src, source_control, source_object_rotation,
-        target_object_rotation, shoulder_rest, upper_rest)
-    forearm_basis = calibrated_local_delta(
-        source_rig, forearm_src, source_control, source_object_rotation,
-        target_object_rotation, upper_rest, forearm_rest)
-    hand_basis = calibrated_local_delta(
-        source_rig, hand_src, source_control, source_object_rotation,
-        target_object_rotation, forearm_rest, hand_rest)
-
-    torso_pose = baseline_pose["bone_21"]
-    shoulder_pose = torso_pose @ torso_rest.inverted_safe() @ shoulder_rest @ shoulder_basis
-    upper_pose = shoulder_pose @ shoulder_rest.inverted_safe() @ upper_rest @ upper_basis
-    forearm_pose = upper_pose @ upper_rest.inverted_safe() @ forearm_rest @ forearm_basis
-    hand_pose = forearm_pose @ forearm_rest.inverted_safe() @ hand_rest @ hand_basis
-    return {"shoulder": shoulder_pose, "upper": upper_pose,
-            "forearm": forearm_pose, "hand": hand_pose}, {
-                "shoulder": shoulder_rest, "upper": upper_rest,
-                "forearm": forearm_rest, "hand": hand_rest}
-
-
 def distribute_control_pose(target, target_pose_matrices, control_pose, control_rest, side):
     profile = CONTROL_SKELETON[side]
     segment_for_bone = {bone: segment for segment, bones in profile["deforms"].items()
@@ -292,6 +248,226 @@ def distribute_control_pose(target, target_pose_matrices, control_pose, control_
         target_pose_matrices.clear()
         target_pose_matrices.update(pose_matrices_from_basis(target))
     return target_pose_matrices
+
+
+TRAJECTORY_PROFILE = {
+    "left": {"source_torso": "Spine2", "target_torso": "bone_21",
+             "source_joints": ("ArmL1", "ArmL2", "HandL"),
+             "target_controls": ("bone_22", "bone_25", "bone_26", "bone_30"),
+             "target_elbow": "bone_25", "target_wrist": "bone_30",
+             "upper_axis_bone": "bone_25", "forearm_axis_bone": "bone_26",
+             "wrist_source": "HandL"},
+    "right": {"source_torso": "Spine2", "target_torso": "bone_21",
+              "source_joints": ("ArmR1", "ArmR2", "HandR"),
+              "target_controls": ("bone_57", "bone_60", "bone_61", "bone_65"),
+              "target_elbow": "bone_60", "target_wrist": "bone_65",
+              "upper_axis_bone": "bone_60", "forearm_axis_bone": "bone_61",
+              "wrist_source": "HandR"},
+}
+
+
+def twist_angle_about(q, axis):
+    q = q.copy()
+    q.normalize()
+    if q.w < 0.0:
+        q.negate()
+    projection = Vector((q.x, q.y, q.z)).dot(axis.normalized())
+    return 2.0 * math.atan2(projection, float(q.w))
+
+
+def source_segment_twist(source, source_pose, torso_name, source_torso_pose,
+                         start_name, end_name, segment_bone):
+    torso_rest = source.data.bones[torso_name].matrix_local
+    start_rest = source.data.bones[start_name].head_local
+    end_rest = source.data.bones[end_name].head_local
+    rest_start = torso_rest.inverted_safe() @ start_rest
+    rest_end = torso_rest.inverted_safe() @ end_rest
+    current_start = source_torso_pose.inverted_safe() @ source_pose[start_name].translation
+    current_end = source_torso_pose.inverted_safe() @ source_pose[end_name].translation
+    rest_axis = rest_end - rest_start
+    current_axis = current_end - current_start
+    q_swing = rest_axis.normalized().rotation_difference(current_axis.normalized())
+    bone_rest_local = torso_rest.inverted_safe() @ source.data.bones[segment_bone].matrix_local
+    bone_pose_local = source_torso_pose.inverted_safe() @ source_pose[segment_bone]
+    delta = bone_pose_local.to_quaternion() @ bone_rest_local.to_quaternion().inverted()
+    return twist_angle_about(q_swing.inverted() @ delta, rest_axis)
+
+
+def trajectory_control_pose(source, source_pose, target, target_pose, source_object_rotation,
+                            target_object_rotation, side):
+    """Solve Waluigi FK controls from Luigi's torso-relative joint trajectory.
+
+    Luigi's measured shoulder, elbow and wrist points determine the two target
+    segment directions. Target lengths come from Waluigi rest geometry; the
+    shoulder displacement and each segment direction are scaled independently.
+    Segment swing is solved geometrically and source axial twist is restored.
+    """
+    profile = TRAJECTORY_PROFILE[side]
+    torso_s = source.data.bones[profile["source_torso"]].matrix_local.copy()
+    torso_t = target.data.bones[profile["target_torso"]].matrix_local.copy()
+    torso_s_pose = source_pose[profile["source_torso"]]
+    torso_t_pose = target_pose[profile["target_torso"]]
+    source_names = profile["source_joints"]
+    src_shoulder_bone, src_elbow_bone, src_wrist_bone = source_names
+    shoulder_control, upper_control, forearm_control, hand_control = profile["target_controls"]
+    source_rest_points = [source.data.bones[n].head_local.copy() for n in source_names]
+    source_rest_local = [torso_s.inverted_safe() @ p for p in source_rest_points]
+    source_current_local = [torso_s_pose.inverted_safe() @ source_pose[n].translation
+                            for n in source_names]
+
+    upper_target_rest_bone = target.data.bones[upper_control]
+    forearm_target_rest_bone = target.data.bones[forearm_control]
+    hand_target_rest_bone = target.data.bones[hand_control]
+    target_rest_shoulder = torso_t.inverted_safe() @ upper_target_rest_bone.head_local
+    target_rest_elbow = torso_t.inverted_safe() @ target.data.bones[profile["target_elbow"]].tail_local
+    target_rest_wrist = torso_t.inverted_safe() @ hand_target_rest_bone.head_local
+
+    src_upper_rest_len = (source_rest_local[1] - source_rest_local[0]).length
+    src_lower_rest_len = (source_rest_local[2] - source_rest_local[1]).length
+    tgt_upper_len = (target_rest_elbow - target_rest_shoulder).length
+    tgt_lower_len = (target_rest_wrist - target_rest_elbow).length
+    if min(src_upper_rest_len, src_lower_rest_len, tgt_upper_len, tgt_lower_len) <= 1e-8:
+        raise RuntimeError(f"invalid rest segment lengths for {side} arm trajectory")
+    scale_upper = tgt_upper_len / src_upper_rest_len
+    scale_lower = tgt_lower_len / src_lower_rest_len
+    scale_shoulder = (tgt_upper_len + tgt_lower_len) / (src_upper_rest_len + src_lower_rest_len)
+
+    # Convert local torso coordinates through object orientation and torso rest
+    # frames. This maps Z-up Galaxy anatomy into Y-up Waluigi without guessing
+    # Euler axes or mirroring the right side.
+    armature_alignment = target_object_rotation.inverted() @ source_object_rotation
+    anatomical = torso_t.to_3x3().inverted() @ armature_alignment @ torso_s.to_3x3()
+    shoulder_local = target_rest_shoulder + anatomical @ (
+        source_current_local[0] - source_rest_local[0]) * scale_shoulder
+    source_upper = source_current_local[1] - source_current_local[0]
+    source_lower = source_current_local[2] - source_current_local[1]
+    upper_local = anatomical @ source_upper
+    lower_local = anatomical @ source_lower
+    if upper_local.length < 1e-8 or lower_local.length < 1e-8:
+        raise RuntimeError(f"degenerate source joint trajectory for {side} arm")
+    elbow_local = shoulder_local + upper_local.normalized() * tgt_upper_len
+    wrist_local = elbow_local + lower_local.normalized() * tgt_lower_len
+
+    shoulder_arm = torso_t_pose @ shoulder_local
+    elbow_arm = torso_t_pose @ elbow_local
+    wrist_arm = torso_t_pose @ wrist_local
+    upper_dir_arm = torso_t_pose.to_3x3() @ (elbow_local - shoulder_local).normalized()
+    forearm_dir_arm = torso_t_pose.to_3x3() @ (wrist_local - elbow_local).normalized()
+
+    def segment_orientation(target_bone, direction_arm, source_segment_bone,
+                            source_start, source_end):
+        rest_bone = target.data.bones[target_bone]
+        rest_direction = (rest_bone.tail_local - rest_bone.head_local).normalized()
+        align = rest_direction.rotation_difference(direction_arm.normalized())
+        base_rotation = align @ rest_bone.matrix_local.to_quaternion()
+        twist = source_segment_twist(source, source_pose, profile["source_torso"],
+                                     torso_s_pose, source_start, source_end,
+                                     source_segment_bone)
+        twist_q = Quaternion(direction_arm.normalized(), twist)
+        return (twist_q @ base_rotation).normalized(), twist
+
+    upper_rotation, upper_twist = segment_orientation(
+        upper_control, upper_dir_arm, src_shoulder_bone,
+        src_shoulder_bone, src_elbow_bone)
+    forearm_rotation, forearm_twist = segment_orientation(
+        forearm_control, forearm_dir_arm, src_elbow_bone,
+        src_elbow_bone, src_wrist_bone)
+    upper_pose = Matrix.LocRotScale(shoulder_arm, upper_rotation, (1, 1, 1))
+    forearm_pose = Matrix.LocRotScale(elbow_arm, forearm_rotation, (1, 1, 1))
+
+    rest_shoulder_control = target.data.bones[shoulder_control].matrix_local.copy()
+    rest_upper_control = upper_target_rest_bone.matrix_local.copy()
+    rest_forearm_control = forearm_target_rest_bone.matrix_local.copy()
+    rest_hand_control = hand_target_rest_bone.matrix_local.copy()
+    shoulder_pose = upper_pose @ rest_upper_control.inverted_safe() @ rest_shoulder_control
+
+    wrist_basis = calibrated_local_delta(
+        source, profile["wrist_source"], source,
+        source_object_rotation, target_object_rotation,
+        rest_forearm_control, rest_hand_control).to_quaternion()
+    hand_rest_local = rest_forearm_control.inverted_safe() @ rest_hand_control
+    hand_pose = forearm_pose @ hand_rest_local @ Matrix.LocRotScale(
+        Vector((0, 0, 0)), wrist_basis, (1, 1, 1))
+    hand_pose.translation = wrist_arm
+
+    control_pose = {"shoulder": shoulder_pose, "upper": upper_pose,
+                    "forearm": forearm_pose, "hand": hand_pose}
+    control_rest = {"shoulder": rest_shoulder_control, "upper": rest_upper_control,
+                    "forearm": rest_forearm_control, "hand": rest_hand_control}
+    diagnostics = {
+        "source_torso_local_joints": [list(p) for p in source_current_local],
+        "source_torso_local_rest_joints": [list(p) for p in source_rest_local],
+        "target_torso_local_joints": [list(shoulder_local), list(elbow_local), list(wrist_local)],
+        "target_torso_local_rest_joints": [list(target_rest_shoulder),
+                                            list(target_rest_elbow), list(target_rest_wrist)],
+        "source_to_target_torso_basis": [[float(anatomical[r][c]) for c in range(3)]
+                                          for r in range(3)],
+        "source_upper_length": src_upper_rest_len,
+        "source_forearm_length": src_lower_rest_len,
+        "target_upper_length": tgt_upper_len,
+        "target_forearm_length": tgt_lower_len,
+        "source_total_length": src_upper_rest_len + src_lower_rest_len,
+        "target_total_length": tgt_upper_len + tgt_lower_len,
+        "source_elbow_flexion_radians": math.acos(max(-1.0, min(1.0,
+            source_upper.normalized().dot(source_lower.normalized())))),
+        "source_forearm_twist_radians": forearm_twist,
+        "source_upper_twist_radians": upper_twist,
+        "source_arm_plane_normal": list(source_upper.cross(source_lower).normalized()),
+        "mapped_wrist_basis_quaternion": list(wrist_basis),
+    }
+    return control_pose, control_rest, diagnostics
+
+
+def normalized_vec_error(a, b):
+    return (Vector(a) - Vector(b)).length
+
+
+def rms(values):
+    return math.sqrt(sum(float(v) ** 2 for v in values) / len(values)) if values else 0.0
+
+
+def scalar_range(values):
+    return [min(values), max(values)] if values else [0.0, 0.0]
+
+
+def motion_retention(source_values, target_values):
+    source_excursion = max(source_values) - min(source_values) if source_values else 0.0
+    target_excursion = max(target_values) - min(target_values) if target_values else 0.0
+    return {"source_excursion": source_excursion,
+            "target_excursion": target_excursion,
+            "retention_ratio": target_excursion / source_excursion
+                if source_excursion > 1e-8 else None}
+
+
+def trajectory_actual_points(target, pose_matrices, side):
+    profile = TRAJECTORY_PROFILE[side]
+    torso = pose_matrices[profile["target_torso"]]
+    shoulder_bone = profile["target_elbow"]
+    forearm_bone = "bone_27" if side == "left" else "bone_62"
+    shoulder = pose_matrices[shoulder_bone].translation.copy()
+    elbow = pose_matrices[shoulder_bone] @ Vector((0.0, target.data.bones[shoulder_bone].length, 0.0))
+    wrist = pose_matrices[forearm_bone] @ Vector((0.0, target.data.bones[forearm_bone].length, 0.0))
+    inv_torso = torso.inverted_safe()
+    return [inv_torso @ shoulder, inv_torso @ elbow, inv_torso @ wrist]
+
+
+def target_segment_twist(target, pose_matrices, side):
+    profile = TRAJECTORY_PROFILE[side]
+    torso_name = profile["target_torso"]
+    shoulder_name, elbow_name, wrist_name = profile["target_controls"][1:]
+    torso_rest = target.data.bones[torso_name].matrix_local
+    torso_pose = pose_matrices[torso_name]
+    rest_start = torso_rest.inverted_safe() @ target.data.bones[shoulder_name].head_local
+    rest_end = torso_rest.inverted_safe() @ target.data.bones[elbow_name].head_local
+    rest_wrist = torso_rest.inverted_safe() @ target.data.bones["bone_30" if side == "left" else "bone_65"].head_local
+    current_points = trajectory_actual_points(target, pose_matrices, side)
+    rest_axis = rest_wrist - rest_end
+    current_axis = current_points[2] - current_points[1]
+    swing = rest_axis.normalized().rotation_difference(current_axis.normalized())
+    bone_rest_local = torso_rest.inverted_safe() @ target.data.bones[elbow_name].matrix_local
+    bone_pose_local = torso_pose.inverted_safe() @ pose_matrices[elbow_name]
+    delta = bone_pose_local.to_quaternion() @ bone_rest_local.to_quaternion().inverted()
+    return twist_angle_about(swing.inverted() @ delta, rest_axis)
 
 
 MESH_SEAMS = {
@@ -459,7 +635,7 @@ def main():
     target.matrix_basis = object_basis(target_base)
     target.data.name = target.name + "_Data"
     target_action = copy_action_slot(walk_action, walk_slot, target,
-                                     "Waluigi_DirectGalaxyWalk_ArmAdapter_v2_ControlChain")
+                                     "Waluigi_DirectGalaxyWalk_ArmAdapter_v3_GeometricTrajectory")
     target_baseline_curves = curves_for_slot(target_action, target.animation_data.action_slot)
     collection = bpy.data.collections.new("DirectGalaxyWalk_Candidate")
     scene.collection.children.link(collection)
@@ -488,7 +664,6 @@ def main():
     srot = object_basis(control).to_3x3().to_quaternion().to_matrix()
     trot = object_basis(target).to_3x3().to_quaternion().to_matrix()
     desired_by_frame = {}
-    baseline_basis_by_frame = {}
     mesh_gaps_by_frame = {}
     jumps = {name: 0.0 for name in ARM_OUTPUTS}
     previous = {}
@@ -496,6 +671,8 @@ def main():
                       "ShoulderR", "ArmR1", "ArmR2", "HandR")
     source_rest_deltas = {key: [] for key in semantic_bones}
     source_channel_samples = {}
+    trajectory_rows = {"left": [], "right": []}
+    trajectory_world_samples = {}
     glove_gaps = {"left": [], "right": []}
     baseline_fingers = {}
     baseline_other_errors = 0.0
@@ -518,13 +695,14 @@ def main():
             target_pose_matrices = pose_matrices_from_basis(target)
             pose_snapshot = {n: target.pose.bones[n].matrix_basis.copy()
                              for n in target.data.bones.keys()}
-            baseline_basis_by_frame[frame] = pose_snapshot
+            frame_trajectory = {}
             for side in ("left", "right"):
-                controls, rests = build_control_pose(
-                    control, control, target, target_pose_matrices,
+                controls, rests, trajectory = trajectory_control_pose(
+                    control, source_pose_matrices, target, target_pose_matrices,
                     srot, trot, side)
                 target_pose_matrices = distribute_control_pose(
                     target, target_pose_matrices, controls, rests, side)
+                frame_trajectory[side] = trajectory
             bpy.context.view_layer.update()
             for target_name in ARM_OUTPUTS:
                 q = target_pose_matrices[target_name].to_quaternion()
@@ -547,6 +725,90 @@ def main():
                                    group="Direct Galaxy Adapter")
             desired_by_frame[frame] = {n: target_pose_matrices[n].copy()
                                        for n in ARM_OUTPUTS}
+            for side in ("left", "right"):
+                profile = TRAJECTORY_PROFILE[side]
+                td = frame_trajectory[side]
+                anatomical = Matrix(td["source_to_target_torso_basis"])
+                source_points = [Vector(p) for p in td["source_torso_local_joints"]]
+                source_rest_points = [Vector(p) for p in td["source_torso_local_rest_joints"]]
+                expected_points = [Vector(p) for p in td["target_torso_local_joints"]]
+                target_rest_points = [Vector(p) for p in td["target_torso_local_rest_joints"]]
+                actual_points = trajectory_actual_points(target, target_pose_matrices, side)
+                source_total = td["source_total_length"]
+                target_total = td["target_total_length"]
+                src_upper = source_points[1] - source_points[0]
+                src_lower = source_points[2] - source_points[1]
+                tgt_upper = actual_points[1] - actual_points[0]
+                tgt_lower = actual_points[2] - actual_points[1]
+                mapped_src_shoulder = anatomical @ (source_points[0] - source_rest_points[0]) / source_total
+                actual_tgt_shoulder = (actual_points[0] - target_rest_points[0]) / target_total
+                mapped_src_elbow = anatomical @ src_upper / source_total
+                actual_tgt_elbow = tgt_upper / target_total
+                mapped_src_wrist = anatomical @ (source_points[2] - source_points[0]) / source_total
+                actual_tgt_wrist = (actual_points[2] - actual_points[0]) / target_total
+                source_forward = mapped_src_wrist.z
+                target_forward = actual_tgt_wrist.z
+                source_flex = td["source_elbow_flexion_radians"]
+                target_flex = math.acos(max(-1.0, min(1.0,
+                    tgt_upper.normalized().dot(tgt_lower.normalized()))))
+                mapped_plane = (anatomical @ src_upper).cross(anatomical @ src_lower).normalized()
+                target_plane = tgt_upper.cross(tgt_lower).normalized()
+                plane_error = math.acos(max(-1.0, min(1.0,
+                    mapped_plane.dot(target_plane))))
+                target_twist = target_segment_twist(target, target_pose_matrices, side)
+                source_twist = td["source_forearm_twist_radians"]
+                hand_name = "bone_30" if side == "left" else "bone_65"
+                forearm_name = "bone_26" if side == "left" else "bone_61"
+                target_rest_hand = target.data.bones[hand_name].matrix_local
+                target_rest_forearm = target.data.bones[forearm_name].matrix_local
+                expected_wrist_relative = ((target_rest_forearm.inverted_safe() @
+                    target_rest_hand).to_quaternion() @
+                    Quaternion(td["mapped_wrist_basis_quaternion"])).normalized()
+                actual_wrist_relative = (target_pose_matrices[forearm_name].to_quaternion().inverted() @
+                                         target_pose_matrices[hand_name].to_quaternion()).normalized()
+                wrist_orientation_error = quat_angle(expected_wrist_relative,
+                                                     actual_wrist_relative)
+                row = {
+                    "frame": frame,
+                    "source_shoulder_excursion_normalized": list(mapped_src_shoulder),
+                    "target_shoulder_excursion_normalized": list(actual_tgt_shoulder),
+                    "source_elbow_vector_normalized": list(mapped_src_elbow),
+                    "target_elbow_vector_normalized": list(actual_tgt_elbow),
+                    "source_wrist_vector_normalized": list(mapped_src_wrist),
+                    "target_wrist_vector_normalized": list(actual_tgt_wrist),
+                    "normalized_shoulder_error": normalized_vec_error(mapped_src_shoulder,
+                                                                        actual_tgt_shoulder),
+                    "normalized_elbow_trajectory_error": normalized_vec_error(mapped_src_elbow,
+                                                                                 actual_tgt_elbow),
+                    "normalized_wrist_trajectory_error": normalized_vec_error(mapped_src_wrist,
+                                                                                actual_tgt_wrist),
+                    "source_forward_backward": source_forward,
+                    "target_forward_backward": target_forward,
+                    "source_elbow_flexion_radians": source_flex,
+                    "target_elbow_flexion_radians": target_flex,
+                    "elbow_flexion_error_radians": abs(source_flex - target_flex),
+                    "source_forearm_roll_radians": source_twist,
+                    "target_forearm_roll_radians": target_twist,
+                    "forearm_roll_error_radians": abs(source_twist - target_twist),
+                    "arm_plane_orientation_error_radians": plane_error,
+                    "wrist_relative_orientation_error_radians": wrist_orientation_error,
+                    "source_torso_local_joints": td["source_torso_local_joints"],
+                    "target_torso_local_joints": [list(p) for p in actual_points],
+                }
+                trajectory_rows[side].append(row)
+                if frame in (0, 15, 30, 45, 60):
+                    src_pts_arm = [source_pose_matrices[n].translation for n in profile["source_joints"]]
+                    target_pts_arm = [target_pose_matrices[profile["target_controls"][1]].translation,
+                        target_pose_matrices[profile["target_elbow"]] @ Vector((0, target.data.bones[profile["target_elbow"]].length, 0)),
+                        target_pose_matrices["bone_27" if side == "left" else "bone_62"] @
+                            Vector((0, target.data.bones["bone_27" if side == "left" else "bone_62"].length, 0))]
+                    trajectory_world_samples.setdefault(side, {})[str(frame)] = {
+                        "source_world_shoulder_elbow_wrist": [list((object_basis(source) @ p))
+                                                               for p in src_pts_arm],
+                        "target_world_shoulder_elbow_wrist": [list((object_basis(target) @ p))
+                                                               for p in target_pts_arm],
+                    }
+            frame_trajectory = None
             # Verify actual armature-skinned mesh seams against the unchanged
             # walk baseline for every frame, using temporary duplicate meshes.
             for name, basis in pose_snapshot.items():
@@ -634,6 +896,56 @@ def main():
         worst_mesh_seam = None
         max_mesh_edge_relative_delta = 0.0
         worst_mesh_edge = None
+        trajectory_summary = {}
+        for side, rows_for_side in trajectory_rows.items():
+            source_flex = [r["source_elbow_flexion_radians"] for r in rows_for_side]
+            target_flex = [r["target_elbow_flexion_radians"] for r in rows_for_side]
+            source_forward = [r["source_forward_backward"] for r in rows_for_side]
+            target_forward = [r["target_forward_backward"] for r in rows_for_side]
+            source_roll = [r["source_forearm_roll_radians"] for r in rows_for_side]
+            target_roll = [r["target_forearm_roll_radians"] for r in rows_for_side]
+            source_roll_delta = [v - source_roll[0] for v in source_roll]
+            target_roll_delta = [v - target_roll[0] for v in target_roll]
+            source_shoulder_forward = [r["source_shoulder_excursion_normalized"][2]
+                                       for r in rows_for_side]
+            target_shoulder_forward = [r["target_shoulder_excursion_normalized"][2]
+                                       for r in rows_for_side]
+            trajectory_summary[side] = {
+                "source_elbow_flexion_range_radians": scalar_range(source_flex),
+                "target_elbow_flexion_range_radians": scalar_range(target_flex),
+                "elbow_flexion_rmse_radians": rms([r["elbow_flexion_error_radians"]
+                                                    for r in rows_for_side]),
+                "elbow_flexion_excursion": motion_retention(source_flex, target_flex),
+                "forward_backward_source_range_normalized": scalar_range(source_forward),
+                "forward_backward_target_range_normalized": scalar_range(target_forward),
+                "forward_backward_rmse_normalized": rms([
+                    r["source_forward_backward"] - r["target_forward_backward"]
+                    for r in rows_for_side]),
+                "forward_backward_excursion": motion_retention(source_forward, target_forward),
+                "shoulder_forward_backward_excursion": motion_retention(
+                    source_shoulder_forward, target_shoulder_forward),
+                "normalized_shoulder_trajectory_rmse": rms([
+                    r["normalized_shoulder_error"] for r in rows_for_side]),
+                "normalized_elbow_trajectory_rmse": rms([
+                    r["normalized_elbow_trajectory_error"] for r in rows_for_side]),
+                "normalized_wrist_trajectory_rmse": rms([
+                    r["normalized_wrist_trajectory_error"] for r in rows_for_side]),
+                "arm_plane_orientation_rmse_radians": rms([
+                    r["arm_plane_orientation_error_radians"] for r in rows_for_side]),
+                "source_forearm_roll_range_radians": scalar_range([
+                    r["source_forearm_roll_radians"] for r in rows_for_side]),
+                "target_forearm_roll_range_radians": scalar_range([
+                    r["target_forearm_roll_radians"] for r in rows_for_side]),
+                "forearm_roll_motion_rmse_radians": rms([
+                    s - t for s, t in zip(source_roll_delta, target_roll_delta)]),
+                "forearm_roll_excursion": motion_retention(source_roll_delta,
+                                                            target_roll_delta),
+                "forearm_roll_absolute_rest_offset_rmse_radians": rms([
+                    r["forearm_roll_error_radians"] for r in rows_for_side]),
+                "wrist_relative_orientation_rmse_radians": rms([
+                    r["wrist_relative_orientation_error_radians"] for r in rows_for_side]),
+                "frames": rows_for_side,
+            }
         for frame, pair in mesh_gaps_by_frame.items():
             delta, worst, edge_delta, edge_worst = max_seam_delta(
                 pair["candidate"], pair["baseline"])
@@ -649,6 +961,26 @@ def main():
                 worst_mesh_edge = {"frame": int(frame), **edge_worst}
         armature_world_scale = max(abs(float(s)) for s in target.matrix_basis.to_scale())
         mesh_gap_tolerance_world = args.max_glove_gap_delta * armature_world_scale
+        trajectory_gates = {}
+        for side, summary in trajectory_summary.items():
+            flex_retention = summary["elbow_flexion_excursion"]["retention_ratio"]
+            forward_retention = summary["forward_backward_excursion"]["retention_ratio"]
+            roll_retention = summary["forearm_roll_excursion"]["retention_ratio"]
+            trajectory_gates[f"{side}_elbow_flexion"] = (
+                summary["elbow_flexion_rmse_radians"] < 0.03 and
+                flex_retention is not None and 0.80 <= flex_retention <= 1.20)
+            trajectory_gates[f"{side}_forward_backward_swing"] = (
+                summary["forward_backward_rmse_normalized"] < 0.02 and
+                forward_retention is not None and 0.80 <= forward_retention <= 1.20)
+            trajectory_gates[f"{side}_joint_trajectories"] = (
+                summary["normalized_shoulder_trajectory_rmse"] < 0.02 and
+                summary["normalized_elbow_trajectory_rmse"] < 0.02 and
+                summary["normalized_wrist_trajectory_rmse"] < 0.02)
+            trajectory_gates[f"{side}_arm_plane_and_roll"] = (
+                summary["arm_plane_orientation_rmse_radians"] < 0.05 and
+                summary["forearm_roll_motion_rmse_radians"] < 0.08 and
+                roll_retention is not None and 0.80 <= roll_retention <= 1.20 and
+                summary["wrist_relative_orientation_rmse_radians"] < 1e-3)
         numerical_gates = {
             "finite": finite,
             "target_scale_unchanged": scale_error < 1e-6,
@@ -660,6 +992,7 @@ def main():
             "mesh_space_elbow_wrist_continuity": max_mesh_seam_delta < mesh_gap_tolerance_world,
             "mesh_space_cross_weight_edges": max_mesh_edge_relative_delta < 0.20,
         }
+        numerical_gates.update(trajectory_gates)
         passed = all(numerical_gates.values())
         report = {
             "schema": "mg1.direct-galaxy-walk-adapter-probe.v1",
@@ -670,6 +1003,8 @@ def main():
             "source_action_curve_count": len(source_curves),
             "source_action_evaluation": "selected-slot FCurve evaluation at each integer frame",
             "source_channel_diagnostics": source_channel_samples,
+            "source_and_target_world_joint_trajectories": trajectory_world_samples,
+            "anatomical_trajectory_validation": trajectory_summary,
             "source_arm_motion_radians": {
                 name: max((quat_angle(values[0], value) for value in values[1:]),
                           default=0.0)
