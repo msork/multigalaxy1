@@ -64,6 +64,13 @@ class ContextDatasetTests(unittest.TestCase):
         self.assertEqual(data["training_actions"], ["Waluigi_7_Batting_seq0"])
         self.assertEqual(data["holdout_actions"], ["Waluigi_7_Batting_seq11"])
 
+    def test_bilateral_v2_schema_is_accepted(self):
+        raw = raw_fixture()
+        raw["schema"] = "mg1.raw-sluggies-native-calibration.v2"
+        version = raw["schema"]
+        data = normalize_context_dataset(raw)
+        self.assertEqual(data["source_schema"], version)
+
 
 if __name__ == "__main__":
     unittest.main(argv=[sys.argv[0]])

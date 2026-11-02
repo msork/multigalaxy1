@@ -25,17 +25,22 @@ from raw_anm_calibration import (
     WALUIGI_ARM_BONES,
     WALUIGI_ARM_TRACK_TO_BONE,
     WALUIGI_CONTEXT_BONES,
+    WALUIGI_LEFT_PROFILE,
+    WALUIGI_RIGHT_PROFILE,
+    WALUIGI_RIGHT_HAND_TRACK_TO_BONE,
     bank_index,
     sequence_index,
     split_for_action,
     validate_profile,
 )
+from anatomical_semantic_frames import derive_anatomical_frames
+from semantic_arm_fit_math import semantic_features
 
 DEFAULT_ROOT = Path(r"C:\MultiGalaxy1-Assets\Working\MSS\Waluigi")
 DEFAULT_MODEL = DEFAULT_ROOT / "123475520_waluigi.gpl" / "123475520_waluigi.gpl.sluggie"
 DEFAULT_ANM_DIR = DEFAULT_ROOT / "anm"
-DEFAULT_OUTPUT = Path("tools/blender/reports/native_waluigi_raw_anm_calibration.json.gz")
-DEFAULT_VALIDATION = Path("tools/blender/reports/native_waluigi_raw_anm_validation.json")
+DEFAULT_OUTPUT = Path("tools/blender/reports/native_waluigi_raw_anm_bilateral_v2.json.gz")
+DEFAULT_VALIDATION = Path("tools/blender/reports/native_waluigi_raw_anm_bilateral_v2_validation.json")
 DEFAULT_PREVIEW = Path("tools/blender/reports/raw_native_waluigi_batting_preview.blend")
 DEFAULT_PRODUCTION_MATRIX = (
     43.437, 0.0, 0.0, 0.0,
@@ -44,7 +49,9 @@ DEFAULT_PRODUCTION_MATRIX = (
     0.0, 0.0, 0.0, 1.0,
 )
 PAIR_NAMES = (("bone_23", "bone_25"), ("bone_26", "bone_29"),
-              ("bone_27", "bone_30"), ("bone_22", "bone_23"))
+              ("bone_27", "bone_30"), ("bone_22", "bone_23"),
+              ("bone_58", "bone_60"), ("bone_61", "bone_64"),
+              ("bone_62", "bone_65"), ("bone_57", "bone_58"))
 LANDMARKS = {
     "shoulder": ("bone_22", "head"),
     "elbow_main": ("bone_26", "head"),
@@ -52,6 +59,12 @@ LANDMARKS = {
     "wrist_main": ("bone_27", "tail"),
     "glove_wrist": ("bone_30", "head"),
     "glove_tip": ("bone_30", "tail"),
+    "shoulder_right": ("bone_58", "head"),
+    "elbow_main_right": ("bone_61", "head"),
+    "elbow_overlap_right": ("bone_64", "head"),
+    "wrist_right": ("bone_62", "tail"),
+    "glove_wrist_right": ("bone_65", "head"),
+    "glove_tip_right": ("bone_65", "tail"),
 }
 
 
@@ -407,6 +420,10 @@ def extract(args):
         if actual_arm_tracks != WALUIGI_ARM_TRACK_TO_BONE:
             raise RuntimeError("raw .sluggie arm TrackIds differ from the verified mapping: "
                                + repr(actual_arm_tracks))
+        for track_id, bone_name in WALUIGI_RIGHT_HAND_TRACK_TO_BONE.items():
+            actual = track_to_bone.get(str(track_id))
+            if actual != bone_name:
+                raise RuntimeError(f"right hand TrackId {track_id} expected {bone_name}, got {actual}")
     missing_track_bones = sorted(set(arm_bones) - set(rig.data.bones.keys()))
     if missing_track_bones:
         raise RuntimeError("armature track map lacks arm profile bones")
@@ -448,6 +465,12 @@ def extract(args):
         "rest_tail": _vec(rig.data.bones[name].tail_local),
         "rest_length": float(rig.data.bones[name].length),
     } for name in profile}
+    semantic_rest = {name: {**row, "head": row["rest_head"],
+                            "tail": row["rest_tail"]}
+                     for name, row in rest_bones.items()}
+    anatomy = derive_anatomical_frames(semantic_rest, _rows(rig.matrix_world),
+                                       WALUIGI_LEFT_PROFILE,
+                                       WALUIGI_RIGHT_PROFILE)
     mesh_static = _static_mesh_profile(meshes, rig, profile, arm_bones)
     replay_rig, replay_meshes = _duplicate_rig_and_meshes(rig, meshes, bpy.context.scene.collection)
     scene = bpy.context.scene
@@ -482,6 +505,19 @@ def extract(args):
                 record = _sample_record(frame_time, (frame_time - lo) / duration if duration else 0.0,
                                         evaluated_rig, pose_bones, rig.data, evaluated_rig.matrix_world,
                                         mesh_centroids, mesh_vertices, meshes, profile, arm_bones, rig)
+                sample_pose = {name: _rows(pose_bones[name].matrix) for name in profile}
+                record["anatomical_semantics"] = {
+                    "left": semantic_features(semantic_rest, sample_pose,
+                        WALUIGI_LEFT_PROFILE, anatomy["torso_to_anatomical"],
+                        anatomy["sides"]["left"]["forearm_to_anatomical"],
+                        anatomy["sides"]["left"]["forearm_axes_local"],
+                        elbow_absolute=True).tolist(),
+                    "right": semantic_features(semantic_rest, sample_pose,
+                        WALUIGI_RIGHT_PROFILE, anatomy["torso_to_anatomical"],
+                        anatomy["sides"]["right"]["forearm_to_anatomical"],
+                        anatomy["sides"]["right"]["forearm_axes_local"],
+                        elbow_absolute=True).tolist(),
+                }
                 # The duplicate receives exactly the extracted profile local
                 # bases while all other bones preserve this raw action sample.
                 for name, pose_bone in pose_bones.items():
@@ -581,8 +617,18 @@ def extract(args):
         args.preview.parent.mkdir(parents=True, exist_ok=True)
         bpy.ops.wm.save_as_mainfile(filepath=str(args.preview.resolve()))
 
+    left_track_ids = set(WALUIGI_LEFT_ARM_TRACK_TO_BONE)
+    right_track_ids = set(WALUIGI_RIGHT_ARM_TRACK_TO_BONE)
+    def side_sampling(track_ids):
+        actions_with_tracks = [row for row in action_rows
+            if track_ids.intersection(row["source_track_ids"])]
+        return {"pose_samples": sum(len(row["samples"]) for row in action_rows),
+                "actions_with_arm_tracks": len(actions_with_tracks),
+                "samples_in_actions_with_arm_tracks": sum(
+                    len(row["samples"]) for row in actions_with_tracks)}
+
     report = {
-        "schema": "mg1.raw-sluggies-native-calibration.v1",
+        "schema": "mg1.raw-sluggies-native-calibration.v2",
         "read_only_sources": True,
         "importer": "Sluggies IO Blender add-on v0.9.0 operators; reorient_bones=true",
         "model": {"path": str(model), "sha256": _hash(model), "size_bytes": model.stat().st_size},
@@ -592,13 +638,19 @@ def extract(args):
                 "production_basis_matrix_world": _rows(rig.matrix_world),
                 "matrix_world": _rows(rig.matrix_world), "scale": _vec(rig.scale),
                 "track_id_to_bone": track_to_bone, "profile_bones": list(profile),
-                "arm_region_bones": list(arm_bones), "rest_bones": rest_bones},
+                "arm_region_bones": list(arm_bones), "rest_bones": rest_bones,
+                "semantic_profiles": {"left": WALUIGI_LEFT_PROFILE,
+                                      "right": WALUIGI_RIGHT_PROFILE},
+                "hand_position_sign_convention": "positive X is character-right in the shared anatomical frame; outward motion is negative on the character-left and positive on the character-right"},
         "meshes": mesh_static,
         "banks": [{k: v for k, v in record.items() if k not in ("actions", "raw_sequences")}
                   for record in bank_records],
         "provenance": {
             "authority": "raw native .anm bank imported onto matching .sluggie skeleton by TrackId",
             "arm_track_ids_verified": {name: int(rig.data.bones[name]["track_id"]) for name in arm_bones},
+            "right_hand_track_ids_verified": {name: int(rig.data.bones[name]["track_id"])
+                for name in WALUIGI_RIGHT_HAND_TRACK_TO_BONE.values()},
+            "side_extraction_policy": "left and right pose transforms are sampled directly from raw ANM channels by their own TrackIds; no mirrored right samples",
             "candidate_owner_conversion": "not applied; imported .sluggie rest basis equals production Waluigi rest basis",
             "legacy_action_mapping": comparison,
         },
@@ -611,6 +663,8 @@ def extract(args):
         "training_action_count": sum(row["split"] == "train" for row in action_rows),
         "holdout_action_count": sum(row["split"] == "holdout" for row in action_rows),
         "sample_count": sum(len(row["samples"]) for row in action_rows),
+        "side_sampling": {"left": side_sampling(left_track_ids),
+                          "right": side_sampling(right_track_ids)},
         "actions": action_rows,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -628,6 +682,7 @@ def extract(args):
         "training_action_count": report["training_action_count"],
         "holdout_action_count": report["holdout_action_count"],
         "sample_count": report["sample_count"],
+        "side_sampling": report["side_sampling"],
         "identity_replay": report["identity_replay"],
         "legacy_action_mapping": comparison,
         "texture_inventory": texture_report,
@@ -740,6 +795,8 @@ def main():
     parser.add_argument("--validation-output", type=Path, default=DEFAULT_VALIDATION)
     parser.add_argument("--compare-dataset", type=Path,
                         default=Path("tools/blender/reports/native_waluigi_arm_context_production_basis.json.gz"))
+    parser.add_argument("--no-compare-dataset", action="store_true",
+                        help="skip legacy inferred-dataset comparison")
     parser.add_argument("--preview", type=Path, default=DEFAULT_PREVIEW)
     parser.add_argument("--no-preview", action="store_true",
                         help="write dataset/report without saving a Blender preview")
@@ -752,6 +809,8 @@ def main():
     parser.add_argument("--bone", dest="bones", action="append")
     parser.add_argument("--arm-bone", dest="arm_bones", action="append")
     args = parser.parse_args(argv)
+    if args.no_compare_dataset:
+        args.compare_dataset = None
     if args.no_preview:
         args.preview = None
     extract(args)

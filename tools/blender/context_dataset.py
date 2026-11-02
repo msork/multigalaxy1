@@ -10,6 +10,7 @@ import numpy as np
 
 
 RAW_SCHEMA = "mg1.raw-sluggies-native-calibration.v1"
+RAW_SCHEMAS = {RAW_SCHEMA, "mg1.raw-sluggies-native-calibration.v2"}
 
 
 def _quat_matrix_wxyz(quaternion):
@@ -37,7 +38,8 @@ def _rest_relative_matrix(transform):
 
 def normalize_context_dataset(data):
     """Normalize the raw extractor schema without changing its source or split."""
-    if data.get("schema") != RAW_SCHEMA or not data.get("provenance", {}).get("authority", "").startswith("raw native .anm"):
+    source_schema = data.get("schema")
+    if source_schema not in RAW_SCHEMAS or not data.get("provenance", {}).get("authority", "").startswith("raw native .anm"):
         raise ValueError("context-model training requires an authoritative raw Sluggies .anm dataset")
     bones = list(data["rig"]["profile_bones"])
     rest_bones = data["rig"]["rest_bones"]
@@ -84,7 +86,7 @@ def normalize_context_dataset(data):
         raise ValueError("raw calibration contains an unknown split label")
     data.clear()
     data.update({
-        "schema": "mg1.context-model-input.v1", "source_schema": RAW_SCHEMA,
+        "schema": "mg1.context-model-input.v1", "source_schema": source_schema,
         "source_authority": "raw native .anm bank imported onto matching .sluggie skeleton by TrackId",
         "bones": bones, "rest_bones": rest_bones, "actions": actions,
         "training_actions": training_names, "holdout_actions": holdout_names,

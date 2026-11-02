@@ -1,0 +1,191 @@
+{
+  "schema": "mg1.raw-sluggies-native-calibration.v2",
+  "model_sha256": "d9e82dc01425e72b22702a54ea4dfb84d8ab9df1441504dc29b208cb0d45f5ae",
+  "rest_signature_sha256": "339b5a1a51ca6a3bf3160ae26259ee3345546dc1158e24c70eb3afa299c8a9cf",
+  "bone_count": 92,
+  "bank_count": 9,
+  "banks": [
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_10_Catcher.anm",
+      "file": "Waluigi_10_Catcher.anm",
+      "sha256": "07b3077957ffd36df6dbe4fc9efbb67027ac6f998ba474f9015323c5af020f31",
+      "size_bytes": 49356,
+      "bank_index": 10,
+      "sequence_count": 4,
+      "raw_magic": 20070619,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_11_Reactions.anm",
+      "file": "Waluigi_11_Reactions.anm",
+      "sha256": "6bda73c6bb84e10d97cc92ba441eb88b55eda45bf494948d779371b47da8eb64",
+      "size_bytes": 314748,
+      "bank_index": 11,
+      "sequence_count": 9,
+      "raw_magic": 20060925,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_12_Various.anm",
+      "file": "Waluigi_12_Various.anm",
+      "sha256": "d5d02685c964f32fca28ab7a076fb5992eb350f29f78d6aaefbe3de04dbaba0c",
+      "size_bytes": 340040,
+      "bank_index": 12,
+      "sequence_count": 24,
+      "raw_magic": 20070619,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_13_Skate.anm",
+      "file": "Waluigi_13_Skate.anm",
+      "sha256": "5ba42c1603a637fa01a112685c5172554fe3f28df2b10087db2bc68858a11672",
+      "size_bytes": 22508,
+      "bank_index": 13,
+      "sequence_count": 2,
+      "raw_magic": 20060925,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_14_Entrance.anm",
+      "file": "Waluigi_14_Entrance.anm",
+      "sha256": "8f3b0a53c401af2aae310f9fcb83327c9ee40b1d325fd2eefa724477fe5d45ed",
+      "size_bytes": 107814,
+      "bank_index": 14,
+      "sequence_count": 5,
+      "raw_magic": 20070619,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_6_Fielding.anm",
+      "file": "Waluigi_6_Fielding.anm",
+      "sha256": "c8c46c60ec01878a09b9c4ed9bdc1973d11b3154e61ceaa81f6cde426e04c45e",
+      "size_bytes": 656902,
+      "bank_index": 6,
+      "sequence_count": 44,
+      "raw_magic": 20060925,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_7_Batting.anm",
+      "file": "Waluigi_7_Batting.anm",
+      "sha256": "53e129d720cfd77e982b42c4ed53b165de0a36ebf4cb0a16cd1609ad4280d77c",
+      "size_bytes": 933352,
+      "bank_index": 7,
+      "sequence_count": 28,
+      "raw_magic": 20060925,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_8_Running.anm",
+      "file": "Waluigi_8_Running.anm",
+      "sha256": "7b194e53d785254f82648c189e8c4dcc17f934e2d3181c74956bbe65e6e07f51",
+      "size_bytes": 364590,
+      "bank_index": 8,
+      "sequence_count": 17,
+      "raw_magic": 20060925,
+      "raw_bank_id": 0
+    },
+    {
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\anm\\Waluigi_9_Pitching.anm",
+      "file": "Waluigi_9_Pitching.anm",
+      "sha256": "9fcfdf52d90c91ac6bd197622dc9bb6dd8a576ae95fe1873022110505c9beeaa",
+      "size_bytes": 371914,
+      "bank_index": 9,
+      "sequence_count": 12,
+      "raw_magic": 20070619,
+      "raw_bank_id": 0
+    }
+  ],
+  "action_count": 145,
+  "training_action_count": 118,
+  "holdout_action_count": 27,
+  "sample_count": 5284,
+  "identity_replay": {
+    "sample_count": 5284,
+    "max_pose_matrix_error": 7.62939453125e-06,
+    "max_mesh_vertex_error_world": 0.00010705073851223231
+  },
+  "legacy_action_mapping": null,
+  "texture_inventory": [
+    {
+      "name": "tex1_1024x128_2dea43f386b17ea6_14.png",
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\123475520_waluigi.gpl\\tex\\tex1_1024x128_2dea43f386b17ea6_14.png",
+      "exists": true,
+      "size": [
+        1024,
+        128
+      ],
+      "packed": false,
+      "users": 2
+    },
+    {
+      "name": "tex1_256x128_3de451c2184e1ca4_14.png",
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\123475520_waluigi.gpl\\tex\\tex1_256x128_3de451c2184e1ca4_14.png",
+      "exists": true,
+      "size": [
+        256,
+        128
+      ],
+      "packed": false,
+      "users": 2
+    },
+    {
+      "name": "tex1_512x512_971d7f722f9c1033_14.png",
+      "path": "C:\\MultiGalaxy1-Assets\\Working\\MSS\\Waluigi\\123475520_waluigi.gpl\\tex\\tex1_512x512_971d7f722f9c1033_14.png",
+      "exists": true,
+      "size": [
+        512,
+        512
+      ],
+      "packed": false,
+      "users": 5
+    }
+  ],
+  "preview": null,
+  "dataset": "C:\\Users\\maxim\\Projects\\multigalaxy1-waluigi-rigging\\tools\\blender\\reports\\native_waluigi_raw_anm_bilateral_v2.json.gz",
+  "side_sampling": {
+    "left": {
+      "pose_samples": 5284,
+      "training_pose_samples": 4116,
+      "holdout_pose_samples": 1168,
+      "actions_with_arm_tracks": 145,
+      "samples_in_actions_with_arm_tracks": 5284
+    },
+    "right": {
+      "pose_samples": 5284,
+      "training_pose_samples": 4116,
+      "holdout_pose_samples": 1168,
+      "actions_with_arm_tracks": 145,
+      "samples_in_actions_with_arm_tracks": 5284
+    }
+  },
+  "right_arm_track_map": {
+    "22": "bone_57",
+    "117": "bone_58",
+    "118": "bone_59",
+    "23": "bone_60",
+    "113": "bone_61",
+    "114": "bone_62",
+    "24": "bone_64",
+    "25": "bone_65"
+  },
+  "right_hand_track_map": {
+    "26": "bone_66",
+    "94": "bone_67",
+    "95": "bone_68",
+    "38": "bone_69",
+    "96": "bone_70",
+    "97": "bone_71",
+    "98": "bone_72",
+    "99": "bone_74",
+    "100": "bone_75",
+    "101": "bone_76",
+    "102": "bone_78",
+    "103": "bone_79",
+    "104": "bone_80",
+    "105": "bone_82",
+    "106": "bone_83",
+    "107": "bone_84",
+    "3": "bone_86"
+  }
+}

@@ -70,9 +70,10 @@ the newly imported disposable rig.
 
 The profile is character-agnostic at the extractor boundary: model, banks,
 profile bones, arm-region bones, meshes, and action split policy are arguments.
-The current Waluigi profile stores the validated 38 context bones plus the
-eight arm branches and all mesh weights needed to replay the arm region. A
-Wario run must provide Wario's own `.sluggie`, ANM banks, TrackIds, and profile.
+The original v1 Waluigi profile stored 38 left-arm context bones. The bilateral
+v2 profile stores 67 bones: shared torso/root once, both eight-bone arm
+branches, and both hand/finger/helper branches through bone 86. A Wario run
+must provide Wario's own `.sluggie`, ANM banks, TrackIds, and profile.
 
 ## Provenance evidence
 
@@ -88,7 +89,23 @@ TrackIds match the previously investigated arm mapping exactly:
 | `bone_26` | 111 | `bone_27` | 112 |
 | `bone_23` | 115 | `bone_24` | 116 |
 
-The arm TrackId map is asserted by the extractor and covered by a unit test.
+The left-arm TrackId map is asserted by the extractor and covered by a unit test.
+The native model metadata also establishes the right-arm map:
+
+| Bone | TrackId | Bone | TrackId |
+| --- | ---: | --- | ---: |
+| `bone_57` | 22 | `bone_60` | 23 |
+| `bone_64` | 24 | `bone_65` | 25 |
+| `bone_61` | 113 | `bone_62` | 114 |
+| `bone_58` | 117 | `bone_59` | 118 |
+
+Right hand/finger tracks resolve directly from the imported model metadata:
+`26→bone_66`, `94→bone_67`, `95→bone_68`, `38→bone_69`, `96→bone_70`,
+`97→bone_71`, `98→bone_72`, `99→bone_74`, `100→bone_75`, `101→bone_76`,
+`102→bone_78`, `103→bone_79`, `104→bone_80`, `105→bone_82`, `106→bone_83`,
+`107→bone_84`, and `3→bone_86`. The extractor asserts these TrackIds before
+sampling. Right-side transforms are evaluated from their own raw ANM tracks;
+they are never copied from or reflected out of left-side samples.
 Some ANM sequences also contain TrackIds absent from the 92-bone model (such
 as `16385`, `16641`, `16643`, `33032`, and `33288`). They are retained in raw
 track metadata but are not guessed to be bone transforms or inserted into the
