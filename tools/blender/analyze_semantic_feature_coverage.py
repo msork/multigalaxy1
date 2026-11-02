@@ -40,12 +40,12 @@ def parse_args():
 FEATURE_NAMES = (
     "shoulder_rot_x", "shoulder_rot_y", "shoulder_rot_z", "elbow_flexion",
     "forearm_roll", "wrist_rot_x", "wrist_rot_y", "wrist_rot_z",
-    "hand_delta_x", "hand_delta_y", "hand_delta_z",
+    "hand_radial", "hand_tangential", "hand_depth",
 )
 GROUPS = {
     "shoulder_orientation": (0, 1, 2), "elbow_flexion": (3,),
     "forearm_roll": (4,), "wrist_orientation": (5, 6, 7),
-    "normalized_hand_position": (8, 9, 10),
+    "arm_plane_hand_position": (8, 9, 10),
 }
 
 
@@ -378,8 +378,8 @@ def main():
         if group in ("shoulder_orientation", "wrist_orientation"):
             mirror = np.asarray((1.0, -1.0, -1.0))
             right = right * mirror[:len(indices)]
-        elif group == "normalized_hand_position":
-            right = right * np.asarray((-1.0, 1.0, 1.0))
+        elif group == "arm_plane_hand_position":
+            right = right * np.asarray((1.0, 1.0, -1.0))
         elif group == "forearm_roll":
             right = -right
         source_lr_symmetry[group] = {
@@ -432,7 +432,7 @@ def main():
             "target_forearm_twist_axes_local": target_anatomy["sides"]["left"]["forearm_axes_local"],
             "left_right_mirror_convention": {
                 "shoulder_and_wrist_rotation_vectors": "axial vector reflection diag(+1,-1,-1)",
-                "hand_position_vector": "polar vector reflection diag(-1,+1,+1)",
+                "hand_arm_plane_vector": "radial/tangential components preserve sign; depth component reflects with sign -1",
                 "elbow_flexion": "unchanged scalar magnitude",
                 "forearm_roll": "sign evaluated around each side's elbow-to-wrist distal axis"},
             "elbow_rest_bend_angle_radians": {

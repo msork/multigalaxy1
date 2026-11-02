@@ -91,6 +91,21 @@ native solve**. Do not start fitting until lateral hand coverage is improved
 or a separately validated lateral target constraint can remain inside the
 measured native support.
 
+### Follow-up: arm-plane hand semantics
+
+The preceding table is the historical audit of the original shared torso-X
+`hand_delta_x`; it is no longer the selected representation. The follow-up
+coordinate audit found that this feature mixed rig-specific shoulder/torso
+orientation with signed hand motion. The replacement uses normalized,
+rest-calibrated radial/tangential/depth hand displacement on each side. It has
+zero unsupported frames per component on both sides (p95 nearest errors at
+most `0.00173` left and `0.00108` right). See
+[`hand-position-feature-audit.md`](hand-position-feature-audit.md) and the
+machine-readable alternative comparison in
+`tools/blender/reports/luigi_walk_hand_lateral_feature_audit_v1.json`.
+Coverage is now sufficient to consider a later local-native fitting
+experiment; no solver was run as part of this feature audit.
+
 The compact result is
 `tools/blender/reports/luigi_walk_bilateral_semantic_coverage_v1.json`;
 extraction identity diagnostics are in

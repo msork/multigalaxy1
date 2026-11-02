@@ -90,8 +90,8 @@ RIGHT_GAP_PAIRS = {
 }
 SEMANTIC_NAMES = ("shoulder_rot_x", "shoulder_rot_y", "shoulder_rot_z",
                   "elbow_flexion", "forearm_roll", "wrist_rot_x",
-                  "wrist_rot_y", "wrist_rot_z", "hand_delta_x",
-                  "hand_delta_y", "hand_delta_z")
+                  "wrist_rot_y", "wrist_rot_z", "hand_radial",
+                  "hand_tangential", "hand_depth")
 
 
 def args_parse():
@@ -1341,7 +1341,7 @@ def main():
         semantic_groups = {
             "shoulder_orientation": (0, 1, 2), "elbow_flexion": (3,),
             "forearm_roll": (4,), "wrist_orientation": (5, 6, 7),
-            "hand_position": (8, 9, 10)}
+            "arm_plane_hand_position": (8, 9, 10)}
         group_comparison = {}
         for label, indices in semantic_groups.items():
             names = [SEMANTIC_NAMES[i] for i in indices]

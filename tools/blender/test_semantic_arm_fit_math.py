@@ -38,7 +38,8 @@ def anatomical_fixture():
             for name, (head, tail) in points.items()}
 
     def profile(side):
-        return {"torso": "Spine2", "shoulder_point_bone": "Shoulder" + side,
+        return {"torso": "Spine2", "shoulder": "Shoulder" + side,
+            "shoulder_point_bone": "Shoulder" + side,
             "shoulder_endpoint": "head", "upper": "Arm" + side + "1",
             "elbow_a": "Arm" + side + "1", "elbow_endpoint_a": "tail",
             "elbow_b": "Arm" + side + "2", "elbow_endpoint_b": "head",
@@ -99,6 +100,26 @@ class SemanticArmFitMathTests(unittest.TestCase):
         pose = {name: matrix.tolist() for name, matrix in rest.items()}
         features = semantic_features(rest_bones, pose, profile)
         np.testing.assert_allclose(features, np.zeros(11), atol=1e-10)
+
+    def test_arm_plane_hand_displacement_preserves_direction(self):
+        rest, left, _right = anatomical_fixture()
+        rest_bones = {name: row for name, row in rest.items()}
+        rest_pose = {name: np.asarray(row["rest_matrix"], dtype=np.float64)
+                     for name, row in rest.items()}
+        hand = left["hand"]
+        positive = {name: matrix.copy() for name, matrix in rest_pose.items()}
+        negative = {name: matrix.copy() for name, matrix in rest_pose.items()}
+        positive[hand][:3, 3] += np.asarray((-0.2, 0.0, 0.0))
+        negative[hand][:3, 3] += np.asarray((0.2, 0.0, 0.0))
+        positive_features = semantic_features(rest_bones,
+            {name: matrix.tolist() for name, matrix in positive.items()}, left)
+        negative_features = semantic_features(rest_bones,
+            {name: matrix.tolist() for name, matrix in negative.items()}, left)
+        np.testing.assert_allclose(positive_features[:8], 0.0, atol=1e-10)
+        np.testing.assert_allclose(negative_features[:8], 0.0, atol=1e-10)
+        np.testing.assert_allclose(positive_features[8:11],
+                                   -negative_features[8:11], atol=1e-10)
+        self.assertGreater(float(np.linalg.norm(positive_features[8:11])), 0.0)
 
     def test_rbf_fit_and_prediction_are_finite(self):
         rng = np.random.default_rng(41)

@@ -8,6 +8,13 @@ import math
 import numpy as np
 
 
+SEMANTIC_FEATURE_NAMES = (
+    "shoulder_rot_x", "shoulder_rot_y", "shoulder_rot_z", "elbow_flexion",
+    "forearm_roll", "wrist_rot_x", "wrist_rot_y", "wrist_rot_z",
+    "hand_radial", "hand_tangential", "hand_depth",
+)
+
+
 def _matrix(value):
     return np.asarray(value, dtype=np.float64).reshape(4, 4)
 
@@ -220,7 +227,22 @@ def semantic_features(rest_bones, pose, profile, body_frame_map=None,
     rest_limb_length = max(float(np.linalg.norm(upper_rest_vec) + np.linalg.norm(lower_rest_vec)), 1e-8)
     hand_rest_offset = rest["hand"] - rest["shoulder"]
     hand_cur_offset = cur["hand"] - cur["shoulder"]
-    hand_delta = body_map @ ((hand_cur_offset - hand_rest_offset) / rest_limb_length)
+    hand_delta_anatomical = body_map @ (hand_cur_offset - hand_rest_offset)
+    # Express signed hand displacement in a character-neutral arm-plane basis
+    # derived from this side's rest shoulder-to-hand reach. Radial points from
+    # shoulder toward the hand at rest; tangent is the projected body-forward
+    # direction; depth completes a right-handed frame. All axes are rest-based,
+    # so the semantic channels retain motion direction without following the
+    # animated shoulder frame.
+    radial = _normalize(body_map @ hand_rest_offset)
+    forward = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+    normal = np.cross(radial, forward)
+    if np.linalg.norm(normal) < 1e-8:
+        normal = np.cross(radial, np.array([0.0, 1.0, 0.0], dtype=np.float64))
+    normal = _normalize(normal)
+    tangent = _normalize(np.cross(normal, radial))
+    hand_frame = np.column_stack((radial, tangent, normal))
+    hand_delta = hand_frame.T @ hand_delta_anatomical / rest_limb_length
 
     return np.r_[shoulder_rot, elbow_delta, forearm_roll, wrist_rot, hand_delta]
 

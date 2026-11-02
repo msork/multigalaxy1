@@ -163,7 +163,7 @@ def target_profile_semantics(pose, rest, anatomy):
 def semantic_metrics(source, target):
     labels = {"shoulder_orientation": (0, 3), "elbow_flexion": (3, 4),
               "forearm_roll": (4, 5), "wrist_orientation": (5, 8),
-              "normalized_hand_position": (8, 11)}
+              "arm_plane_hand_position": (8, 11)}
     return {name: float(np.sqrt(np.mean((source[:, a:b] - target[:, a:b]) ** 2)))
             for name, (a, b) in labels.items()}
 
@@ -331,19 +331,19 @@ def evaluate_scaffold(name, action, semantics, final_poses, descriptors, times,
             "source_left": {key: semantic_range(source_sem[:, a:b])
                 for key, (a, b) in {"shoulder_orientation": (0, 3), "elbow_flexion": (3, 4),
                     "forearm_roll": (4, 5), "wrist_orientation": (5, 8),
-                    "signed_hand_position": (8, 11)}.items()},
+                    "arm_plane_hand_position": (8, 11)}.items()},
             "target_left": {key: semantic_range(left_target[:, a:b])
                 for key, (a, b) in {"shoulder_orientation": (0, 3), "elbow_flexion": (3, 4),
                     "forearm_roll": (4, 5), "wrist_orientation": (5, 8),
-                    "signed_hand_position": (8, 11)}.items()},
+                    "arm_plane_hand_position": (8, 11)}.items()},
             "source_right": {key: semantic_range(source_sem_right[:, a:b])
                 for key, (a, b) in {"shoulder_orientation": (0, 3), "elbow_flexion": (3, 4),
                     "forearm_roll": (4, 5), "wrist_orientation": (5, 8),
-                    "signed_hand_position": (8, 11)}.items()},
+                    "arm_plane_hand_position": (8, 11)}.items()},
             "target_right": {key: semantic_range(right_target[:, a:b])
                 for key, (a, b) in {"shoulder_orientation": (0, 3), "elbow_flexion": (3, 4),
                     "forearm_roll": (4, 5), "wrist_orientation": (5, 8),
-                    "signed_hand_position": (8, 11)}.items()}},
+                    "arm_plane_hand_position": (8, 11)}.items()}},
         "motion_retention": retention,
         "max_final_pose_jump": max_jump_row,
         "mean_final_pose_jump_rms": float(np.mean([r["normalized_se3_rms"] for r in transitions])),
@@ -508,7 +508,7 @@ def main():
                    "comparison_scaffold": args.secondary,
                    "semantic_features": ["rest-calibrated shoulder orientation",
                        "absolute elbow angle from straight", "anatomical-axis forearm roll",
-                       "forearm-relative wrist orientation", "signed body-frame hand position"],
+                       "forearm-relative wrist orientation", "signed arm-plane hand displacement"],
                    "path_constraints": "single action only; bounded monotonic local sample transitions; full-pose SE(3) transition and phase costs",
                    "post_bake_smoothing": False},
         "candidates": candidates,

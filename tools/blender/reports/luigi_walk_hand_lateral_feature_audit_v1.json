@@ -1,0 +1,510 @@
+{
+  "schema": "mg1.hand-lateral-semantic-audit.v1",
+  "read_only": true,
+  "retarget_solver_or_preview_run": false,
+  "coordinate_convention": "hand displacement is normalized by each rig's rest limb length and projected into a side-specific rest arm-plane basis: radial follows rest shoulder-to-hand reach, tangential follows projected character-forward, and depth completes the right-handed frame",
+  "selected_representation": "arm_plane_radial_tangential_depth",
+  "tolerances": {
+    "continuous_feature": 0.08,
+    "outward_sign_deadband": 0.015
+  },
+  "candidates": {
+    "left": {
+      "sample_counts": {
+        "Luigi_frames": 61,
+        "Waluigi_training_samples": 4116
+      },
+      "arm_length_normalization": {
+        "Luigi_mean": 35.544031742668516,
+        "Waluigi_mean": 1.1427076058200547
+      },
+      "current_torso_frame": {
+        "components": {
+          "current": {
+            "unsupported_frame_count": 35,
+            "unsupported_frame_indices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59,
+              60
+            ],
+            "nearest_abs_error_p95": 0.5281116407480984,
+            "nearest_abs_error_max": 0.5326574394895578,
+            "tolerance": 0.08
+          }
+        },
+        "trajectory_correlation": {
+          "current": {
+            "with_visible_hand_path_radius": 0.8743712246869001,
+            "with_visible_hand_step_length": 0.2562438226936311
+          }
+        }
+      },
+      "shoulder_local_lateral": {
+        "components": {
+          "shoulder_local": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0005704719005788506,
+            "nearest_abs_error_max": 0.0010176954470256794,
+            "tolerance": 0.08
+          }
+        },
+        "trajectory_correlation": {
+          "shoulder_local": {
+            "with_visible_hand_path_radius": 0.8602213715438713,
+            "with_visible_hand_step_length": 0.28207792794941716
+          }
+        }
+      },
+      "normalized_shoulder_hand_lateral_absolute": {
+        "components": {
+          "absolute_lateral": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.003099901655763848,
+            "nearest_abs_error_max": 0.0066263846974635165,
+            "tolerance": 0.08
+          }
+        },
+        "trajectory_correlation": {
+          "absolute_lateral": {
+            "with_visible_hand_path_radius": 0.8743712246869002,
+            "with_visible_hand_step_length": 0.2562438226936311
+          }
+        }
+      },
+      "arm_plane_radial_tangential_depth": {
+        "components": {
+          "radial": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0017297377329484054,
+            "nearest_abs_error_max": 0.005217836653599761,
+            "tolerance": 0.08
+          },
+          "tangential": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0006061738143322004,
+            "nearest_abs_error_max": 0.0007618006195558302,
+            "tolerance": 0.08
+          },
+          "depth": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0016403857985425874,
+            "nearest_abs_error_max": 0.002944682638338608,
+            "tolerance": 0.08
+          }
+        },
+        "trajectory_correlation": {
+          "radial": {
+            "with_visible_hand_path_radius": 0.2058484915262858,
+            "with_visible_hand_step_length": 0.7796266870169024
+          },
+          "tangential": {
+            "with_visible_hand_path_radius": -0.4260179461562217,
+            "with_visible_hand_step_length": -0.6920863549283109
+          },
+          "depth": {
+            "with_visible_hand_path_radius": -0.87436442538452,
+            "with_visible_hand_step_length": -0.2562605857521375
+          }
+        }
+      },
+      "unsigned_reach_plus_outward_sign": {
+        "components": {
+          "reach_magnitude": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0016018411759877171,
+            "nearest_abs_error_max": 0.0020263075499289407,
+            "tolerance": 0.08
+          },
+          "outward_direction_sign": {
+            "unsupported_frame_count": 37,
+            "unsupported_frame_indices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59,
+              60
+            ],
+            "sign_classes_source": [
+              -1,
+              0,
+              1
+            ],
+            "sign_classes_native": [
+              -1
+            ],
+            "tolerance": "exact discrete sign class; values within 0.015 are neutral"
+          },
+          "reach_tangential": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0006061738143322004,
+            "nearest_abs_error_max": 0.0007618006195558302,
+            "tolerance": 0.08
+          }
+        },
+        "trajectory_correlation": {
+          "reach_magnitude": {
+            "with_visible_hand_path_radius": -0.0547600253147224,
+            "with_visible_hand_step_length": -0.863803242050399
+          },
+          "reach_tangential": {
+            "with_visible_hand_path_radius": -0.4260179461562217,
+            "with_visible_hand_step_length": -0.6920863549283109
+          }
+        }
+      },
+      "feature_consistency": {
+        "Luigi_max_abs_error_vs_shared_semantic_function": 1.1102230246251565e-16,
+        "Waluigi_legacy_torso_lateral_max_abs_error_vs_extracted_semantics": 1.4497406379820887e-06,
+        "note": "Waluigi comparison checks the previous stored torso-x value; the arm-plane output is recomputed from exact stored transforms."
+      }
+    },
+    "right": {
+      "sample_counts": {
+        "Luigi_frames": 61,
+        "Waluigi_training_samples": 4116
+      },
+      "arm_length_normalization": {
+        "Luigi_mean": 35.54600313383538,
+        "Waluigi_mean": 1.142706647614276
+      },
+      "current_torso_frame": {
+        "components": {
+          "current": {
+            "unsupported_frame_count": 23,
+            "unsupported_frame_indices": [
+              0,
+              1,
+              2,
+              3,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59,
+              60
+            ],
+            "nearest_abs_error_p95": 0.36154755634621055,
+            "nearest_abs_error_max": 0.3686865232886802,
+            "tolerance": 0.08
+          }
+        },
+        "trajectory_correlation": {
+          "current": {
+            "with_visible_hand_path_radius": -0.8069736745708205,
+            "with_visible_hand_step_length": 0.16658615162021723
+          }
+        }
+      },
+      "shoulder_local_lateral": {
+        "components": {
+          "shoulder_local": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0006951752076450879,
+            "nearest_abs_error_max": 0.000964540102986404,
+            "tolerance": 0.08
+          }
+        },
+        "trajectory_correlation": {
+          "shoulder_local": {
+            "with_visible_hand_path_radius": -0.8250096636659666,
+            "with_visible_hand_step_length": 0.1933799256148733
+          }
+        }
+      },
+      "normalized_shoulder_hand_lateral_absolute": {
+        "components": {
+          "absolute_lateral": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0046944416092555286,
+            "nearest_abs_error_max": 0.004922279204412738,
+            "tolerance": 0.08
+          }
+        },
+        "trajectory_correlation": {
+          "absolute_lateral": {
+            "with_visible_hand_path_radius": -0.8069736745708205,
+            "with_visible_hand_step_length": 0.1665861516202173
+          }
+        }
+      },
+      "arm_plane_radial_tangential_depth": {
+        "components": {
+          "radial": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.000918384501659153,
+            "nearest_abs_error_max": 0.0011981828138425688,
+            "tolerance": 0.08
+          },
+          "tangential": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0009183309202887013,
+            "nearest_abs_error_max": 0.0015107184393675643,
+            "tolerance": 0.08
+          },
+          "depth": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0010703397829570638,
+            "nearest_abs_error_max": 0.0014660656724480026,
+            "tolerance": 0.08
+          }
+        },
+        "trajectory_correlation": {
+          "radial": {
+            "with_visible_hand_path_radius": -0.7766409004380721,
+            "with_visible_hand_step_length": 0.7212185057830819
+          },
+          "tangential": {
+            "with_visible_hand_path_radius": 0.8112316819028154,
+            "with_visible_hand_step_length": -0.6360320024981844
+          },
+          "depth": {
+            "with_visible_hand_path_radius": -0.806972788735406,
+            "with_visible_hand_step_length": 0.16658433256794625
+          }
+        }
+      },
+      "unsigned_reach_plus_outward_sign": {
+        "components": {
+          "reach_magnitude": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0017279763652129354,
+            "nearest_abs_error_max": 0.0024900584913125634,
+            "tolerance": 0.08
+          },
+          "outward_direction_sign": {
+            "unsupported_frame_count": 27,
+            "unsupported_frame_indices": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59,
+              60
+            ],
+            "sign_classes_source": [
+              -1,
+              0,
+              1
+            ],
+            "sign_classes_native": [
+              -1
+            ],
+            "tolerance": "exact discrete sign class; values within 0.015 are neutral"
+          },
+          "reach_tangential": {
+            "unsupported_frame_count": 0,
+            "unsupported_frame_indices": [],
+            "nearest_abs_error_p95": 0.0009183309202887013,
+            "nearest_abs_error_max": 0.0015107184393675643,
+            "tolerance": 0.08
+          }
+        },
+        "trajectory_correlation": {
+          "reach_magnitude": {
+            "with_visible_hand_path_radius": 0.7446341388253871,
+            "with_visible_hand_step_length": -0.7902016939055067
+          },
+          "reach_tangential": {
+            "with_visible_hand_path_radius": 0.8112316819028154,
+            "with_visible_hand_step_length": -0.6360320024981844
+          }
+        }
+      },
+      "feature_consistency": {
+        "Luigi_max_abs_error_vs_shared_semantic_function": 1.1102230246251565e-16,
+        "Waluigi_legacy_torso_lateral_max_abs_error_vs_extracted_semantics": 1.4179059013574857e-06,
+        "note": "Waluigi comparison checks the previous stored torso-x value; the arm-plane output is recomputed from exact stored transforms."
+      }
+    }
+  },
+  "summary": {
+    "left": {
+      "current_torso_frame": {
+        "component_unsupported_counts": [
+          35
+        ],
+        "worst_component_p95": 0.5281116407480984
+      },
+      "shoulder_local_lateral": {
+        "component_unsupported_counts": [
+          0
+        ],
+        "worst_component_p95": 0.0005704719005788506
+      },
+      "normalized_shoulder_hand_lateral_absolute": {
+        "component_unsupported_counts": [
+          0
+        ],
+        "worst_component_p95": 0.003099901655763848
+      },
+      "arm_plane_radial_tangential_depth": {
+        "component_unsupported_counts": [
+          0,
+          0,
+          0
+        ],
+        "worst_component_p95": 0.0017297377329484054
+      },
+      "unsigned_reach_plus_outward_sign": {
+        "component_unsupported_counts": [
+          0,
+          37,
+          0
+        ],
+        "worst_component_p95": 0.0016018411759877171
+      }
+    },
+    "right": {
+      "current_torso_frame": {
+        "component_unsupported_counts": [
+          23
+        ],
+        "worst_component_p95": 0.36154755634621055
+      },
+      "shoulder_local_lateral": {
+        "component_unsupported_counts": [
+          0
+        ],
+        "worst_component_p95": 0.0006951752076450879
+      },
+      "normalized_shoulder_hand_lateral_absolute": {
+        "component_unsupported_counts": [
+          0
+        ],
+        "worst_component_p95": 0.0046944416092555286
+      },
+      "arm_plane_radial_tangential_depth": {
+        "component_unsupported_counts": [
+          0,
+          0,
+          0
+        ],
+        "worst_component_p95": 0.0010703397829570638
+      },
+      "unsigned_reach_plus_outward_sign": {
+        "component_unsupported_counts": [
+          0,
+          27,
+          0
+        ],
+        "worst_component_p95": 0.0017279763652129354
+      }
+    }
+  },
+  "support_gate": {
+    "minimum_supported_fraction": 0.9,
+    "passed": true,
+    "note": "gate applies to the selected signed arm-plane representation; rejected alternatives are reported for comparison"
+  }
+}

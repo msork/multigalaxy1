@@ -30,7 +30,7 @@ SEMANTIC_WEIGHTS = np.asarray(
     dtype=np.float64)
 SEMANTIC_NAMES = ("shoulder_x", "shoulder_y", "shoulder_z",
     "elbow_flexion", "forearm_roll", "wrist_x", "wrist_y", "wrist_z",
-    "hand_x", "hand_y", "hand_z")
+    "hand_radial", "hand_tangential", "hand_depth")
 
 
 def parse_args():
@@ -244,7 +244,7 @@ def fit_sequence(prior, source, evaluator, semantic_scale, source_ranges,
 def feature_rmse(source, target):
     labels = {"shoulder_orientation": (0, 3), "elbow_flexion": (3, 4),
               "forearm_roll": (4, 5), "wrist_orientation": (5, 8),
-              "signed_hand_position": (8, 11)}
+              "arm_plane_hand_position": (8, 11)}
     result = {}
     for label, (start, stop) in labels.items():
         result[label] = {

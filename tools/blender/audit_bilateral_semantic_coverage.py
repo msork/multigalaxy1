@@ -18,15 +18,15 @@ sys.path.insert(0, HERE)
 import fit_luigi_walk_semantic_waluigi as fit
 from anatomical_semantic_frames import derive_anatomical_frames
 from analyze_native_arm_context import source_pose_from_curves
-from context_dataset import normalize_context_dataset
+from context_dataset import normalize_context_dataset, _rest_relative_matrix
 from raw_anm_calibration import (WALUIGI_LEFT_PROFILE, WALUIGI_RIGHT_PROFILE,
                                  WALUIGI_RIGHT_ARM_BONES)
 from semantic_arm_fit_math import semantic_features
 
 FEATURES = (
-    "shoulder_x", "shoulder_y", "shoulder_z", "elbow_flexion",
-    "forearm_roll", "wrist_x", "wrist_y", "wrist_z",
-    "hand_delta_x", "hand_delta_y", "hand_delta_z",
+    "shoulder_rot_x", "shoulder_rot_y", "shoulder_rot_z", "elbow_flexion",
+    "forearm_roll", "wrist_rot_x", "wrist_rot_y", "wrist_rot_z",
+    "hand_radial", "hand_tangential", "hand_depth",
 )
 TOLERANCE = np.asarray((0.15, 0.15, 0.15, 0.08, 0.15,
                         0.15, 0.15, 0.15, 0.08, 0.08, 0.08))
@@ -61,13 +61,19 @@ def dataset_semantics(dataset, target_rig, profile, side):
         if action["split"] != "train":
             continue
         for sample in action["samples"]:
-            saved_semantics = sample.get("anatomical_semantics", {}).get(side)
-            if saved_semantics is not None:
-                rows.append(np.asarray(saved_semantics, dtype=np.float64))
-                action_names.append(action["action"])
-                continue
-            pose = {name: np.asarray(sample["bones"][name]["armature_pose"], dtype=np.float64)
-                    for name in dataset["bones"]}
+            bone_names = dataset.get("bones", dataset.get("rig", {}).get("profile_bones", []))
+            pose = {}
+            for name in bone_names:
+                if name not in sample["bones"]:
+                    continue
+                raw = sample["bones"][name]
+                if "armature_pose" in raw:
+                    pose[name] = np.asarray(raw["armature_pose"], dtype=np.float64)
+                elif raw.get("armature_pose_matrix") is not None:
+                    pose[name] = np.asarray(raw["armature_pose_matrix"], dtype=np.float64)
+                else:
+                    pose[name] = (np.asarray(rest[name]["rest_matrix"], dtype=np.float64) @
+                                  _rest_relative_matrix(raw["rest_relative_se3"]))
             side_frame = anatomy["sides"][side]
             rows.append(semantic_features(rest, pose, profile,
                 anatomy["torso_to_anatomical"],
@@ -186,7 +192,7 @@ def main():
             "right_extraction": current_provenance["side_extraction_policy"]},
         "semantic_convention": {
             "frames": "independently rest-calibrated left and right anatomical frames",
-            "hand_delta_x": "positive is character-right in one shared torso frame; left outward is negative and right outward is positive; no per-side sign flip",
+            "hand_position": "signed radial/tangential/depth components in each side's rest-calibrated arm-plane frame; no magnitude/sign loss",
             "feature_tolerances": dict(zip(FEATURES, TOLERANCE.tolist())),
         },
         "coverage_before_real_right_extraction": {
@@ -197,7 +203,9 @@ def main():
             "Luigi_left_vs_Waluigi_left": feature_report(source_rows["left"], new_left),
             "Luigi_right_vs_Waluigi_right": feature_report(source_rows["right"], new_right),
         },
-        "gate": {"all_dimensions_supported": False},
+        "gate": {"all_dimensions_supported": False,
+                 "hand_position_representation": "rest-calibrated arm-plane radial/tangential/depth",
+                 "max_unsupported_frames_per_dimension": 6},
     }
     # Both arms are usable only if each semantic dimension stays inside its
     # declared tolerance for at least 90% of the source walk samples.

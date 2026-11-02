@@ -34,7 +34,7 @@ from raw_anm_calibration import (
     validate_profile,
 )
 from anatomical_semantic_frames import derive_anatomical_frames
-from semantic_arm_fit_math import semantic_features
+from semantic_arm_fit_math import SEMANTIC_FEATURE_NAMES, semantic_features
 
 DEFAULT_ROOT = Path(r"C:\MultiGalaxy1-Assets\Working\MSS\Waluigi")
 DEFAULT_MODEL = DEFAULT_ROOT / "123475520_waluigi.gpl" / "123475520_waluigi.gpl.sluggie"
@@ -641,7 +641,8 @@ def extract(args):
                 "arm_region_bones": list(arm_bones), "rest_bones": rest_bones,
                 "semantic_profiles": {"left": WALUIGI_LEFT_PROFILE,
                                       "right": WALUIGI_RIGHT_PROFILE},
-                "hand_position_sign_convention": "positive X is character-right in the shared anatomical frame; outward motion is negative on the character-left and positive on the character-right"},
+                "semantic_feature_names": list(SEMANTIC_FEATURE_NAMES),
+                "hand_position_representation": "signed displacement normalized by rest limb length and expressed in a side-specific rest arm-plane basis: radial, tangential, depth"},
         "meshes": mesh_static,
         "banks": [{k: v for k, v in record.items() if k not in ("actions", "raw_sequences")}
                   for record in bank_records],
