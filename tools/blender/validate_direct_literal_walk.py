@@ -13,6 +13,8 @@ def args_from_cli():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     p = argparse.ArgumentParser()
     p.add_argument("--fit-report", required=True)
+    p.add_argument("--reference-fit-report",
+                    help="pre-correction report used to confirm other pose channels are unchanged")
     p.add_argument("--output", required=True)
     p.add_argument("--rig", default="LiteralWalk_Waluigi_Target")
     return p.parse_args(argv)
@@ -33,28 +35,53 @@ def main():
     args = args_from_cli()
     with open(args.fit_report, "r", encoding="utf-8") as stream:
         fit = json.load(stream)
+    reference_fit = None
+    if args.reference_fit_report:
+        with open(args.reference_fit_report, "r", encoding="utf-8") as stream:
+            reference_fit = json.load(stream)
     target = bpy.data.objects.get(args.rig)
     if target is None or target.type != "ARMATURE":
         raise RuntimeError(f"preview armature not found: {args.rig}")
     if not target.animation_data or not target.animation_data.action:
         raise RuntimeError("preview rig has no baked action")
     expected = fit["expected_pose_basis"]
+    expected_object_location = fit.get("expected_object_location", {})
     scene = bpy.context.scene
     max_matrix_error = 0.0
     worst = None
     max_fist_step = 0.0
+    max_object_location_error = 0.0
+    max_non_torso_pose_error = 0.0
+    max_root_rotation_scale_error = 0.0
     fist_reference = {}
     finger_bones = [f"bone_{i}" for i in range(31, 52)] + [f"bone_{i}" for i in range(66, 87)]
     for frame_key in sorted(expected, key=float):
         frame = float(frame_key)
         scene.frame_set(math.floor(frame), subframe=frame - math.floor(frame))
         bpy.context.view_layer.update()
+        wanted_location = expected_object_location.get(frame_key)
+        if wanted_location is not None:
+            max_object_location_error = max(max_object_location_error,
+                max(abs(float(target.location[i]) - float(wanted_location[i]))
+                    for i in range(3)))
         for name, rows in expected[frame_key].items():
             actual = target.pose.bones[name].matrix_basis
             error = mat_error(actual, Matrix(rows))
             if error > max_matrix_error:
                 max_matrix_error = error
                 worst = {"frame": frame, "bone": name, "matrix_error": error}
+            if reference_fit is not None:
+                old_rows = reference_fit["expected_pose_basis"].get(frame_key, {}).get(name)
+                if old_rows is not None:
+                    old_matrix = Matrix(old_rows)
+                    if name == "bone_6":
+                        component_error = max(abs(float(actual[r][c]) - float(old_matrix[r][c]))
+                                              for r in range(3) for c in range(3))
+                        max_root_rotation_scale_error = max(max_root_rotation_scale_error,
+                                                            component_error)
+                    else:
+                        max_non_torso_pose_error = max(max_non_torso_pose_error,
+                                                       mat_error(actual, old_matrix))
         for name in finger_bones:
             q = target.pose.bones[name].matrix_basis.to_quaternion()
             if name not in fist_reference:
@@ -79,6 +106,9 @@ def main():
         "max_reopened_pose_basis_error": max_matrix_error,
         "worst_pose_sample": worst,
         "max_closed_fist_local_rotation_change": max_fist_step,
+        "max_reopened_object_location_error": max_object_location_error,
+        "max_non_torso_pose_channel_error_vs_reference": max_non_torso_pose_error,
+        "max_root_bone_rotation_scale_error_vs_reference": max_root_rotation_scale_error,
         "runtime_constraints": constraints,
         "object_scale": scale,
         "scale_error": scale_error,
@@ -87,6 +117,9 @@ def main():
         "visible_armatures": [obj.name for obj in visible_armatures],
         "gates": {
             "reopened_pose_matches_bake": max_matrix_error < 1e-5,
+            "reopened_root_motion_matches_bake": max_object_location_error < 1e-5,
+            "non_torso_pose_channels_unchanged": max_non_torso_pose_error < 1e-6,
+            "root_rotation_scale_unchanged": max_root_rotation_scale_error < 1e-6,
             "fixed_fists": max_fist_step < 1e-5,
             "no_runtime_constraints": constraints == 0,
             "scale_preserved": scale_error < 1e-6,
@@ -100,6 +133,9 @@ def main():
         json.dump(report, stream, indent=2)
     print("LITERAL_WALK_REOPEN", json.dumps({k: report[k] for k in (
         "samples_checked", "max_reopened_pose_basis_error",
+        "max_reopened_object_location_error",
+        "max_non_torso_pose_channel_error_vs_reference",
+        "max_root_bone_rotation_scale_error_vs_reference",
         "max_closed_fist_local_rotation_change", "scale_error", "gates", "passed")}, sort_keys=True))
     if not report["passed"]:
         raise RuntimeError("saved/reopened preview validation failed")

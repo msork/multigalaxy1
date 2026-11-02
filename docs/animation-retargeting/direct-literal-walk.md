@@ -42,6 +42,17 @@ scale is excluded from orientation calibration and the intentional Waluigi
 scale `43.437` is preserved. The baseline action is copied to a new action;
 only explicitly mapped Waluigi channels are replaced.
 
+The first preview exposed a torso issue: source `JointRoot` translation was
+written to Waluigi `bone_6`, an interior connector above the pelvis, so the
+weighted torso portion below that bone slid relative to torso vertices above
+it. The corrected prototype transfers that same translation to the disposable
+armature object's location and holds `bone_6` at its first sampled translation.
+The translation is transformed through `bone_6`'s parent/rest frame, so every
+descendant's world-space pose remains unchanged (measured maximum matrix error
+is recorded). This keeps root timing and travel while avoiding a local shear at
+the torso. Arm, leg, hand, and finger pose channels remain identical; only
+`bone_6.location` is relocated and object-location curves are added.
+
 Blender 5.2 layered source FCurves are evaluated directly from Luigi's selected
 action slot. Every source key time is retained, and the transformed pose is
 sampled every 0.25 frames over 0–60. Because quaternion basis conversion is
@@ -65,10 +76,15 @@ the report records the source keys, sample spacing, and reopened pose error.
 The runner checks complete source keyed-bone coverage, mapped bone existence,
 source key retention, output finite transforms, unchanged object scale,
 fixed approved finger poses, action replay at every baked sample, and absence of
-runtime constraints. It also records armature-modified world-space mesh vertex
-change versus the baseline at frames 0, 15, 30, 45, and 60. Front and side
-renders at those frames are generated for human review. The report does not
-claim that a numerically passing preview is visually approved.
+runtime constraints. It verifies root motion after reopening and records
+armature-space world matrix preservation for descendants of `bone_6`. The
+torso validator samples both sides at all 241 quarter-frame points, measures
+lateral extent and section-area proxies, and compares BVH surface-overlap
+pairs to the previously approved preview. Front and side renders at frames
+0, 15, 30, 45, and 60 are generated for human review. Automated overlap counts
+include pre-existing layered-surface pairs; the check ensures the correction
+does not add pairs. Reports do not claim that a numerically passing preview is
+visually approved.
 
 ## Run
 
@@ -78,6 +94,10 @@ From the repository root in PowerShell:
 & 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background 'tools\blender\reports\luigi_walk_semantic_waluigi_both_arms_v7_texture_repaired.blend' --python 'tools\blender\prototype_direct_luigi_walk_literal.py' -- --preview 'tools\blender\reports\direct_luigi_waluigi_literal_walk_v1.blend' --report 'tools\blender\reports\direct_luigi_waluigi_literal_walk_v1.json' --renders 'tools\blender\reports\direct_luigi_waluigi_literal_walk_v1_renders'
 & 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background 'tools\blender\reports\direct_luigi_waluigi_literal_walk_v1.blend' --python 'tools\blender\validate_direct_literal_walk.py' -- --fit-report 'tools\blender\reports\direct_luigi_waluigi_literal_walk_v1.json' --output 'tools\blender\reports\direct_luigi_waluigi_literal_walk_v1_reopen.json'
 ```
+
+For the torso-corrected preview, run `validate_direct_literal_walk.py` with its
+matching `_v2_root_translation.json`, then run `validate_literal_torso.py`
+with the v1 torso validation report as `--reference-validation`.
 
 Run math tests with Blender 5.2.3:
 

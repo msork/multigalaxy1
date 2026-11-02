@@ -158,6 +158,11 @@ The literal hierarchy-transfer prototype is documented in
 It supersedes the geometric V4/V5 leg reconstruction for this walk experiment
 and maps every multi-key Luigi source bone through constant rest-basis
 corrections. It uses no IK or trajectory reconstruction.
+Root translation is carried by the disposable armature object's location rather
+than interior Waluigi `bone_6`; this preserves descendant world poses and avoids
+shearing torso vertices across the `bone_6` influence boundary. The dedicated
+torso audit and quarter-frame validator are `diagnose_literal_torso.py` and
+`validate_literal_torso.py`.
 
 The direct transfer probe samples the original Luigi walk action's selected
 Blender 5.x channelbag onto a disposable source control clone, measures

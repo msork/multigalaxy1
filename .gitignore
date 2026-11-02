@@ -65,3 +65,12 @@ dist/
 /tools/blender/reports/direct_luigi_waluigi_literal_walk_v1_reopen.json
 /tools/blender/reports/direct_luigi_waluigi_literal_walk_v1_renders/
 /tools/blender/reports/direct_luigi_waluigi_literal_walk_v1_arm_mesh_audit.json
+/tools/blender/reports/direct_luigi_waluigi_literal_walk_v1_torso_audit.json
+/tools/blender/reports/direct_luigi_waluigi_literal_walk_v1_torso_validation.json
+/tools/blender/reports/direct_luigi_waluigi_literal_walk_v1_torso_weight_probe*.json
+/tools/blender/reports/direct_luigi_waluigi_literal_walk_v2_root_translation.blend
+/tools/blender/reports/direct_luigi_waluigi_literal_walk_v2_root_translation.json
+/tools/blender/reports/direct_luigi_waluigi_literal_walk_v2_reopen.json
+/tools/blender/reports/direct_luigi_waluigi_literal_walk_v2_torso_audit.json
+/tools/blender/reports/direct_luigi_waluigi_literal_walk_v2_torso_validation.json
+/tools/blender/reports/direct_luigi_waluigi_literal_walk_v2_root_translation_renders/

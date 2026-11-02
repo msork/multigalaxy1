@@ -234,7 +234,7 @@ def make_camera(scene, name, location, target, lens=52.0):
     return camera
 
 
-def setup_render(scene, rig, meshes, render_dir, pose_samples):
+def setup_render(scene, rig, meshes, render_dir, pose_samples, root_location_samples):
     os.makedirs(render_dir, exist_ok=True)
     render_scene = bpy.data.scenes.new("LiteralWalk_Render_Scene")
     render_scene.world = scene.world
@@ -289,6 +289,8 @@ def setup_render(scene, rig, meshes, render_dir, pose_samples):
         sample = pose_samples[frame]
         for name, matrix_rows_value in sample.items():
             render_rig.pose.bones[name].matrix_basis = Matrix(matrix_rows_value)
+        if float(frame) in root_location_samples:
+            render_rig.location = root_location_samples[float(frame)]
         for obj in render_meshes:
             obj.hide_render = False
             obj.hide_set(False)
@@ -372,6 +374,9 @@ def main():
     target = duplicate_rig(target_base, "LiteralWalk_Waluigi_Target")
     target.matrix_basis = target_base.matrix_basis.copy()
     target.data.name = target.name + "_Data"
+    if target.parent is not None:
+        raise RuntimeError("literal root-motion relocation requires an unparented target armature")
+    target_object_location = target.location.copy()
     for col in list(target.users_collection):
         col.objects.unlink(target)
     collection.objects.link(target)
@@ -426,10 +431,15 @@ def main():
 
     intended = {}
     render_pose_samples = {}
+    root_location_samples = {}
+    root_translation_reference = None
+    root_translation_world_pose_error = 0.0
     per_bone_source_error = {target_name: 0.0 for target_name in MAPPED_TARGETS}
     finger_change = 0.0
     for frame in frames:
         scene.frame_set(math.floor(frame), subframe=frame - math.floor(frame))
+        target.location = target_object_location
+        bpy.context.view_layer.update()
         evaluate_curves(source_eval, source_curves, frame)
         source_pose_matrices = pose_matrices_from_basis(source_eval)
         src_basis = {name: source_eval.pose.bones[name].matrix_basis.copy()
@@ -469,6 +479,52 @@ def main():
                     per_bone_source_error[target_name],
                     abs(1.0 - math.sqrt(sum(float(v) ** 2
                                              for v in target_pb.rotation_quaternion))))
+        # JointRoot translation belongs to the character root, not the interior
+        # pelvis connector bone_6. Keep all descendant bone world transforms
+        # unchanged by moving only that translation component to the armature
+        # object's location. This prevents the pelvis subtree sliding under
+        # torso vertices weighted above bone_6.
+        root_pb = target.pose.bones["bone_6"]
+        root_local = root_pb.matrix_basis.copy()
+        if root_translation_reference is None:
+            root_translation_reference = root_local.translation.copy()
+        old_pose_matrices = pose_matrices_from_basis(target)
+        old_world_pose = {name: target.matrix_world @ matrix
+                          for name, matrix in old_pose_matrices.items()}
+        root_bone = target.data.bones["bone_6"]
+        root_parent = root_bone.parent
+        parent_pose = old_pose_matrices[root_parent.name] if root_parent else Matrix.Identity(4)
+        rest_local = (root_parent.matrix_local.inverted_safe() @ root_bone.matrix_local
+                      if root_parent else root_bone.matrix_local.copy())
+        local_displacement = parent_pose.to_3x3() @ rest_local.to_3x3() @ (
+            root_local.translation - root_translation_reference)
+        world_displacement = target.matrix_world.to_3x3() @ local_displacement
+        target.location = target_object_location + world_displacement
+        root_local.translation = root_translation_reference
+        root_pb.matrix_basis = root_local
+        root_pb.keyframe_insert("location", frame=frame, group="Literal Galaxy Root Translation")
+        target.keyframe_insert("location", frame=frame, group="Literal Galaxy Root Translation")
+        root_location_samples[float(frame)] = [float(x) for x in target.location]
+        intended.setdefault(frame, {})["bone_6"] = root_pb.matrix_basis.copy()
+        target_pose_matrices = pose_matrices_from_basis(target)
+        bpy.context.view_layer.update()
+        for name, old_world in old_world_pose.items():
+            if name == "bone_6" or name.startswith("bone_"):
+                # Only validate the subtree whose local root displacement was
+                # redistributed. Other root branches intentionally receive the
+                # now-correct global motion.
+                data_bone = target.data.bones[name]
+                ancestor = data_bone.parent
+                descendant_of_root = False
+                while ancestor:
+                    if ancestor.name == "bone_6":
+                        descendant_of_root = True
+                        break
+                    ancestor = ancestor.parent
+                if name == "bone_6" or descendant_of_root:
+                    new_world = target.matrix_world @ target_pose_matrices[name]
+                    root_translation_world_pose_error = max(
+                        root_translation_world_pose_error, matrix_error(old_world, new_world))
         # The user-approved Waluigi fists are a fixed pose exception: Galaxy
         # has no finger articulation in this walk, and Waluigi must keep fists.
         reflection = Matrix.Diagonal(Vector((-1.0, 1.0, 1.0)))
@@ -506,6 +562,10 @@ def main():
     # integer timing exactly and use linear interpolation between 0.25 samples.
     for curve in output_bag.fcurves:
         if any(f'pose.bones["{name}"]' in curve.data_path for name in MAPPED_TARGETS):
+            for point in curve.keyframe_points:
+                point.interpolation = "LINEAR"
+            curve.update()
+        if curve.data_path == "location":
             for point in curve.keyframe_points:
                 point.interpolation = "LINEAR"
             curve.update()
@@ -550,7 +610,7 @@ def main():
     if source_eval_data.users == 0:
         bpy.data.armatures.remove(source_eval_data)
     render_paths, render_failures = setup_render(
-        scene, target, meshes, args.renders, render_pose_samples)
+        scene, target, meshes, args.renders, render_pose_samples, root_location_samples)
     scene.frame_set(0)
     bpy.context.view_layer.update()
     os.makedirs(os.path.dirname(os.path.abspath(args.preview)), exist_ok=True)
@@ -572,6 +632,10 @@ def main():
         "baked_samples": len(frames),
         "bake_step": args.step,
         "source_height_to_target_height_ratio": root_translation_ratio,
+        "root_translation_rebased_to_object_location": True,
+        "root_translation_world_pose_preservation_error": root_translation_world_pose_error,
+        "expected_object_location": {str(frame): location
+                                     for frame, location in root_location_samples.items()},
         "target_rig": target.name,
         "target_action": new_action.name,
         "target_meshes": [obj.name for obj in meshes],
