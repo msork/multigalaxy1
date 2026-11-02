@@ -153,6 +153,12 @@ in [`semantic-walk-joint-continuity.md`](../../docs/animation-retargeting/semant
 
 ## Direct Galaxy walk adapter probe
 
+The literal hierarchy-transfer prototype is documented in
+[`direct-literal-walk.md`](../../docs/animation-retargeting/direct-literal-walk.md).
+It supersedes the geometric V4/V5 leg reconstruction for this walk experiment
+and maps every multi-key Luigi source bone through constant rest-basis
+corrections. It uses no IK or trajectory reconstruction.
+
 The direct transfer probe samples the original Luigi walk action's selected
 Blender 5.x channelbag onto a disposable source control clone, measures
 torso-relative shoulder/elbow/wrist trajectories, solves Waluigi segment
