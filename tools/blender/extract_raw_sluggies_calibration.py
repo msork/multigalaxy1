@@ -642,7 +642,8 @@ def extract(args):
                 "semantic_profiles": {"left": WALUIGI_LEFT_PROFILE,
                                       "right": WALUIGI_RIGHT_PROFILE},
                 "semantic_feature_names": list(SEMANTIC_FEATURE_NAMES),
-                "hand_position_representation": "signed displacement normalized by rest limb length and expressed in a side-specific rest arm-plane basis: radial, tangential, depth"},
+                "hand_position_representation": "signed displacement normalized by rest limb length and expressed in a side-specific rest arm-plane basis: radial, tangential, depth",
+                "forearm_roll_frame": "twist is measured torso-relative in the rest-calibrated forearm-local anatomical axis"},
         "meshes": mesh_static,
         "banks": [{k: v for k, v in record.items() if k not in ("actions", "raw_sequences")}
                   for record in bank_records],

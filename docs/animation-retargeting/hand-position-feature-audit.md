@@ -50,11 +50,14 @@ in `tools/blender/reports/luigi_walk_hand_lateral_feature_audit_v1.json`.
 
 The read-only bilateral audit recomputes Luigi and Waluigi semantics using the
 same rest-calibrated coordinates. All retained hand-position components meet
-the 90% support gate on both sides. The other semantic dimensions retain their
-existing definitions and tolerances; no fitting, preview generation, or
-production scene mutation is part of this audit. This clears the hand-position
-coverage blocker for a future local-native fitting experiment, but does not
-validate a solver or authorize an animation preview.
+the 90% support gate on both sides. The forearm-roll implementation was also
+made torso-relative after a local fit exposed that it alone counted shared
+torso rotation as arm roll. The v3 bilateral audit confirms all 11 dimensions
+remain within the scalar coverage gate. This does not establish that their
+full 11D combinations are jointly supported by a local native neighborhood;
+the first local fit failed that stricter check. See
+`luigi_walk_bilateral_semantic_coverage_v3_torso_neutral_roll.json` and
+`local-native-luigi-walk-results.md`.
 
 The stored bilateral dataset predates this feature schema and intentionally
 remains unchanged. To rebuild its `anatomical_semantics` fields in the future,

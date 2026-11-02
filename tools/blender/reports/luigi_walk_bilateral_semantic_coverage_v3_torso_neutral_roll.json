@@ -1,0 +1,889 @@
+{
+  "schema": "mg1.bilateral-semantic-coverage.v1",
+  "read_only": true,
+  "retarget_solver_or_preview_run": false,
+  "dataset": {
+    "schema": "mg1.raw-sluggies-native-calibration.v2",
+    "training_action_count": 118,
+    "holdout_action_count": 27,
+    "training_samples_per_side": {
+      "left": 4116,
+      "right": 4116
+    },
+    "holdout_samples_per_side": {
+      "left": 1168,
+      "right": 1168
+    },
+    "profile_bone_count": 67,
+    "right_arm_bones": [
+      "bone_57",
+      "bone_58",
+      "bone_59",
+      "bone_60",
+      "bone_61",
+      "bone_62",
+      "bone_64",
+      "bone_65"
+    ],
+    "right_arm_track_map": {
+      "22": "bone_57",
+      "117": "bone_58",
+      "118": "bone_59",
+      "23": "bone_60",
+      "113": "bone_61",
+      "114": "bone_62",
+      "24": "bone_64",
+      "25": "bone_65"
+    },
+    "right_hand_track_map": {
+      "26": "bone_66",
+      "94": "bone_67",
+      "95": "bone_68",
+      "38": "bone_69",
+      "96": "bone_70",
+      "97": "bone_71",
+      "98": "bone_72",
+      "99": "bone_74",
+      "100": "bone_75",
+      "101": "bone_76",
+      "102": "bone_78",
+      "103": "bone_79",
+      "104": "bone_80",
+      "105": "bone_82",
+      "106": "bone_83",
+      "107": "bone_84",
+      "3": "bone_86"
+    },
+    "right_extraction": "left and right pose transforms are sampled directly from raw ANM channels by their own TrackIds; no mirrored right samples"
+  },
+  "semantic_convention": {
+    "frames": "independently rest-calibrated left and right anatomical frames",
+    "hand_position": "signed radial/tangential/depth components in each side's rest-calibrated arm-plane frame; no magnitude/sign loss",
+    "feature_tolerances": {
+      "shoulder_rot_x": 0.15,
+      "shoulder_rot_y": 0.15,
+      "shoulder_rot_z": 0.15,
+      "elbow_flexion": 0.08,
+      "forearm_roll": 0.15,
+      "wrist_rot_x": 0.15,
+      "wrist_rot_y": 0.15,
+      "wrist_rot_z": 0.15,
+      "hand_radial": 0.08,
+      "hand_tangential": 0.08,
+      "hand_depth": 0.08
+    }
+  },
+  "coverage_before_real_right_extraction": {
+    "Luigi_left_vs_old_Waluigi_left": {
+      "source_frame_count": 61,
+      "native_training_sample_count": 4116,
+      "features": {
+        "shoulder_rot_x": {
+          "source_range": [
+            -0.6194508409118057,
+            0.6353373661343564
+          ],
+          "native_range": [
+            -2.1882637653401997,
+            1.4584301062581502
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0021319588789269206,
+          "nearest_abs_error_p95": 0.0016947355838989875,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "shoulder_rot_y": {
+          "source_range": [
+            -0.7664731411678001,
+            -0.7505575433888212
+          ],
+          "native_range": [
+            -2.473624933589607,
+            1.4119644340668298
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.000588442458357985,
+          "nearest_abs_error_p95": 0.0003829058747195635,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "shoulder_rot_z": {
+          "source_range": [
+            -0.18797065975444963,
+            0.18094238054393097
+          ],
+          "native_range": [
+            -1.3166839624885691,
+            1.8645486793791235
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.002208755907567944,
+          "nearest_abs_error_p95": 0.0009719058037360052,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "elbow_flexion": {
+          "source_range": [
+            0.17498513473432772,
+            0.6780089994776323
+          ],
+          "native_range": [
+            0.0007313281547130687,
+            2.5168681004151487
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.005232923216795471,
+          "nearest_abs_error_p95": 0.003766600491864447,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "forearm_roll": {
+          "source_range": [
+            -0.3833221367403947,
+            0.23670258825240922
+          ],
+          "native_range": [
+            -3.1267912828133864,
+            3.138100486397988
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0040171897195522555,
+          "nearest_abs_error_p95": 0.00283518948191383,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_x": {
+          "source_range": [
+            0.0024428060403764093,
+            0.03073075208120237
+          ],
+          "native_range": [
+            -1.2393391871294819,
+            0.9195990213508415
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0007722265543290592,
+          "nearest_abs_error_p95": 0.0006403529328312309,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_y": {
+          "source_range": [
+            -0.024377151658293617,
+            -0.017406259871366334
+          ],
+          "native_range": [
+            -1.0629525566093943,
+            0.6363222825724378
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0008033480645490872,
+          "nearest_abs_error_p95": 0.0007173182697913782,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_z": {
+          "source_range": [
+            -0.4280874639926283,
+            0.28027687809639346
+          ],
+          "native_range": [
+            -1.6296894582627395,
+            1.9273683480335784
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0019847656126666946,
+          "nearest_abs_error_p95": 0.0009314938553630636,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_radial": {
+          "source_range": [
+            -0.3683189010560284,
+            -0.15917132526020952
+          ],
+          "native_range": [
+            -2.259454988296616,
+            -0.05514927649793258
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.005217836653599761,
+          "nearest_abs_error_p95": 0.0017297377329483499,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_tangential": {
+          "source_range": [
+            -0.4929804333245218,
+            -0.2998213597946412
+          ],
+          "native_range": [
+            -1.258613171979205,
+            0.8959543636794991
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0007618006195560523,
+          "nearest_abs_error_p95": 0.0006061738143320339,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_depth": {
+          "source_range": [
+            -0.35171558171719175,
+            0.4808400943149806
+          ],
+          "native_range": [
+            -1.1560347310954768,
+            1.2610031575810003
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0029446826383388858,
+          "nearest_abs_error_p95": 0.001640385798542282,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        }
+      },
+      "unsupported_dimension_frequency": {
+        "shoulder_rot_x": 0,
+        "shoulder_rot_y": 0,
+        "shoulder_rot_z": 0,
+        "elbow_flexion": 0,
+        "forearm_roll": 0,
+        "wrist_rot_x": 0,
+        "wrist_rot_y": 0,
+        "wrist_rot_z": 0,
+        "hand_radial": 0,
+        "hand_tangential": 0,
+        "hand_depth": 0
+      },
+      "frames_with_any_unsupported_feature": [],
+      "joint_nearest_standardized_distance": {
+        "median": 1.4839042753525236,
+        "p95": 2.101403966961805,
+        "max": 2.111338939333198
+      }
+    },
+    "Luigi_right_vs_old_Waluigi_left_proxy": {
+      "source_frame_count": 61,
+      "native_training_sample_count": 4116,
+      "features": {
+        "shoulder_rot_x": {
+          "source_range": [
+            -0.6179450461476325,
+            0.6351804947491264
+          ],
+          "native_range": [
+            -2.1882637653401997,
+            1.4584301062581502
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0019298777495516187,
+          "nearest_abs_error_p95": 0.001456725128455183,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "shoulder_rot_y": {
+          "source_range": [
+            -0.766545075767765,
+            -0.750380002151553
+          ],
+          "native_range": [
+            -2.473624933589607,
+            1.4119644340668298
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0005192013188863864,
+          "nearest_abs_error_p95": 0.0003721599448974766,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "shoulder_rot_z": {
+          "source_range": [
+            -0.1884935104109268,
+            0.18116173930678725
+          ],
+          "native_range": [
+            -1.3166839624885691,
+            1.8645486793791235
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.002371163290895595,
+          "nearest_abs_error_p95": 0.0011134320816837961,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "elbow_flexion": {
+          "source_range": [
+            0.8443643426936813,
+            1.312999326326879
+          ],
+          "native_range": [
+            0.0007313281547130687,
+            2.5168681004151487
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0013786614289938992,
+          "nearest_abs_error_p95": 0.0007224592148979969,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "forearm_roll": {
+          "source_range": [
+            0.06136326084929422,
+            0.6692628837937109
+          ],
+          "native_range": [
+            -3.1267912828133864,
+            3.138100486397988
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.007707834314545359,
+          "nearest_abs_error_p95": 0.0042782097656017815,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_x": {
+          "source_range": [
+            -0.009133284707806307,
+            0.014016993576023143
+          ],
+          "native_range": [
+            -1.2393391871294819,
+            0.9195990213508415
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0006101199000879577,
+          "nearest_abs_error_p95": 0.000475717846345005,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_y": {
+          "source_range": [
+            -1.5917332210366367e-07,
+            2.4401359815598207e-07
+          ],
+          "native_range": [
+            -1.0629525566093943,
+            0.6363222825724378
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 3.9349784206090147e-05,
+          "nearest_abs_error_p95": 3.932118515136488e-05,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_z": {
+          "source_range": [
+            -0.27922561247404803,
+            0.4285318121384418
+          ],
+          "native_range": [
+            -1.6296894582627395,
+            1.9273683480335784
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0014462747648316572,
+          "nearest_abs_error_p95": 0.0011405747147122391,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_radial": {
+          "source_range": [
+            -0.3726481015769566,
+            -0.1569336308388722
+          ],
+          "native_range": [
+            -2.259454988296616,
+            -0.05514927649793258
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.00415929527899811,
+          "nearest_abs_error_p95": 0.0023948983337128693,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_tangential": {
+          "source_range": [
+            -0.49021193465487817,
+            -0.2961921644164127
+          ],
+          "native_range": [
+            -1.258613171979205,
+            0.8959543636794991
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0006058297096289134,
+          "nearest_abs_error_p95": 0.0005106486387091436,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_depth": {
+          "source_range": [
+            -0.4857531251755246,
+            0.34469538657673876
+          ],
+          "native_range": [
+            -1.1560347310954768,
+            1.2610031575810003
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0010628366624956809,
+          "nearest_abs_error_p95": 0.0007426540057073328,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        }
+      },
+      "unsupported_dimension_frequency": {
+        "shoulder_rot_x": 0,
+        "shoulder_rot_y": 0,
+        "shoulder_rot_z": 0,
+        "elbow_flexion": 0,
+        "forearm_roll": 0,
+        "wrist_rot_x": 0,
+        "wrist_rot_y": 0,
+        "wrist_rot_z": 0,
+        "hand_radial": 0,
+        "hand_tangential": 0,
+        "hand_depth": 0
+      },
+      "frames_with_any_unsupported_feature": [],
+      "joint_nearest_standardized_distance": {
+        "median": 1.7284381302111107,
+        "p95": 1.8640544653896316,
+        "max": 1.8805589551458783
+      }
+    }
+  },
+  "coverage_after_bilateral_extraction": {
+    "Luigi_left_vs_Waluigi_left": {
+      "source_frame_count": 61,
+      "native_training_sample_count": 4116,
+      "features": {
+        "shoulder_rot_x": {
+          "source_range": [
+            -0.6194508409118057,
+            0.6353373661343564
+          ],
+          "native_range": [
+            -2.1882637653401997,
+            1.4584301062581502
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0021319588789269206,
+          "nearest_abs_error_p95": 0.0016947355838989875,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "shoulder_rot_y": {
+          "source_range": [
+            -0.7664731411678001,
+            -0.7505575433888212
+          ],
+          "native_range": [
+            -2.473624933589607,
+            1.4119644340668298
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.000588442458357985,
+          "nearest_abs_error_p95": 0.0003829058747195635,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "shoulder_rot_z": {
+          "source_range": [
+            -0.18797065975444963,
+            0.18094238054393097
+          ],
+          "native_range": [
+            -1.3166839624885691,
+            1.8645486793791235
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.002208755907567944,
+          "nearest_abs_error_p95": 0.0009719058037360052,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "elbow_flexion": {
+          "source_range": [
+            0.17498513473432772,
+            0.6780089994776323
+          ],
+          "native_range": [
+            0.0007313281547130687,
+            2.5168681004151487
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.005232923216795471,
+          "nearest_abs_error_p95": 0.003766600491864447,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "forearm_roll": {
+          "source_range": [
+            -0.3833221367403947,
+            0.23670258825240922
+          ],
+          "native_range": [
+            -3.1267912828133864,
+            3.138100486397988
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0040171897195522555,
+          "nearest_abs_error_p95": 0.00283518948191383,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_x": {
+          "source_range": [
+            0.0024428060403764093,
+            0.03073075208120237
+          ],
+          "native_range": [
+            -1.2393391871294819,
+            0.9195990213508415
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0007722265543290592,
+          "nearest_abs_error_p95": 0.0006403529328312309,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_y": {
+          "source_range": [
+            -0.024377151658293617,
+            -0.017406259871366334
+          ],
+          "native_range": [
+            -1.0629525566093943,
+            0.6363222825724378
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0008033480645490872,
+          "nearest_abs_error_p95": 0.0007173182697913782,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_z": {
+          "source_range": [
+            -0.4280874639926283,
+            0.28027687809639346
+          ],
+          "native_range": [
+            -1.6296894582627395,
+            1.9273683480335784
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0019847656126666946,
+          "nearest_abs_error_p95": 0.0009314938553630636,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_radial": {
+          "source_range": [
+            -0.3683189010560284,
+            -0.15917132526020952
+          ],
+          "native_range": [
+            -2.259454988296616,
+            -0.05514927649793258
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.005217836653599761,
+          "nearest_abs_error_p95": 0.0017297377329483499,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_tangential": {
+          "source_range": [
+            -0.4929804333245218,
+            -0.2998213597946412
+          ],
+          "native_range": [
+            -1.258613171979205,
+            0.8959543636794991
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0007618006195560523,
+          "nearest_abs_error_p95": 0.0006061738143320339,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_depth": {
+          "source_range": [
+            -0.35171558171719175,
+            0.4808400943149806
+          ],
+          "native_range": [
+            -1.1560347310954768,
+            1.2610031575810003
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0029446826383388858,
+          "nearest_abs_error_p95": 0.001640385798542282,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        }
+      },
+      "unsupported_dimension_frequency": {
+        "shoulder_rot_x": 0,
+        "shoulder_rot_y": 0,
+        "shoulder_rot_z": 0,
+        "elbow_flexion": 0,
+        "forearm_roll": 0,
+        "wrist_rot_x": 0,
+        "wrist_rot_y": 0,
+        "wrist_rot_z": 0,
+        "hand_radial": 0,
+        "hand_tangential": 0,
+        "hand_depth": 0
+      },
+      "frames_with_any_unsupported_feature": [],
+      "joint_nearest_standardized_distance": {
+        "median": 1.4839042753525236,
+        "p95": 2.101403966961805,
+        "max": 2.111338939333198
+      }
+    },
+    "Luigi_right_vs_Waluigi_right": {
+      "source_frame_count": 61,
+      "native_training_sample_count": 4116,
+      "features": {
+        "shoulder_rot_x": {
+          "source_range": [
+            -0.6179450461476325,
+            0.6351804947491264
+          ],
+          "native_range": [
+            -2.144919874417889,
+            1.9623317290027984
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.002704682134858194,
+          "nearest_abs_error_p95": 0.0012740592104320408,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "shoulder_rot_y": {
+          "source_range": [
+            -0.766545075767765,
+            -0.750380002151553
+          ],
+          "native_range": [
+            -2.051326292187707,
+            2.3359595661264345
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.009247455431420804,
+          "nearest_abs_error_p95": 0.008906664343011128,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "shoulder_rot_z": {
+          "source_range": [
+            -0.1884935104109268,
+            0.18116173930678725
+          ],
+          "native_range": [
+            -1.7636752046511592,
+            1.093903266281056
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0020417658464621236,
+          "nearest_abs_error_p95": 0.0013294077394714748,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "elbow_flexion": {
+          "source_range": [
+            0.8443643426936813,
+            1.312999326326879
+          ],
+          "native_range": [
+            0.002637005732215326,
+            2.6028006955484675
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0008878241406011789,
+          "nearest_abs_error_p95": 0.0006308347531436276,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "forearm_roll": {
+          "source_range": [
+            0.06136326084929422,
+            0.6692628837937109
+          ],
+          "native_range": [
+            -3.0869799041735995,
+            3.1172025885709247
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0033258150415613613,
+          "nearest_abs_error_p95": 0.0028613551484242272,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_x": {
+          "source_range": [
+            -0.009133284707806307,
+            0.014016993576023143
+          ],
+          "native_range": [
+            -0.8872033105115477,
+            1.2139881441354656
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0006467339560390466,
+          "nearest_abs_error_p95": 0.0004609355309740503,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_y": {
+          "source_range": [
+            -1.5917332210366367e-07,
+            2.4401359815598207e-07
+          ],
+          "native_range": [
+            -0.9376366814420606,
+            1.020443828983719
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0001380375854899798,
+          "nearest_abs_error_p95": 0.00013800898643525454,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "wrist_rot_z": {
+          "source_range": [
+            -0.27922561247404803,
+            0.4285318121384418
+          ],
+          "native_range": [
+            -1.5946894845900885,
+            1.980480346409996
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0008243642455568745,
+          "nearest_abs_error_p95": 0.0007314782221618521,
+          "tolerance": 0.15,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_radial": {
+          "source_range": [
+            -0.3726481015769566,
+            -0.1569336308388722
+          ],
+          "native_range": [
+            -2.1972471661480553,
+            -0.026098852740438282
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.001198182813842541,
+          "nearest_abs_error_p95": 0.0009183845016589864,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_tangential": {
+          "source_range": [
+            -0.49021193465487817,
+            -0.2961921644164127
+          ],
+          "native_range": [
+            -1.257035844414001,
+            1.1565807892202666
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.0015107184393677864,
+          "nearest_abs_error_p95": 0.0009183309202889234,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        },
+        "hand_depth": {
+          "source_range": [
+            -0.4857531251755246,
+            0.34469538657673876
+          ],
+          "native_range": [
+            -1.2073533068859201,
+            1.263539964650297
+          ],
+          "source_range_overlap_fraction": 1.0,
+          "nearest_abs_error_max": 0.001466065672448169,
+          "nearest_abs_error_p95": 0.0010703397829568417,
+          "tolerance": 0.08,
+          "unsupported_frame_count": 0,
+          "unsupported_frame_indices": []
+        }
+      },
+      "unsupported_dimension_frequency": {
+        "shoulder_rot_x": 0,
+        "shoulder_rot_y": 0,
+        "shoulder_rot_z": 0,
+        "elbow_flexion": 0,
+        "forearm_roll": 0,
+        "wrist_rot_x": 0,
+        "wrist_rot_y": 0,
+        "wrist_rot_z": 0,
+        "hand_radial": 0,
+        "hand_tangential": 0,
+        "hand_depth": 0
+      },
+      "frames_with_any_unsupported_feature": [],
+      "joint_nearest_standardized_distance": {
+        "median": 1.347736873216813,
+        "p95": 1.7249994967309255,
+        "max": 1.7531023114784834
+      }
+    }
+  },
+  "gate": {
+    "all_dimensions_supported": true,
+    "hand_position_representation": "rest-calibrated arm-plane radial/tangential/depth",
+    "max_unsupported_frames_per_dimension": 6
+  }
+}

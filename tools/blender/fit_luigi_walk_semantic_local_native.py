@@ -20,13 +20,12 @@ import fit_luigi_walk_semantic_waluigi as fit
 from anatomical_semantic_frames import derive_anatomical_frames
 from context_dataset import normalize_context_dataset
 from convert_native_owner_actions import evaluated_bone_matrices
-from fit_native_context_pca import encode_sample
-from local_native_deformation import fit_local_sequence
+from local_native_deformation import fit_local_sequence, joint_temporal_refine
 from native_pose_graph import pose_pair_distance
 
 
-SEMANTIC_NAMES = ("shoulder_x", "shoulder_y", "shoulder_z",
-    "elbow_flexion", "forearm_roll", "wrist_x", "wrist_y", "wrist_z",
+SEMANTIC_NAMES = ("shoulder_rot_x", "shoulder_rot_y", "shoulder_rot_z",
+    "elbow_flexion", "forearm_roll", "wrist_rot_x", "wrist_rot_y", "wrist_rot_z",
     "hand_radial", "hand_tangential", "hand_depth")
 
 
@@ -53,17 +52,84 @@ def parse_args():
     return p.parse_args(argv)
 
 
-def pose_feature(sample, bones):
-    return np.asarray(encode_sample(sample, bones), dtype=np.float64)
+def pose_feature(sample, bones, torso="bone_21"):
+    """Native arm transforms relative to the shared torso, in six SE(3) values."""
+    torso_pose = np.asarray(sample["bones"][torso]["armature_pose"], dtype=np.float64)
+    inverse_torso = np.linalg.inv(torso_pose)
+    features = []
+    for name in bones:
+        pose = np.asarray(sample["bones"][name]["armature_pose"], dtype=np.float64)
+        relative = inverse_torso @ pose
+        quaternion = Matrix(relative[:3, :3].tolist()).to_quaternion()
+        quaternion.normalize()
+        if quaternion.w < 0.0:
+            quaternion.negate()
+        quat_vector = Vector((quaternion.x, quaternion.y, quaternion.z))
+        angle = 2.0 * math.atan2(float(quat_vector.length),
+                                 float(quaternion.w))
+        axis = quat_vector.normalized() if angle > 1e-10 else Vector((0, 0, 0))
+        features.extend(relative[:3, 3].tolist())
+        features.extend(float(v) for v in axis * angle)
+    return np.asarray(features, dtype=np.float64)
 
 
-def decode_pose(z, model, bones, rests):
-    mean, scale, components = model
-    feature = mean + (np.asarray(z, dtype=np.float64) @ components) * scale
+def decode_relative_pose(values, bones, torso_pose):
+    result = {}
+    values = np.asarray(values, dtype=np.float64)
+    for index, name in enumerate(bones):
+        row = values[index * 6:index * 6 + 6]
+        translation, rotvec = Vector(row[:3].tolist()), Vector(row[3:6].tolist())
+        angle = float(rotvec.length)
+        rotation = (Quaternion(rotvec / angle, angle) if angle > 1e-10
+                    else Quaternion((1.0, 0.0, 0.0, 0.0)))
+        delta = Matrix.LocRotScale(translation, rotation, Vector((1.0, 1.0, 1.0)))
+        result[name] = scaffold.fit.numpy_matrix(torso_pose) @ np.asarray(
+            [[float(delta[r][c]) for c in range(4)] for r in range(4)],
+            dtype=np.float64)
+    return result
+
+
+def pose_matrix_feature(pose, bones, torso_name="bone_21"):
+    torso_inverse = np.linalg.inv(scaffold.fit.numpy_matrix(pose[torso_name]))
+    features = []
+    for name in bones:
+        relative = torso_inverse @ scaffold.fit.numpy_matrix(pose[name])
+        quaternion = Matrix(relative[:3, :3].tolist()).to_quaternion()
+        quaternion.normalize()
+        if quaternion.w < 0.0:
+            quaternion.negate()
+        vector = Vector((quaternion.x, quaternion.y, quaternion.z))
+        angle = 2.0 * math.atan2(float(vector.length), float(quaternion.w))
+        axis = vector.normalized() if angle > 1e-10 else Vector((0, 0, 0))
+        features.extend(relative[:3, 3].tolist())
+        features.extend(float(v) for v in axis * angle)
+    return np.asarray(features, dtype=np.float64)
+
+
+def encode_final_pose(pose, bones, rests, length_scale):
+    output = []
+    for name in bones:
+        relative = (np.linalg.inv(scaffold.fit.numpy_matrix(
+            rests[name]["rest_matrix"])) @ scaffold.fit.numpy_matrix(pose[name]))
+        quaternion = Matrix(relative[:3, :3].tolist()).to_quaternion()
+        quaternion.normalize()
+        if quaternion.w < 0.0:
+            quaternion.negate()
+        quat_vector = Vector((quaternion.x, quaternion.y, quaternion.z))
+        angle = 2.0 * math.atan2(float(quat_vector.length),
+                                 float(quaternion.w))
+        axis = quat_vector.normalized() if angle > 1e-10 else Vector((0, 0, 0))
+        output.extend((relative[:3, 3] / length_scale).tolist())
+        output.extend(float(v) for v in axis * angle)
+    return np.asarray(output, dtype=np.float64)
+
+
+def decode_final_pose(values, bones, rests, length_scale):
+    values = np.asarray(values, dtype=np.float64)
     output = {}
     for index, name in enumerate(bones):
-        row = feature[index * 6:index * 6 + 6]
-        translation = Vector(row[:3].tolist())
+        row = values[index * 6:index * 6 + 6]
+        translation = Vector((row[:3] * length_scale).tolist())
         rotvec = Vector(row[3:6].tolist())
         angle = float(rotvec.length)
         rotation = (Quaternion(rotvec / angle, angle) if angle > 1e-10
@@ -73,10 +139,6 @@ def decode_pose(z, model, bones, rests):
             [[float(delta[r][c]) for c in range(4)] for r in range(4)],
             dtype=np.float64)
     return output
-
-
-def matrix_local(parent_pose, child_pose):
-    return np.linalg.inv(scaffold.fit.numpy_matrix(parent_pose)) @ scaffold.fit.numpy_matrix(child_pose)
 
 
 def apply_fixed_fingers(pose, finger_relatives, parent_names):
@@ -96,32 +158,21 @@ def apply_fixed_fingers(pose, finger_relatives, parent_names):
         pose[name] = scaffold.fit.numpy_matrix(pose[parent]) @ finger_relatives[name]
 
 
-def make_pose_evaluator(model, bones, rests, baseline_rows, target_rest,
-                        target_rest_all, target_original, anatomy,
-                        finger_relatives, parent_names, right_subtree,
-                        right_fingers):
-    all_arm = set(bones) - fit.TORSO_CONTEXT
-    semantic_names = {"bone_22", "bone_23", "bone_24", "bone_25",
-                      "bone_26", "bone_27", "bone_29", "bone_30"}
-    right_semantic = {fit.LEFT_TO_RIGHT_BONES[name] for name in semantic_names}
-
-    def evaluate(z, frame, return_pose=False):
-        left_pose = decode_pose(z, model, bones, rests)
-        final, root_delta = fit.compose_final_semantic_pose(
-            baseline_rows[frame], left_pose, left_pose,
-            target_rest=target_rest, target_rest_all=target_rest_all,
-            arm_bones=all_arm, torso_context=fit.TORSO_CONTEXT,
-            semantic_arm_names=semantic_names,
-            left_to_right=fit.LEFT_TO_RIGHT_BONES,
-            right_subtree=right_subtree, right_finger_names=right_fingers,
-            parent_by_bone=parent_names, right_root_name="bone_57",
-            torso_name=fit.TARGET_PROFILE["torso"])
+def make_pose_evaluator(left_rows, right_rows, left_bones, right_bones,
+                        rests, baseline_rows, anatomy, finger_relatives,
+                        parent_names):
+    def evaluate(_unused, frame, return_pose=False):
+        final = {name: scaffold.fit.numpy_matrix(value).copy()
+                 for name, value in baseline_rows[frame].items()}
+        torso = final[fit.TARGET_PROFILE["torso"]]
+        final.update(decode_relative_pose(left_rows[frame], left_bones, torso))
+        final.update(decode_relative_pose(right_rows[frame], right_bones, torso))
         apply_fixed_fingers(final, finger_relatives, parent_names)
-        enforce_glove_attachment(final, target_rest_all, parent_names)
+        enforce_glove_attachment(final, rests, parent_names)
         left_sem, right_sem = scaffold.target_profile_semantics(
-            final, target_rest_all, anatomy)
+            final, rests, anatomy)
         semantics = np.r_[left_sem, right_sem]
-        return (semantics, final, root_delta) if return_pose else semantics
+        return (semantics, final, 0.0) if return_pose else semantics
     return evaluate
 
 
@@ -162,6 +213,29 @@ def feature_rmse(source, target):
     return result
 
 
+def validate_reopened_action(filepath, rig_name, intended_rows):
+    """Reopen a disposable candidate blend and compare every saved pose matrix."""
+    bpy.ops.wm.open_mainfile(filepath=os.path.abspath(filepath))
+    rig = bpy.data.objects.get(rig_name)
+    if rig is None or rig.type != "ARMATURE" or not rig.animation_data or not rig.animation_data.action:
+        return {"passed": False, "reason": "reopened target/action is missing"}
+    action_name = rig.animation_data.action.name
+    scene = bpy.context.scene
+    max_error, worst = 0.0, None
+    for frame, intended in enumerate(intended_rows):
+        scene.frame_set(frame)
+        actual = evaluated_bone_matrices(rig)
+        for name, expected in intended.items():
+            error = fit.matrix_error(actual[name], expected)
+            if error > max_error:
+                max_error = error
+                worst = {"frame": frame, "bone": name, "matrix_error": error}
+    return {"passed": bool(max_error <= 2e-4),
+            "max_matrix_error": float(max_error), "worst": worst,
+            "action": action_name, "frame_count": len(intended_rows),
+            "tolerance": 2e-4}
+
+
 def excursion(source, target):
     result = {}
     for side, offset in (("left", 0), ("right", 11)):
@@ -183,6 +257,8 @@ def excursion(source, target):
 
 def main():
     args = parse_args()
+    if args.neighbors != 96:
+        raise RuntimeError("this milestone requires exactly 96 local native neighbors per side and frame")
     with gzip.open(args.dataset, "rt", encoding="utf-8") as stream:
         dataset = normalize_context_dataset(json.load(stream))
     source = bpy.data.objects.get(args.source_rig)
@@ -204,7 +280,6 @@ def main():
                                      production.data.bones.keys())
     bones = list(dataset["bones"])
     rests = fit.source_rest_from_rig(production)
-    target_rest = dataset["rest_bones"]
     source_rest = fit.source_rest_from_rig(source)
     source_anatomy = derive_anatomical_frames(
         source_rest, fit.numpy_matrix(fit.object_transform_matrix(source)),
@@ -218,52 +293,53 @@ def main():
     source_features = np.column_stack((source_left, source_right))
     baseline_rows, _root = scaffold.build_baseline_rows(
         bpy.context.scene, clean, baseline, walk_action, walk_slot)
+    left_bones = ["bone_22", "bone_23", "bone_24", "bone_25",
+                  "bone_26", "bone_27", "bone_29", "bone_30"]
+    right_bones = [fit.LEFT_TO_RIGHT_BONES[name] for name in left_bones]
     native_samples, native_actions = [], []
+    native_left_semantics, native_right_semantics = [], []
     for action in dataset["actions"]:
         if action["split"] != "train":
             continue
         for sample_index, sample in enumerate(action["samples"]):
             pose = scaffold.load_pose(sample, bones)
-            full_pose = dict(pose)
-            for left_name, right_name in fit.LEFT_TO_RIGHT_BONES.items():
-                if left_name not in pose or right_name not in rests:
-                    continue
-                full_pose[right_name] = fit.mirror_pose_across_sagittal(
-                    pose[left_name], pose["bone_21"],
-                    rests["bone_21"]["rest_matrix"],
-                    rests[left_name]["rest_matrix"],
-                    rests[right_name]["rest_matrix"])
-            native_samples.append((sample, full_pose))
+            left_sem, right_sem = scaffold.target_profile_semantics(
+                pose, rests, target_anatomy)
+            native_samples.append(sample)
+            native_left_semantics.append(left_sem)
+            native_right_semantics.append(right_sem)
             native_actions.append({"action": action["action"],
                                    "time": float(sample["normalized_time"]),
                                    "sample_index": sample_index})
-    native_semantics = np.asarray([np.r_[
-        scaffold.target_profile_semantics(pose, rests, target_anatomy)]
-        for _sample, pose in native_samples], dtype=np.float64)
-    x_train = np.asarray([pose_feature(sample, bones)
-                          for sample, _pose in native_samples], dtype=np.float64)
-    native_scale = np.maximum(native_semantics.std(axis=0), 0.05)
-    pose_scale = np.maximum(x_train.std(axis=0), 0.01)
-    local_features, local_info = fit_local_sequence(
-        native_semantics, x_train, source_features, native_scale,
-        k=args.neighbors, passes=args.local_passes, pose_scale=pose_scale)
-    # Identity decoding: each locally regressed feature row is a full set of
-    # rest-relative transforms, not a global PCA latent vector.
-    model = (np.zeros(x_train.shape[1]), np.ones(x_train.shape[1]),
-             np.eye(x_train.shape[1]))
+    native_left_semantics = np.asarray(native_left_semantics, dtype=np.float64)
+    native_right_semantics = np.asarray(native_right_semantics, dtype=np.float64)
+    x_train_left = np.asarray([pose_feature(sample, left_bones)
+                               for sample in native_samples], dtype=np.float64)
+    x_train_right = np.asarray([pose_feature(sample, right_bones)
+                                for sample in native_samples], dtype=np.float64)
+    left_pose_scale = np.maximum(x_train_left.std(axis=0), 0.01)
+    right_pose_scale = np.maximum(x_train_right.std(axis=0), 0.01)
+    left_features, left_info = fit_local_sequence(
+        native_left_semantics, x_train_left, source_features[:, :11],
+        np.maximum(native_left_semantics.std(axis=0), 0.05),
+        k=args.neighbors, passes=args.local_passes, pose_scale=left_pose_scale)
+    right_features, right_info = fit_local_sequence(
+        native_right_semantics, x_train_right, source_features[:, 11:],
+        np.maximum(native_right_semantics.std(axis=0), 0.05),
+        k=args.neighbors, passes=args.local_passes, pose_scale=right_pose_scale)
 
     scene = bpy.context.scene
     old_frame, old_sub = scene.frame_current, scene.frame_subframe
     scene.frame_set(0)
     bpy.context.view_layer.update()
-    evaluated_production = production.evaluated_get(bpy.context.evaluated_depsgraph_get())
-    left_fingers = fit.descendant_bone_names(production.data, "bone_30")
-    right_fingers = fit.descendant_bone_names(production.data, "bone_65")
+    evaluated_baseline = baseline.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    left_fingers = fit.descendant_bone_names(baseline.data, "bone_30")
+    right_fingers = fit.descendant_bone_names(baseline.data, "bone_65")
     finger_names = left_fingers | right_fingers
-    closed_basis = {name: evaluated_production.pose.bones[name].matrix_basis.copy()
+    closed_basis = {name: evaluated_baseline.pose.bones[name].matrix_basis.copy()
                     for name in finger_names}
     closed_pose = {name: fit.numpy_matrix(matrix)
-                   for name, matrix in evaluated_bone_matrices(production).items()}
+                   for name, matrix in evaluated_bone_matrices(baseline).items()}
     scene.frame_set(old_frame, subframe=old_sub)
     bpy.context.view_layer.update()
     parent_names = {bone.name: bone.parent.name if bone.parent else None
@@ -273,28 +349,60 @@ def main():
         parent_name = parent_names[name]
         if parent_name:
             finger_relatives[name] = np.linalg.inv(closed_pose[parent_name]) @ closed_pose[name]
-    right_subtree = fit.descendant_bone_names(production.data, "bone_57") | {"bone_57"}
-    right_arm = {fit.LEFT_TO_RIGHT_BONES[name] for name in
-                 ("bone_22", "bone_23", "bone_24", "bone_25",
-                  "bone_26", "bone_27", "bone_29", "bone_30")}
-    right_finger_names = right_subtree - right_arm - {"bone_57"}
-    evaluate = make_pose_evaluator(model, bones, rests, baseline_rows,
-        target_rest, rests, production, target_anatomy, finger_relatives,
-        parent_names, right_subtree, right_finger_names)
-    predicted = np.asarray([evaluate(local_features[frame], frame)
-                            for frame in range(61)])
-    pose_rows, predicted_exact, root_deltas = [], [], []
+    evaluate = make_pose_evaluator(left_features, right_features,
+        left_bones, right_bones, rests, baseline_rows, target_anatomy,
+        finger_relatives, parent_names)
+    pose_rows, predicted_exact = [], []
     for frame in range(61):
-        sem, pose, root_delta = evaluate(local_features[frame], frame, return_pose=True)
+        sem, pose, _root_delta = evaluate(None, frame, return_pose=True)
         pose_rows.append(pose)
         predicted_exact.append(sem)
-        root_deltas.append(root_delta)
+    pre_temporal_semantics = np.asarray(predicted_exact, dtype=np.float64)
+    pre_temporal_rmse = feature_rmse(source_features, pre_temporal_semantics)
+    modeled_bones = left_bones + right_bones
+    arm_length = max(float(rests["bone_25"]["length"]), 1e-6)
+    initial_final_se3 = np.asarray([encode_final_pose(
+        pose, modeled_bones, rests, arm_length) for pose in pose_rows])
+    trust_radii = np.asarray([min(0.35, max(0.08,
+        min(left_info[i]["local_pose_trust_radius"],
+            right_info[i]["local_pose_trust_radius"]))) for i in range(61)])
+    joint_final_se3, temporal_objective = joint_temporal_refine(
+        initial_final_se3, feature_scale=np.ones(initial_final_se3.shape[1]),
+        lambda_velocity=0.30, lambda_acceleration=0.90,
+        trust_radii=trust_radii, iterations=120)
+    for frame in range(61):
+        pose_rows[frame].update(decode_final_pose(
+            joint_final_se3[frame], modeled_bones, rests, arm_length))
+        apply_fixed_fingers(pose_rows[frame], finger_relatives, parent_names)
+        enforce_glove_attachment(pose_rows[frame], rests, parent_names)
+        left_sem, right_sem = scaffold.target_profile_semantics(
+            pose_rows[frame], rests, target_anatomy)
+        predicted_exact[frame] = np.r_[left_sem, right_sem]
     predicted_exact = np.asarray(predicted_exact)
-    all_bones = sorted(set(bones) | {fit.LEFT_TO_RIGHT_BONES[n] for n in bones
-                                    if n in fit.LEFT_TO_RIGHT_BONES})
+    def pose_support(side_bones, features, infos, pose_scale):
+        failures = []
+        max_trust_deviation = 0.0
+        for frame, pose in enumerate(pose_rows):
+            values = pose_matrix_feature(pose, side_bones)
+            info = infos[frame]
+            low = np.asarray(info["pose_support_low"], dtype=np.float64)
+            high = np.asarray(info["pose_support_high"], dtype=np.float64)
+            outside = np.flatnonzero((values < low - 1e-4) | (values > high + 1e-4))
+            deviation = float(np.linalg.norm((values - features[frame]) / pose_scale))
+            max_trust_deviation = max(max_trust_deviation, deviation)
+            if len(outside):
+                failures.append({"frame": frame, "unsupported_pose_channels": outside.tolist()})
+            if deviation > float(info["local_pose_trust_radius"]) + 1e-5:
+                failures.append({"frame": frame, "trust_radius_exceeded": deviation,
+                                 "trust_radius": float(info["local_pose_trust_radius"])})
+        return {"passed": not failures, "failure_count": len(failures),
+                "first_failure": failures[0] if failures else None,
+                "max_trust_deviation": max_trust_deviation}
+    left_pose_support = pose_support(left_bones, left_features, left_info, left_pose_scale)
+    right_pose_support = pose_support(right_bones, right_features, right_info, right_pose_scale)
+    all_bones = sorted(set(modeled_bones) | set(finger_names))
     rest_inv = {name: np.linalg.inv(fit.numpy_matrix(rests[name]["rest_matrix"]))
                 for name in all_bones}
-    arm_length = max(float(rests["bone_25"]["length"]), 1e-6)
     descriptors = np.asarray([fit.pose_quaternion_descriptor(
         pose, all_bones, rest_inv, arm_length) for pose in pose_rows])
     transition_rows = []
@@ -336,19 +444,27 @@ def main():
     excursion_ok = all(80.0 <= retention[side][kind] <= 120.0
         for side in ("left", "right") for kind in
         ("shoulder_percent", "elbow_percent", "wrist_percent"))
-    locally_supported = all(bool(row["supported"]) for row in local_info)
+    locally_supported = (
+        all(bool(row["supported"]) for row in left_info + right_info) and
+        left_pose_support["passed"] and right_pose_support["passed"])
     semantic_rmse_ok = shoulder_rmse < 0.18 and elbow_rmse < 0.10 and wrist_rmse < 0.20
+    semantic_tolerances = np.asarray((0.15, 0.15, 0.15, 0.08, 0.15,
+                                      0.15, 0.15, 0.15, 0.08, 0.08, 0.08))
+    semantic_max_error = np.max(np.abs(predicted_exact - source_features), axis=0)
+    all_semantics_supported = bool(np.all(semantic_max_error <=
+        np.r_[semantic_tolerances, semantic_tolerances]))
     gate = {
         "semantic_excursions_80_to_120_percent": bool(excursion_ok),
         "shoulder_source_envelope": bool(shoulder_envelope_ok),
         "elbow_source_rest_calibrated_range": bool(elbow_envelope_ok),
         "semantic_rmse_limits": bool(semantic_rmse_ok),
+        "all_semantic_dimensions_within_coverage_tolerance": all_semantics_supported,
         "both_fists_locked": bool(finger_local_error < 1e-6),
         "max_pose_jump_below_0_5": bool(worst_jump["max_normalized_se3"] < 0.5),
         "glove_gap_below_0_02": bool(glove_gap < 0.02),
         "no_unsupported_local_extrapolation": bool(locally_supported),
     }
-    gate_passed = all(gate.values())
+    pre_preview_gate_passed = all(gate.values())
     meshes = sorted((obj for obj in bpy.data.objects if obj.type == "MESH" and
         obj.name.startswith(args.mesh_prefix) and any(
         mod.type == "ARMATURE" and mod.object == baseline for mod in obj.modifiers)),
@@ -356,19 +472,49 @@ def main():
     if not meshes:
         raise RuntimeError("validated walk baseline meshes are missing")
     preview = None
-    if gate_passed:
-        preview = scaffold.write_preview(args.preview, args.action_name,
+    reopen_validation = None
+    if pre_preview_gate_passed:
+        candidate_path = os.path.abspath(args.preview + ".candidate.blend")
+        preview = scaffold.write_preview(candidate_path, args.action_name,
             clean, baseline, baseline_rows, pose_rows, meshes, walk_action,
             walk_slot, closed_fist_basis=closed_basis)
+        reopen_validation = validate_reopened_action(
+            candidate_path, preview["rig"], pose_rows)
+        gate["saved_reopened_action_reproduces_fit"] = bool(reopen_validation["passed"])
+        if gate["saved_reopened_action_reproduces_fit"]:
+            os.replace(candidate_path, os.path.abspath(args.preview))
+            preview["path"] = os.path.abspath(args.preview)
+        else:
+            if os.path.isfile(candidate_path):
+                os.remove(candidate_path)
+            preview = None
+    else:
+        gate["saved_reopened_action_reproduces_fit"] = False
+        reopen_validation = {"passed": False,
+            "not_run_reason": "prior numerical gates failed; no preview candidate was created"}
+    gate_passed = all(gate.values())
+    semantic_error_rows = []
+    error_matrix = np.abs(predicted_exact - source_features)
+    for index, name in enumerate(SEMANTIC_NAMES):
+        for side, offset in (("left", 0), ("right", 11)):
+            column = offset + index
+            frame = int(np.argmax(error_matrix[:, column]))
+            semantic_error_rows.append({"side": side, "feature": name,
+                "frame": frame, "absolute_error": float(error_matrix[frame, column]),
+                "source_value": float(source_features[frame, column]),
+                "target_value": float(predicted_exact[frame, column]),
+                "coverage_tolerance": float(semantic_tolerances[index])})
     report = {
         "schema": "mg1.semantic-walk-local-native.v1",
         "source": {"rig": source.name, "action": source_action.name,
                    "slot": source_slots[0].identifier, "frames": [0, 60]},
-        "target_model": {"type": "local affine raw-ANM deformation model",
-                         "training_samples": len(native_samples), "profile_bones": bones,
-                         "pose_feature_dimensions": int(x_train.shape[1]),
+        "target_model": {"type": "independent bilateral local affine raw-ANM deformation models",
+                         "training_samples_per_side": len(native_samples),
+                         "source_data": "real bilateral raw-ANM samples; right arm is never reflected from left",
+                         "modeled_bones": {"left": left_bones, "right": right_bones},
+                         "pose_feature_dimensions_per_side": int(len(left_bones) * 6),
                          "neighbors_per_frame": args.neighbors,
-                         "local_joint_passes": args.local_passes},
+                         "neighborhood_passes": args.local_passes},
         "semantic_targets": {"features": list(SEMANTIC_NAMES),
                              "coordinate_frame": "rest-calibrated character-neutral anatomical frames",
                              "source_ranges": {
@@ -376,23 +522,34 @@ def main():
                                           "max": source_features[:, :11].max(axis=0).tolist()},
                                  "right": {"min": source_features[:, 11:].min(axis=0).tolist(),
                                            "max": source_features[:, 11:].max(axis=0).tolist()}},
-                             "rmse": rmse, "excursion_retention": retention},
-        "local_support": [{
+                             "pre_temporal_rmse": pre_temporal_rmse,
+                             "rmse": rmse, "max_abs_error_by_dimension": {
+                                 "left": semantic_max_error[:11].tolist(),
+                                 "right": semantic_max_error[11:].tolist()},
+                             "worst_residuals": sorted(semantic_error_rows,
+                                 key=lambda row: row["absolute_error"], reverse=True)[:8],
+                             "excursion_retention": retention},
+        "local_support": {side: [{
+            "frame": frame,
             "nearest_semantic_distance": row["nearest_semantic_distance"],
             "local_semantic_radius_90": row["local_semantic_radius_90"],
             "inside_local_semantic_box": row["inside_local_semantic_box"],
-            "unsupported_semantic_features": [SEMANTIC_NAMES[i % 11] +
-                ("_left" if i < 11 else "_right")
-                for i in row["unsupported_semantic_axes"]],
+            "unsupported_semantic_features": [SEMANTIC_NAMES[i] for i in
+                row["unsupported_semantic_axes"]],
             "supported": row["supported"],
             "local_pose_trust_radius": row["local_pose_trust_radius"],
             "predicted_pose_distance": row["predicted_pose_distance"],
+            "neighbor_count": len(row["neighbors"]),
             "neighbor_actions": sorted({native_actions[int(i)]["action"]
                                          for i in row["neighbors"]})
-            } for row in local_info],
-        "optimization": {"method": "neighbor-weighted affine Jacobian with forward/backward sequence neighborhood passes",
+            } for frame, row in enumerate(rows)]
+            for side, rows in (("left", left_info), ("right", right_info))},
+        "post_refinement_pose_support": {"left": left_pose_support,
+                                         "right": right_pose_support},
+        "optimization": {"method": "independent 96-neighbor local affine maps followed by one joint 61-frame quadratic objective on composed final arm SE(3) poses",
+                         "temporal_penalties": temporal_objective,
                          "post_fit_smoothing": False},
-        "fist_lock": {"source_rig": production.name, "sample_frame": 0,
+        "fist_lock": {"source_rig": baseline.name, "sample_frame": 0,
             "left_finger_count": len(left_fingers),
             "right_finger_count": len(right_fingers),
             "max_frame_local_transform_error": finger_local_error},
@@ -400,7 +557,8 @@ def main():
                        "mean_rms_jump": float(np.mean([r["rms_normalized_se3"] for r in transition_rows])),
                        "max_glove_gap_armature_units": float(glove_gap)},
         "gate": {"checks": gate, "passed": gate_passed,
-                 "failed_checks": [name for name, passed in gate.items() if not passed]},
+                 "failed_checks": [name for name, passed in gate.items() if not passed],
+                 "reopen_validation": reopen_validation},
         "preview": preview,
     }
     os.makedirs(os.path.dirname(os.path.abspath(args.report)), exist_ok=True)

@@ -22,17 +22,23 @@ def local_affine_predict(native_semantics, native_poses, target_semantics,
     delta = (s - target) / scale
     distances = np.linalg.norm(delta, axis=1)
     count = min(max(4, int(k)), len(s))
-    nearest = np.argpartition(distances, count - 1)[:count]
-    candidates = nearest
+    # Keep the neighborhood fixed-size. A growing union with adjacent frames
+    # silently changes the requested k and can turn the local fit into a
+    # sequence-wide/global fit. Continuity only biases selection among the
+    # native candidates; each frame still receives exactly k neighbors.
+    score = distances.copy()
+    prior_set = set()
     if previous_neighbors is not None:
-        prior = np.asarray(previous_neighbors, dtype=np.int64)
-        candidates = np.unique(np.r_[nearest, prior])
+        prior_set = set(np.asarray(previous_neighbors, dtype=np.int64).tolist())
+        continuity_penalty = max(float(np.quantile(distances, 0.25)), 0.02) * float(continuity_weight)
+        score += np.asarray([0.0 if int(i) in prior_set else continuity_penalty
+                             for i in range(len(score))])
+    candidates = np.argpartition(score, count - 1)[:count]
     local_delta = delta[candidates]
     local_distance = np.linalg.norm(local_delta, axis=1)
     bandwidth = max(float(np.quantile(local_distance, 0.75)), 0.05)
     weights = np.exp(-0.5 * (local_distance / bandwidth) ** 2)
     if previous_neighbors is not None:
-        prior_set = set(np.asarray(previous_neighbors, dtype=np.int64).tolist())
         weights *= np.asarray([1.0 + continuity_weight if int(i) in prior_set else 1.0
                                for i in candidates])
     weights = np.maximum(weights, 1e-8)
@@ -71,6 +77,8 @@ def local_affine_predict(native_semantics, native_poses, target_semantics,
         "supported": supported,
         "local_pose_trust_radius": trust_radius,
         "predicted_pose_distance": min(prediction_distance, trust_radius),
+        "pose_support_low": p[candidates].min(axis=0),
+        "pose_support_high": p[candidates].max(axis=0),
         "jacobian": jacobian,
     }
 
@@ -100,3 +108,62 @@ def fit_local_sequence(native_semantics, native_poses, target_semantics,
                 diagnostics[frame] = info
                 neighborhoods[frame] = info["neighbors"]
     return outputs, diagnostics
+
+
+def joint_temporal_refine(pose_sequence, feature_scale=None,
+                          lambda_velocity=0.25,
+                          lambda_acceleration=0.75,
+                          trust_radii=None, iterations=80):
+    """Jointly minimize pose fidelity plus SE(3)-coordinate velocity/acceleration.
+
+    Rows are per-frame concatenated translation/rotation-vector descriptors.
+    Translations should be divided by a characteristic limb length before
+    calling, so translation and angular coordinates have comparable meaning.
+    This is an in-fit constrained optimization; it is never applied to a
+    baked action. Per-frame trust radii bound deviation from local predictions.
+    """
+    values = np.asarray(pose_sequence, dtype=np.float64)
+    if values.ndim != 2 or len(values) < 3:
+        raise ValueError("joint temporal fit expects a frame-by-feature matrix")
+    scale = (np.ones(values.shape[1], dtype=np.float64) if feature_scale is None
+             else np.maximum(np.asarray(feature_scale, dtype=np.float64), 1e-8))
+    if scale.shape != (values.shape[1],):
+        raise ValueError("feature_scale has the wrong shape")
+    y = values / scale
+    count = len(y)
+    velocity = np.zeros((count - 1, count), dtype=np.float64)
+    for row in range(count - 1):
+        velocity[row, row:row + 2] = (-1.0, 1.0)
+    acceleration = np.zeros((count - 2, count), dtype=np.float64)
+    for row in range(count - 2):
+        acceleration[row, row:row + 3] = (1.0, -2.0, 1.0)
+    hessian = (np.eye(count) + float(lambda_velocity) * velocity.T @ velocity +
+               float(lambda_acceleration) * acceleration.T @ acceleration)
+    # Projected gradient solves the joint quadratic with a local-pose trust
+    # ball for every frame. The Lipschitz step is conservative and deterministic.
+    lipschitz = float(np.linalg.eigvalsh(hessian)[-1])
+    step = 1.0 / max(lipschitz, 1e-8)
+    x = y.copy()
+    radii = (None if trust_radii is None else
+             np.asarray(trust_radii, dtype=np.float64).reshape(count))
+    for _ in range(max(1, int(iterations))):
+        gradient = hessian @ x - y
+        updated = x - step * gradient
+        if radii is not None:
+            delta = updated - y
+            norms = np.linalg.norm(delta, axis=1)
+            factors = np.minimum(1.0, radii / np.maximum(norms, 1e-12))
+            updated = y + delta * factors[:, None]
+        if float(np.max(np.abs(updated - x))) < 1e-9:
+            x = updated
+            break
+        x = updated
+    output = x * scale
+    return output, {
+        "lambda_velocity": float(lambda_velocity),
+        "lambda_acceleration": float(lambda_acceleration),
+        "max_frame_deviation": float(np.linalg.norm((output - values) / scale, axis=1).max()),
+        "rms_frame_deviation": float(np.sqrt(np.mean(np.sum(((output - values) / scale) ** 2, axis=1)))),
+        "max_velocity": float(np.linalg.norm(np.diff(output / scale, axis=0), axis=1).max()),
+        "max_acceleration": float(np.linalg.norm(np.diff(output / scale, n=2, axis=0), axis=1).max()),
+    }

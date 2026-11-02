@@ -12,6 +12,7 @@ from semantic_arm_fit_math import (
     refine_latent_sequence_joint,
 )
 from native_pose_graph import pose_pair_distance, solve_native_pose_path
+from local_native_deformation import joint_temporal_refine
 from anatomical_semantic_frames import derive_anatomical_frames
 
 
@@ -121,6 +122,24 @@ class SemanticArmFitMathTests(unittest.TestCase):
                                    -negative_features[8:11], atol=1e-10)
         self.assertGreater(float(np.linalg.norm(positive_features[8:11])), 0.0)
 
+    def test_shared_torso_rotation_does_not_become_forearm_roll(self):
+        rest, left, _right = anatomical_fixture()
+        rest_pose = {name: np.asarray(row["rest_matrix"], dtype=np.float64)
+                     for name, row in rest.items()}
+        angle = 0.72
+        shared = np.eye(4)
+        shared[:3, :3] = np.asarray([
+            [np.cos(angle), 0.0, np.sin(angle)], [0.0, 1.0, 0.0],
+            [-np.sin(angle), 0.0, np.cos(angle)]])
+        posed = {name: shared @ matrix for name, matrix in rest_pose.items()}
+        anatomy = derive_anatomical_frames(rest, np.eye(4), left,
+                                           anatomical_fixture()[2])
+        side = anatomy["sides"]["left"]
+        values = semantic_features(rest, posed, left,
+            anatomy["torso_to_anatomical"], side["forearm_to_anatomical"],
+            side["forearm_axes_local"], elbow_absolute=True)
+        np.testing.assert_allclose(values, 0.0, atol=1e-9)
+
     def test_rbf_fit_and_prediction_are_finite(self):
         rng = np.random.default_rng(41)
         x = rng.normal(size=(120, 4))
@@ -159,6 +178,18 @@ class SemanticArmFitMathTests(unittest.TestCase):
         self.assertLess(history[-1]["objective"],
                         0.5 * float(np.sum(target * target)))
         self.assertTrue(np.isfinite(solved).all())
+
+    def test_local_native_joint_temporal_objective_smooths_inside_trust_ball(self):
+        pose = np.zeros((11, 6))
+        pose[5:, 0] = 0.4
+        pose[1::2, 4] = 0.15
+        refined, metrics = joint_temporal_refine(
+            pose, lambda_velocity=0.3, lambda_acceleration=0.9,
+            trust_radii=np.full(len(pose), 0.2), iterations=120)
+        self.assertLess(float(np.linalg.norm(np.diff(refined[:, 0], n=2, axis=0))),
+                        float(np.linalg.norm(np.diff(pose[:, 0], n=2, axis=0))))
+        self.assertLessEqual(metrics["max_frame_deviation"], 0.2 + 1e-8)
+        self.assertTrue(np.isfinite(refined).all())
 
     def test_joint_temporal_block_reduces_full_pose_context_jumps(self):
         target = np.zeros((9, 3))

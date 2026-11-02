@@ -198,10 +198,18 @@ def semantic_features(rest_bones, pose, profile, body_frame_map=None,
     elbow_delta = (elbow_angle if elbow_absolute else
                    elbow_angle - _angle(upper_rest_vec, lower_rest_vec))
 
-    forearm_rest = _rotation(rest_bones[forearm]["rest_matrix"])
-    forearm_pose = _rotation(_matrix(pose[forearm]))
-    overlap_rest = _rotation(rest_bones[body_names["forearm_overlap"]]["rest_matrix"])
-    overlap_pose = _rotation(_matrix(pose[body_names["forearm_overlap"]]))
+    # Measure twist in torso-relative coordinates. Other semantic channels are
+    # already root/torso neutral; using absolute armature-space forearm
+    # rotations here incorrectly counted shared torso motion as arm roll.
+    rest_body_rotation = _rotation(rest_bones[torso]["rest_matrix"])
+    pose_body_rotation = _rotation(_matrix(pose[torso]))
+    forearm_rest = np.linalg.inv(rest_body_rotation) @ _rotation(
+        rest_bones[forearm]["rest_matrix"])
+    forearm_pose = np.linalg.inv(pose_body_rotation) @ _rotation(_matrix(pose[forearm]))
+    overlap_name = body_names["forearm_overlap"]
+    overlap_rest = np.linalg.inv(rest_body_rotation) @ _rotation(
+        rest_bones[overlap_name]["rest_matrix"])
+    overlap_pose = np.linalg.inv(pose_body_rotation) @ _rotation(_matrix(pose[overlap_name]))
     if forearm_axes_local is None:
         twist_a = _twist_y(np.linalg.inv(forearm_rest) @ forearm_pose)
         twist_b = _twist_y(np.linalg.inv(overlap_rest) @ overlap_pose)
