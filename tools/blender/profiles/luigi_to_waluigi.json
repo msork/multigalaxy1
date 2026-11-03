@@ -1,0 +1,58 @@
+{
+  "schema": "mg1.literal-retarget-character-profile.v1",
+  "profile_id": "luigi_to_waluigi",
+  "source": {
+    "armature_object": "luigi.001_armature",
+    "default_action": "luigi.001_armature_walk",
+    "raw_bdl_armature_object": "luigi_armature",
+    "raw_bck_action_prefix": "luigi_armature_",
+    "raw_bdl_relative_to_asset_root": "Working/Galaxy/LuigiFullAnimationTest/luigi.bdl",
+    "raw_bck_relative_to_asset_root": "Working/Galaxy/LuigiFullAnimationTest",
+    "height_axis": 2
+  },
+  "target": {
+    "armature_object": "Waluigi_Arm_Test",
+    "baseline_action": "Waluigi_GalaxyWalk_Legs_Baked",
+    "mesh_prefix": "ARMTEST_",
+    "object_scale": [43.437, 43.437, 43.437],
+    "bone_count": 92,
+    "height_axis": 1,
+    "root_translation_bone": "bone_6"
+  },
+  "source_to_target_bones": {
+    "Center": ["bone_5"],
+    "JointRoot": ["bone_6"],
+    "Hip": ["bone_19"],
+    "Spine1": ["bone_20"],
+    "Spine2": ["bone_21"],
+    "Head": ["bone_53"],
+    "LegL1": ["bone_7"],
+    "LegL2": ["bone_8"],
+    "FootL": ["bone_9"],
+    "LegR1": ["bone_13"],
+    "LegR2": ["bone_14"],
+    "FootR": ["bone_15"],
+    "ShoulderL": ["bone_22"],
+    "ArmL1": ["bone_23", "bone_24", "bone_25"],
+    "ArmL2": ["bone_26", "bone_27", "bone_29"],
+    "HandL": ["bone_30"],
+    "ShoulderR": ["bone_57"],
+    "ArmR1": ["bone_58", "bone_59", "bone_60"],
+    "ArmR2": ["bone_61", "bone_62", "bone_64"],
+    "HandR": ["bone_65"]
+  },
+  "explicitly_ignored_source_bones": ["HandL0", "HandR0", "PartsControl"],
+  "ignored_source_bone_policy": {
+    "HandL0": "closed_fist_override",
+    "HandR0": "closed_fist_override",
+    "PartsControl": "no_waluigi_equivalent"
+  },
+  "fixed_fist": {
+    "profile": "waluigi_v5_closed_fist.json",
+    "left_bones": [31, 51],
+    "right_offset": 35,
+    "reflection_diagonal": [-1.0, 1.0, 1.0]
+  },
+  "default_output_action": "Waluigi_LuigiWalk_LiteralRestBasis_v1",
+  "default_sample_step": 0.25
+}

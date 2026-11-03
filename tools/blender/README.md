@@ -176,6 +176,15 @@ layered action stays at frame-zero pose in background mode, the probe evaluates
 the original FCurves directly at integer samples; arbitrary subframe fidelity
 and visual anatomy still need review.
 
+## Profile-driven Galaxy action conversion
+
+The V2 literal Luigi walk is the golden regression. The reusable converter
+entry point, character profile, raw BCK inventory/importer, and the selected
+run/jump/swim trial are documented in
+[`literal-animation-converter.md`](../../docs/animation-retargeting/literal-animation-converter.md).
+Use `convert_galaxy_action.py` for new clips and supply a profile; it keeps
+production rigs and the golden preview read-only.
+
 From this worktree, run:
 
 ```powershell

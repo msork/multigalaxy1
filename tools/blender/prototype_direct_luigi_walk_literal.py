@@ -25,45 +25,44 @@ from test_semantic_preview_noop import copy_action_slot, duplicate_mesh
 # Source semantic joints to Waluigi deform outputs. Multi-output mappings drive
 # both overlapping arm branches from the same source joint while calibrating
 # each target bone's own rest frame independently.
-BONE_OUTPUTS = {
-    "JointRoot": ("bone_6",),
-    "Hip": ("bone_19",),
-    "Spine1": ("bone_20",),
-    "Spine2": ("bone_21",),
-    "Head": ("bone_53",),
-    "LegL1": ("bone_7",), "LegL2": ("bone_8",), "FootL": ("bone_9",),
-    "LegR1": ("bone_13",), "LegR2": ("bone_14",), "FootR": ("bone_15",),
-    "ShoulderL": ("bone_22",),
-    "ArmL1": ("bone_23", "bone_24", "bone_25"),
-    "ArmL2": ("bone_26", "bone_27", "bone_29"),
-    "HandL": ("bone_30",),
-    "ShoulderR": ("bone_57",),
-    "ArmR1": ("bone_58", "bone_59", "bone_60"),
-    "ArmR2": ("bone_61", "bone_62", "bone_64"),
-    "HandR": ("bone_65",),
-}
-
-MAPPED_TARGETS = tuple(dict.fromkeys(
-    target for outputs in BONE_OUTPUTS.values() for target in outputs))
-FINGER_BONES = tuple([f"bone_{n}" for n in range(31, 52)] +
-                     [f"bone_{n}" for n in range(66, 87)])
+BONE_OUTPUTS = {}
+MAPPED_TARGETS = ()
+FINGER_BONES = ()
 
 
 def args_from_cli():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source-rig", default="luigi.001_armature")
-    parser.add_argument("--source-action", default="luigi.001_armature_walk")
-    parser.add_argument("--target-rig", default="Waluigi_Arm_Test")
-    parser.add_argument("--baseline-action", default="Waluigi_GalaxyWalk_Legs_Baked")
-    parser.add_argument("--mesh-prefix", default="ARMTEST_")
-    parser.add_argument("--start", type=float, default=0.0)
-    parser.add_argument("--end", type=float, default=60.0)
-    parser.add_argument("--step", type=float, default=0.25)
+    parser.add_argument("--profile", default=os.path.join(HERE, "profiles", "luigi_to_waluigi.json"))
+    parser.add_argument("--source-rig")
+    parser.add_argument("--source-action")
+    parser.add_argument("--target-rig")
+    parser.add_argument("--baseline-action")
+    parser.add_argument("--mesh-prefix")
+    parser.add_argument("--start", type=float)
+    parser.add_argument("--end", type=float)
+    parser.add_argument("--step", type=float)
     parser.add_argument("--preview", required=True)
     parser.add_argument("--report", required=True)
     parser.add_argument("--renders", required=True)
+    parser.add_argument("--reuse-renders", action="store_true",
+                        help="reuse existing per-frame renders when only action metadata changed")
     return parser.parse_args(argv)
+
+
+def load_profile(args):
+    with open(args.profile, "r", encoding="utf-8") as stream:
+        profile = json.load(stream)
+    if profile.get("schema") != "mg1.literal-retarget-character-profile.v1":
+        raise ValueError("unsupported character profile schema")
+    global BONE_OUTPUTS, MAPPED_TARGETS, FINGER_BONES
+    BONE_OUTPUTS = {str(k): tuple(v) for k, v in profile["source_to_target_bones"].items()}
+    MAPPED_TARGETS = tuple(dict.fromkeys(t for values in BONE_OUTPUTS.values() for t in values))
+    fist = profile["fixed_fist"]
+    left_start, left_end = fist["left_bones"]
+    FINGER_BONES = tuple([f"bone_{n}" for n in range(left_start, left_end + 1)] +
+                         [f"bone_{n + int(fist['right_offset'])}" for n in range(left_start, left_end + 1)])
+    return profile
 
 
 def bag_for(action, slot):
@@ -180,7 +179,7 @@ def remove_bone_curves(action, slot, targets):
     bag = bag_for(action, slot)
     paths = {f'pose.bones["{name}"]' for name in targets}
     for curve in list(bag.fcurves):
-        if any(path in curve.data_path for path in paths):
+        if any(path in curve.data_path for path in paths) or ".constraints[" in curve.data_path:
             bag.fcurves.remove(curve)
     return bag
 
@@ -255,8 +254,8 @@ def setup_render(scene, rig, meshes, render_dir, pose_samples, root_location_sam
     for obj in [render_rig] + render_meshes:
         obj.hide_render = False
         obj.hide_set(False)
-    render_scene.frame_start = 0
-    render_scene.frame_end = 60
+    render_scene.frame_start = int(min(pose_samples))
+    render_scene.frame_end = int(max(pose_samples))
     render_scene.view_settings.view_transform = scene.view_settings.view_transform
     render_scene.view_settings.look = scene.view_settings.look
     render_scene.view_settings.exposure = scene.view_settings.exposure
@@ -285,7 +284,7 @@ def setup_render(scene, rig, meshes, render_dir, pose_samples, root_location_sam
     light.rotation_euler = (center - light.location).to_track_quat("-Z", "Y").to_euler()
     outputs = []
     failures = []
-    for frame in (0, 15, 30, 45, 60):
+    for frame in pose_samples:
         sample = pose_samples[frame]
         for name, matrix_rows_value in sample.items():
             render_rig.pose.bones[name].matrix_basis = Matrix(matrix_rows_value)
@@ -326,28 +325,42 @@ def setup_render(scene, rig, meshes, render_dir, pose_samples, root_location_sam
 
 def main():
     args = args_from_cli()
+    profile = load_profile(args)
+    source_cfg, target_cfg = profile["source"], profile["target"]
+    source_rig_name = args.source_rig or source_cfg["armature_object"]
+    source_action_name = args.source_action or source_cfg["default_action"]
+    target_rig_name = args.target_rig or target_cfg["armature_object"]
+    baseline_action_name = args.baseline_action or target_cfg["baseline_action"]
+    mesh_prefix = args.mesh_prefix or target_cfg["mesh_prefix"]
+    step = args.step if args.step is not None else float(profile.get("default_sample_step", 0.25))
     input_blend = bpy.data.filepath
     if bpy.data.filepath and os.path.abspath(args.preview) == os.path.abspath(bpy.data.filepath):
         raise RuntimeError("refusing to overwrite the input blend")
     scene = bpy.context.scene
-    source = bpy.data.objects.get(args.source_rig)
-    target_base = bpy.data.objects.get(args.target_rig)
-    source_action = bpy.data.actions.get(args.source_action)
-    baseline_action = bpy.data.actions.get(args.baseline_action)
+    source = bpy.data.objects.get(source_rig_name)
+    target_base = bpy.data.objects.get(target_rig_name)
+    source_action = bpy.data.actions.get(source_action_name)
+    baseline_action = bpy.data.actions.get(baseline_action_name)
     if not all((source, target_base, source_action, baseline_action)):
         raise RuntimeError("required source rig/action or Waluigi baseline is missing")
-    if len(target_base.data.bones) != 92 or abs(target_base.matrix_basis.to_scale().x - 43.437) > 0.02:
+    expected_bones = int(target_cfg.get("bone_count", 92))
+    expected_scale = target_cfg.get("object_scale", [43.437] * 3)
+    if len(target_base.data.bones) != expected_bones or max(
+            abs(float(a) - float(b)) for a, b in zip(target_base.matrix_basis.to_scale(), expected_scale)) > 0.02:
         raise RuntimeError("Waluigi skeleton or intentional 43.437 scale signature mismatch")
-    source_slot = slot_for(source_action,
-        source.animation_data.action_slot.identifier if source.animation_data else None)
+    source_slot_identifier = (source.animation_data.action_slot.identifier
+        if source.animation_data and source.animation_data.action_slot else None)
+    source_slot = slot_for(source_action, source_slot_identifier)
     baseline_slot = slot_for(baseline_action,
         target_base.animation_data.action_slot.identifier
-        if target_base.animation_data and target_base.animation_data.action == baseline_action else None)
+        if target_base.animation_data and target_base.animation_data.action == baseline_action and
+           target_base.animation_data.action_slot else None)
     source_curves = list(bag_for(source_action, source_slot).fcurves)
     baseline_curves = list(bag_for(baseline_action, baseline_slot).fcurves)
     keyed_source = {curve_path_bone(curve.data_path) for curve in source_curves
                     if curve_path_bone(curve.data_path) and len(curve.keyframe_points) > 1}
-    missing = sorted(keyed_source - set(BONE_OUTPUTS))
+    explicitly_ignored = set(profile.get("explicitly_ignored_source_bones", []))
+    missing = sorted(keyed_source - set(BONE_OUTPUTS) - explicitly_ignored)
     if missing:
         raise RuntimeError(f"animated source bones lack explicit target mapping: {missing}")
     for source_name, targets in BONE_OUTPUTS.items():
@@ -358,16 +371,18 @@ def main():
                 raise RuntimeError(f"mapped Waluigi bone missing: {target_name}")
 
     source_meshes = [obj for obj in bpy.data.objects if obj.type == "MESH" and
-        obj.name.startswith(args.mesh_prefix) and "ArmRetarget" not in obj.name and
+        obj.name.startswith(mesh_prefix) and "ArmRetarget" not in obj.name and
         any(mod.type == "ARMATURE" and mod.object in
             (target_base, bpy.data.objects.get("Waluigi_Arm_Test")) for mod in obj.modifiers)]
     if len(source_meshes) != 2:
         raise RuntimeError(f"expected both original Waluigi preview meshes, found {len(source_meshes)}")
 
-    source_height = (max(float(b.tail_local.z) for b in source.data.bones) -
-                     min(float(b.head_local.z) for b in source.data.bones))
-    target_height = (max(float(b.head_local.y) for b in target_base.data.bones) -
-                     min(float(b.tail_local.y) for b in target_base.data.bones))
+    source_axis = int(source_cfg.get("height_axis", 2))
+    target_axis = int(target_cfg.get("height_axis", 1))
+    source_height = (max(float(b.tail_local[source_axis]) for b in source.data.bones) -
+                     min(float(b.head_local[source_axis]) for b in source.data.bones))
+    target_height = (max(float(b.head_local[target_axis]) for b in target_base.data.bones) -
+                     min(float(b.tail_local[target_axis]) for b in target_base.data.bones))
     root_translation_ratio = target_height / source_height
     scene.collection.children.link(bpy.data.collections.new("LiteralLuigiWalk_WaluigiPreview"))
     collection = bpy.data.collections["LiteralLuigiWalk_WaluigiPreview"]
@@ -392,29 +407,42 @@ def main():
         clone.rotation_mode = original.rotation_mode
     source_eval.animation_data_clear()
 
-    new_action = copy_action_slot(baseline_action, baseline_slot, target,
-                                  "Waluigi_LuigiWalk_LiteralRestBasis_v1")
+    is_default_walk = source_action.name == source_cfg["default_action"]
+    output_action_name = (profile.get("default_output_action", "Waluigi_LiteralRetarget")
+                          if is_default_walk else
+                          f"{target.name}_{source_action.name}_LiteralRestBasis")
+    new_action = copy_action_slot(baseline_action, baseline_slot, target, output_action_name)
+    source_loop_type = getattr(source_action, "bck_loop_type",
+                               source_action.get("bck_loop_type"))
+    if source_loop_type is not None:
+        new_action["bck_loop_type"] = str(source_loop_type)
     target_slot = target.animation_data.action_slot
     output_bag = remove_bone_curves(new_action, target_slot,
                                     set(MAPPED_TARGETS) | set(FINGER_BONES))
-    fist_path = os.path.join(HERE, "profiles", "waluigi_v5_closed_fist.json")
+    fist = profile["fixed_fist"]
+    fist_path = os.path.join(os.path.dirname(args.profile), fist["profile"])
     with open(fist_path, "r", encoding="utf-8") as stream:
         fist_reference = json.load(stream)["quaternion_wxyz_by_bone"]
-    original_range = (args.start, args.end)
-    if args.step <= 0 or args.end <= args.start:
+    action_start, action_end = map(float, source_action.frame_range)
+    start = action_start if args.start is None else args.start
+    end = action_end if args.end is None else args.end
+    if step <= 0 or end <= start:
         raise ValueError("invalid frame range or bake step")
-    sample_count = int(round((args.end - args.start) / args.step))
-    frames = [args.start + i * args.step for i in range(sample_count + 1)]
+    sample_count = int(math.floor((end - start) / step + 1e-8))
+    frames = [start + i * step for i in range(sample_count + 1)]
+    if not frames or frames[-1] < end - 1e-6:
+        frames.append(end)
     source_bag = bag_for(source_action, source_slot)
     original_key_times = sorted({float(point.co.x) for curve in source_bag.fcurves
                                  for point in curve.keyframe_points
-                                 if args.start <= point.co.x <= args.end})
+                                 if start <= point.co.x <= end})
     if not original_key_times:
         raise RuntimeError("source action has no keys in requested walk interval")
     for time in original_key_times:
         if min(abs(frame - time) for frame in frames) > 1.0e-5:
             frames.append(time)
     frames = sorted(set(round(frame, 6) for frame in frames))
+    preview_frames = sorted(set(int(round(start + i * (end-start) / 4.0)) for i in range(5)))
 
     conversions = {}
     ratios = {}
@@ -484,14 +512,15 @@ def main():
         # unchanged by moving only that translation component to the armature
         # object's location. This prevents the pelvis subtree sliding under
         # torso vertices weighted above bone_6.
-        root_pb = target.pose.bones["bone_6"]
+        root_bone_name = target_cfg.get("root_translation_bone", "bone_6")
+        root_pb = target.pose.bones[root_bone_name]
         root_local = root_pb.matrix_basis.copy()
         if root_translation_reference is None:
             root_translation_reference = root_local.translation.copy()
         old_pose_matrices = pose_matrices_from_basis(target)
         old_world_pose = {name: target.matrix_world @ matrix
                           for name, matrix in old_pose_matrices.items()}
-        root_bone = target.data.bones["bone_6"]
+        root_bone = target.data.bones[root_bone_name]
         root_parent = root_bone.parent
         parent_pose = old_pose_matrices[root_parent.name] if root_parent else Matrix.Identity(4)
         rest_local = (root_parent.matrix_local.inverted_safe() @ root_bone.matrix_local
@@ -505,11 +534,11 @@ def main():
         root_pb.keyframe_insert("location", frame=frame, group="Literal Galaxy Root Translation")
         target.keyframe_insert("location", frame=frame, group="Literal Galaxy Root Translation")
         root_location_samples[float(frame)] = [float(x) for x in target.location]
-        intended.setdefault(frame, {})["bone_6"] = root_pb.matrix_basis.copy()
+        intended.setdefault(frame, {})[root_bone_name] = root_pb.matrix_basis.copy()
         target_pose_matrices = pose_matrices_from_basis(target)
         bpy.context.view_layer.update()
         for name, old_world in old_world_pose.items():
-            if name == "bone_6" or name.startswith("bone_"):
+            if name == root_bone_name or name.startswith("bone_"):
                 # Only validate the subtree whose local root displacement was
                 # redistributed. Other root branches intentionally receive the
                 # now-correct global motion.
@@ -517,19 +546,22 @@ def main():
                 ancestor = data_bone.parent
                 descendant_of_root = False
                 while ancestor:
-                    if ancestor.name == "bone_6":
+                    if ancestor.name == root_bone_name:
                         descendant_of_root = True
                         break
                     ancestor = ancestor.parent
-                if name == "bone_6" or descendant_of_root:
+                if name == root_bone_name or descendant_of_root:
                     new_world = target.matrix_world @ target_pose_matrices[name]
                     root_translation_world_pose_error = max(
                         root_translation_world_pose_error, matrix_error(old_world, new_world))
         # The user-approved Waluigi fists are a fixed pose exception: Galaxy
         # has no finger articulation in this walk, and Waluigi must keep fists.
-        reflection = Matrix.Diagonal(Vector((-1.0, 1.0, 1.0)))
-        for left_index in range(31, 52):
-            left_name, right_name = f"bone_{left_index}", f"bone_{left_index + 35}"
+        fist_cfg = profile["fixed_fist"]
+        reflection_diagonal = fist_cfg.get("reflection_diagonal", [-1.0, 1.0, 1.0])
+        reflection = Matrix.Diagonal(Vector(reflection_diagonal))
+        left_start, left_end = map(int, fist_cfg["left_bones"])
+        for left_index in range(left_start, left_end + 1):
+            left_name, right_name = f"bone_{left_index}", f"bone_{left_index + int(fist_cfg['right_offset'])}"
             left_q = Quaternion(fist_reference[left_name])
             left_bone, right_bone = target_base.data.bones[left_name], target_base.data.bones[right_name]
             left_rest_local = (left_bone.parent.matrix_local.inverted_safe() @ left_bone.matrix_local
@@ -554,7 +586,7 @@ def main():
             if name in base_pose:
                 finger_change = max(finger_change,
                     matrix_error(base_pose[name], target.pose.bones[name].matrix_basis))
-        if abs(frame - round(frame)) < 1e-6 and int(round(frame)) in (0, 15, 30, 45, 60):
+        if abs(frame - round(frame)) < 1e-6 and int(round(frame)) in preview_frames:
             render_pose_samples[int(round(frame))] = {
                 name: matrix_rows(target.pose.bones[name].matrix_basis)
                 for name in target.data.bones.keys()}
@@ -585,7 +617,7 @@ def main():
     # Compare candidate and baseline weighted mesh coordinates at the original
     # walk sample points; this is reported, not hidden by bone endpoint metrics.
     mesh_deltas = []
-    for frame in (0, 15, 30, 45, 60):
+    for frame in preview_frames:
         scene.frame_set(frame)
         bpy.context.view_layer.update()
         candidate_vertices = mesh_vertices(meshes)
@@ -603,15 +635,27 @@ def main():
         obj.hide_render = not show
         obj.hide_viewport = not show
         obj.hide_set(not show)
-    scene.frame_set(0)
+    scene.frame_set(math.floor(start), subframe=start - math.floor(start))
     bpy.context.view_layer.update()
     source_eval_data = source_eval.data
     bpy.data.objects.remove(source_eval, do_unlink=True)
     if source_eval_data.users == 0:
         bpy.data.armatures.remove(source_eval_data)
-    render_paths, render_failures = setup_render(
-        scene, target, meshes, args.renders, render_pose_samples, root_location_samples)
-    scene.frame_set(0)
+    if args.reuse_renders:
+        render_paths = [os.path.abspath(os.path.join(args.renders,
+            f"frame_{frame:02d}_{view}.png"))
+            for frame in preview_frames for view in ("front", "side")]
+        missing_renders = [path for path in render_paths if not os.path.isfile(path)]
+        if missing_renders:
+            raise RuntimeError("requested render reuse but image files are missing: " +
+                               ", ".join(missing_renders))
+        render_failures = []
+    else:
+        render_paths, render_failures = setup_render(
+            scene, target, meshes, args.renders, render_pose_samples, root_location_samples)
+    scene.frame_start = math.floor(start)
+    scene.frame_end = math.ceil(end)
+    scene.frame_set(math.floor(start), subframe=start - math.floor(start))
     bpy.context.view_layer.update()
     os.makedirs(os.path.dirname(os.path.abspath(args.preview)), exist_ok=True)
     scene.render.filepath = "//"
@@ -619,18 +663,21 @@ def main():
 
     report = {
         "schema": "mg1.literal-galaxy-walk-retarget.v1",
+        "profile": os.path.abspath(args.profile),
+        "frame_range": [start, end],
         "input_blend": input_blend,
         "source_rig": source.name,
         "source_action": source_action.name,
         "source_slot": source_slot.identifier,
         "source_keyed_bones": sorted(keyed_source),
+        "explicitly_ignored_animated_source_bones": sorted(keyed_source & explicitly_ignored),
         "mapping": {key: list(value) for key, value in BONE_OUTPUTS.items()},
         "rest_frame_conversion": {s: {t: list(q) for t, q in rows.items()}
                                    for s, rows in conversions.items()},
         "translation_scale": {s: rows for s, rows in ratios.items()},
         "source_original_key_times": original_key_times,
         "baked_samples": len(frames),
-        "bake_step": args.step,
+        "bake_step": step,
         "source_height_to_target_height_ratio": root_translation_ratio,
         "root_translation_rebased_to_object_location": True,
         "root_translation_world_pose_preservation_error": root_translation_world_pose_error,
@@ -638,6 +685,8 @@ def main():
                                      for frame, location in root_location_samples.items()},
         "target_rig": target.name,
         "target_action": new_action.name,
+        "target_action_frame_range": [float(x) for x in new_action.frame_range],
+        "source_loop_type": source_loop_type,
         "target_meshes": [obj.name for obj in meshes],
         "intentional_target_object_scale": list(target.matrix_basis.to_scale()),
         "scale_error": scale_error,
