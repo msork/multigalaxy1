@@ -1,6 +1,6 @@
 # Read-only PAL Mario model observer
 
-This is an opt-in, one-shot observer for the existing Mario model under official stock Dolphin 2609a. It reads only the validated read-only MEM1 mapping. It does not pause Dolphin, write guest memory, invoke callbacks, destroy a model, or retain pointers between invocations. The first attempted live run exposed an observer field-layout error; the correction below is statically verified and has synthetic regression coverage, but a live rerun is still required.
+This is an opt-in, one-shot observer for the existing Mario model under official stock Dolphin 2609a. It reads only the validated read-only MEM1 mapping. It does not pause Dolphin, write guest memory, invoke callbacks, destroy a model, or retain pointers between invocations. The first attempted live run exposed an observer field-layout error, corrected in commit `83f6df3`. Two later user-validated read-only samples now confirm the corrected matrix-buffer/tree relationship across a Beach Bowl → Comet Observatory transition.
 
 ## PAL RMGP01 Rev 0 pointer path
 
@@ -37,6 +37,52 @@ The PAL code also answers the polymorphism/layout question: the symbol map has a
 
 `J3DMtxBuffer::initialize` at `0x8043035C` begins by storing zero at `this+0`, then initializes the remaining fields through `+0x34`. `J3DMtxBuffer::create` later stores `modelData+0x10` at `this+0`. This is why checking the first word as a vptr produced the exact false mismatch.
 
+### User-observed live transition samples
+
+The user reports two successful observer samples from Dolphin PID `119844`, in PAL RMGP01 Rev 0. These are live user observations, not independently recaptured in this documentation pass:
+
+| Field | Beach Bowl sample | Comet Observatory sample |
+|---|---:|---:|
+| `AllLiveActorGroup` | `0x80FA07D8` | `0x80FA074C` |
+| `MarioActor` | `0x810B29CC` | `0x810AB5FC` |
+| `ModelManager` | `0x810B96F4` | `0x810B2334` |
+| `XanimePlayer` | `0x8111C7F4` | `0x810F63D4` |
+| `J3DModel` | `0x810B9794` | `0x810B23D4` |
+| `J3DMtxBuffer` | `0x810B997C` | `0x810B25BC` |
+| `J3DModelData` | `0x80D6874C` | `0x80D6874C` |
+| embedded `J3DJointTree` | `0x80D6875C` | `0x80D6875C` |
+| Scene Napa heap | `0x80F8EEF0` | `0x80F8EEF0` |
+| sample-time current heap | matches Napa | matches Napa |
+
+The first-sample matrix buffer `0x810B997C` therefore has the reported `mJointTree` value `0x80D6875C`, equal to that sample's `J3DModelData + 0x10`. This resolves the original mismatch: `0x80D6875C` is the embedded joint-tree address, not the matrix-buffer vptr. The corrected checks also accept the second sample's buffer at `0x810B25BC` with the same ModelData/tree identity.
+
+The group, actor, manager, Xanime, model, and matrix-buffer addresses changed across the transition, while the ModelData/tree and Scene Napa/current-heap values were equal. This proves pointer-value continuity in the two reported samples only. It does not establish that the same resource-holder object remained alive: the model data may have remained cached, or the old allocation may have been released and a new resource reloaded at the same guest address. The scene heap handle's numeric value was also reused or retained; equal heap pointers do not establish heap lifetime continuity. No archive pointer, ResourceHolder identity, manager entry, allocation generation, or destructor event was sampled.
+
+### PAL resource loading, lookup, and invalidation trace
+
+Static evidence is from the exact PAL RMGP01 Rev 0 DOL and the matching symbol map. Petari supplies class/member semantics; the PAL code establishes the addresses and call/data flow.
+
+| Stage | PAL evidence | What it establishes |
+|---|---|---|
+| Actor model setup | `LiveActor::initModelManagerWithAnm` `0x801659C4` allocates/stores a ModelManager at actor `+0x48`; `ModelManager::init` is `0x80169AD0`; `initModelAndAnimation` is `0x8016979C` | The model setup is mediated by a ModelManager and ResourceHolder inputs; an animated model takes the Xanime route |
+| Resource-holder management | `ResourceHolderManager` singleton slot `sInstance` is `0x806A2480`; PAL symbols include `createAndAdd` `0x803A6A58`, `find` `0x803A7104`, and `removeIfIsEqualHeap` `0x803A6BCC`. `ModelManager::init` requests holders for model and, if separate, animation archives. The normal resource-holder creation path receives the current heap when no explicit heap is supplied. | A manager owns/records ResourceHolder entries and can find/create them; scene teardown removes entries associated with a heap. The live samples did not identify which entry supplied this Mario model or whether lookup hit a pre-existing entry. |
+| Model-data lookup | `MR::newJ3DModel` at `0x803E9668` obtains `J3DModelData` from the holder's `ResTable`; its lookup path calls `getRes` at `0x803E9690` before ModelX allocation and `entryModelData` stores that pointer at model `+0x04` | The model instance borrows archive-backed ModelData; ModelX does not become its owner |
+| Scene cleanup | `GameSystemSceneController::destroyScene` `0x8039CF80` destroys the Scene, calls heap-keyed resource/file-holder cleanup (`0x803CE104` → `ResourceHolderManager::removeIfIsEqualHeap` `0x803A6BCC`), then `HeapMemoryWatcher::destroySceneHeap` `0x8039EC9C` destroys the heap handles | Scene-associated holders are removed before their associated scene heap is destroyed on this path. It does not prove a specific holder was removed/recreated during this reported transition. |
+
+The manager exposes creation, lookup, and heap-keyed removal, but this observer does not establish cache-key equality, archive base identity, a cache hit/miss, or any persistent holder identity across the two samples. Because the same ModelData address can be reused after a heap teardown, the equal address alone cannot distinguish a persistent holder from reload-at-reused-address. The samples show that the destination Mario resolved a structurally valid ModelData/tree at the same addresses after the transition; they do not show when or how those bytes were loaded.
+
+#### Shared joint-tree mutation risk
+
+`MR::newJ3DModel` calls `invalidateMtxCalc` (`0x803E7FC4`) and `invalidateJointCallback` (`0x803E7FF8`) on the resolved `J3DModelData*` before constructing the J3DModelX. PAL code traverses the joint array/count in ModelData and clears each joint's matrix-calculation procedure at `joint +0x54` and callback at `joint +0x04`. The ModelData's embedded `J3DJointTree` is at `+0x10`, and both observed samples expose the same ModelData/tree addresses.
+
+Therefore, if two model instances use the same live ModelData at the same time, these factory invalidations act on shared joint objects rather than per-instance matrix buffers. A second model construction can clear joint procedures/callbacks that the first model relies on; later Xanime joint-transform setup also receives the ModelData. This is a concrete shared-mutable-state hazard. It does not prove a visible failure in every combination, nor that two Mario instances were simultaneously active in these two sequential samples. `XanimeCore::enableJointTransform` internals and all subsequent callback writes remain incompletely audited. Sharing this ModelData for a duplicate render instance remains **NO-GO**.
+
+### Remaining unknowns and next bounded experiment
+
+Still unknown: the resource-holder pointer and archive identity used by either sample; whether ResourceHolderManager returned an existing holder or created a new one; the holder's recorded heap in those runs; whether the same heap object survived the transition; and whether any other live model instance shared these joint objects. The samples do not prove constructor-time heap identity or destructor/reclamation events.
+
+Smallest next experiment: offline-trace the PAL `ResourceHolderManager::find/createAndAddInner/removeIfIsEqualHeap` entry layout plus `ResourceHolder` archive/ResTable fields from exact instructions and matching Petari declarations. Only after those offsets are statically verified, extend the existing read-only one-shot observer to report the specific ModelManager ResourceHolder pointer, its archive/ResTable identity, its recorded heap identity if present, and the resolved ModelData pointer. Run once in Beach Bowl and once in Comet Observatory with the same Dolphin PID. Re-resolve the full Mario/scene chain around each fixed bounded read and reject scene changes. Do not scan manager entries, dereference any unverified field, infer persistence from pointer equality alone, or write memory. A stable holder/archive identity across the transition would support reuse but still would not prove uninterrupted lifetime; changed identities would establish replacement, not destructor timing.
+
 `ModelManager::getJ3DModel` returns a `J3DModel*` at the API boundary. The live object is required to have the exact `J3DModelX` dynamic vptr because both the PAL `newXanimePlayer` route and no-Xanime `newJ3DModel` factory construct that type. Unknown model types fail closed. The exact accessor, constructor, member-store, and factory-branch bytes are checked in both the local DOL and live memory; the mandatory AllStars patch is checked for overlap with those signatures.
 
 Petari source is used for names/member interpretation and corroboration: [`LiveActor.hpp`](https://github.com/SMGCommunity/Petari/blob/master/include/Game/LiveActor/LiveActor.hpp), [`ModelManager.hpp`](https://github.com/SMGCommunity/Petari/blob/master/include/Game/LiveActor/ModelManager.hpp), [`ModelManager.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/ModelManager.cpp), and [`J3DModel.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/JSystem/J3DGraphAnimator/J3DModel.cpp). PAL bytes and symbols remain authoritative for this observer.
@@ -66,4 +112,4 @@ Because the emulator continues concurrently, repeated identity checks cannot pro
 
 ## Synthetic coverage and live status
 
-Synthetic tests cover the Xanime and non-Xanime ModelManager branches, expected object vptrs, the non-vptr first matrix-buffer word, embedded-tree identity, wrong joint-tree and matrix-buffer vptrs, invalid/null pointers, model-pointer changes, scene/group changes, and current-heap interpretation. These fixtures validate the Rust reader's bounds and consistency behavior only. They do not prove live model layout or destruction. The corrected observer has not yet been rerun against Dolphin; do not treat compilation or synthetic tests as live runtime evidence.
+Synthetic tests cover the Xanime and non-Xanime ModelManager branches, expected object vptrs, the non-vptr first matrix-buffer word, embedded-tree identity, wrong joint-tree and matrix-buffer vptrs, invalid/null pointers, model-pointer changes, scene/group changes, and current-heap interpretation. These fixtures validate the Rust reader's bounds and consistency behavior only. They do not prove model destruction or ownership. The user reports two live samples after the correction, which validate the model/tree addresses across a transition; holder/cache identity and uninterrupted allocation lifetime remain unobserved.
