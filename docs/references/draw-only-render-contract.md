@@ -140,6 +140,104 @@ It does **not** support a complete object-by-object cleanup sequence. The inspec
 
 The broader PAL scene path supplies a plausible bulk lifetime for allocations made with the Scene heap: `GameSystemSceneController::destroyScene` destructs the Scene, removes `ResourceHolderManager` entries matching the Scene heap, then destroys the scene heap handles (`docs/references/pal-placement-heap-lifetime.md`, exact PAL sites). That bulk path is not an explicit per-model destructor sequence. It does not prove that model callbacks are detached before archive data is removed, or that a manually deleted model’s arrays are reclaimed immediately.
 
+### Phase 1.22: PAL destructor dispatch, actor teardown, and shared-joint mutations
+
+This audit is against the same SHA-256-bound PAL RMGP01 Rev 0 `main.dol` named above and its exact Petari symbol map. The vtable words below were read from the DOL's mapped data section; function bodies and call edges were checked in the corresponding PAL text section. A vtable word is evidence of a dispatch target, not evidence that a particular owner actually dispatches through it.
+
+#### J3D vtable entries and destructor bodies
+
+The vptr address point used by the object is the start shown below. The two leading words are zero; the virtual function words follow them. `+0x20` is therefore the destructor entry relative to this address point. The adjacent `+0x24` word is null in both tables; its compiler-ABI role is not inferred here.
+
+| PAL vtable | PAL address / DOL file offset | Exact words after the two zero prefix words | Verified destructor behavior |
+|---|---|---|---|
+| `__vt__9J3DModelX` | `0x805A31B0` / `0x59F2B0`, 0x28 bytes | `+08 80431970`, `+0C 80431B18`, `+10 804319BC`, `+14 80431628`, `+18 80431794`, `+1C 80431C0C`, `+20 802A8070`, `+24 00000000` | `J3DModelX::~` at `0x802A8070` calls the embedded `J3DVertexBuffer` destructor on `this+0x88` at `0x802A80A0`; its deleting path conditionally calls `__dl(this)` at `0x802A80B0`. It does not call `J3DModel::~` or `J3DMtxBuffer::~`. |
+| `__vt__8J3DModel` | `0x805D4F38` / `0x5D1038`, 0x24 bytes | `+08 80431970`, `+0C 80431B18`, `+10 804319BC`, `+14 80431628`, `+18 80431794`, `+1C 80431C0C`, `+20 802A8134` | `J3DModel::~` at `0x802A8134` calls its embedded vertex-buffer destructor and has a conditional deleting path. It does not call the matrix-buffer or packet destructors. |
+| `__vt__12J3DMtxBuffer` | `0x805D4F5C` / `0x5D105C` | destructor word `+08 80431FE0` | `J3DMtxBuffer::~` conditionally deletes the buffer object; its body does not free the pointed-to matrix arrays. |
+| `__vt__12J3DModelData` | `0x805D4F18` / `0x5D1018` | destructor word `+08 804302F4` | `J3DModelData::~` calls material-table and joint-tree destructors, then has a conditional deleting path. This is resource-data teardown, not instance teardown. |
+| `__vt__12J3DMatPacket` | `0x805D3F20` / `0x5D0020` | destructor word `+10 80422F00` | Destructor target exists. No invocation from the audited model/actor/scene owner paths was established. |
+| `__vt__14J3DShapePacket` | `0x805D3F34` / `0x5D0034` | destructor word `+10 80423080` | Destructor target exists. No invocation from the audited model/actor/scene owner paths was established. |
+
+The entries establish available virtual destructor targets, but not complete C++ destruction. In particular, the observed `J3DModelX` body is not a destructor chain for its base, `J3DMtxBuffer`, shape packets, material packets, or its three material-count arrays. No matching explicit child cleanup was found in those destructor bodies.
+
+#### PAL owner and teardown call graph
+
+```text
+normal scene setup
+  initializeScene 0x8039CEAC
+    select Scene heap as JKRHeap::sCurrentHeap
+    GameScene::init / placement creation
+      actor/model initialization
+        ModelManager::initModelAndAnimation 0x8016979C
+          MR::newJ3DModel 0x803E9668 (no-animation branch)
+            resolve J3DModelData from ResourceHolder/ResTable
+            invalidateMtxCalc + invalidateJointCallback (mutate joint objects)
+            __nw 0x80409B14 -> J3DModelX ctor 0x802A702C
+              J3DModel::entryModelData 0x8043111C
+                __nw J3DMtxBuffer; create matrix arrays; create shape/material packets
+          [animation branch uses MR::newXanimePlayer 0x803E7EE0]
+
+actor destruction path found in PAL
+  LiveActor::~ 0x80037238
+    NameObj::~ 0x80037260
+    deleting variant -> __dl(this) 0x80037270
+  [no observed ModelManager destructor call; no observed model pointer cleanup]
+
+scene transition path
+  GameSystemSceneController::destroyScene 0x8039CF80
+    virtual Scene destructor
+    Scene::~ 0x8034377C
+      releases SceneObjHolder and scene executor; does not iterate actor group
+    remove ResourceHolderManager entries for Scene heap
+    HeapMemoryWatcher::destroySceneHeap 0x8039EC9C
+```
+
+PAL `LiveActor::~` does not load or destroy the `mModelManager` member (`LiveActor+0x48`, layout corroborated by Petari); its body calls the base `NameObj` destructor and then the actor's conditional `__dl`. Petari's `LiveActor::initModelManagerWithAnm` assigns `new ModelManager()` to that member, while its `ModelManager` source declares no destructor implementation. The symbol map also contains no `__dt__12ModelManager` entry. These source/map facts are corroboration, not a binary guarantee about unlabelled compiler-generated code; the PAL `LiveActor` destructor's instructions control this caller path. See Petari [`LiveActor.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/LiveActor.cpp) and [`ModelManager.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/ModelManager.cpp).
+
+The traced Scene destructor frees holder/executor/Scene objects but does not walk `AllLiveActorGroup` to call each actor's virtual destructor. The separate scene-controller path removes heap-associated resource holders and then destroys the scene heap. Accordingly, the normal scene path supports bulk arena reclamation, not evidence of an explicit `J3DModelX`/packet teardown before archive removal. A manually created render instance has no proven owner teardown path.
+
+The search found no direct PAL `bl` from the audited `ModelManager` construction/init, `LiveActor::~`, `Scene::~`, or scene-controller teardown bodies to the J3DModelX, J3DModel, J3DMtxBuffer, shape-packet, or material-packet destructor functions. It also did not establish a complete whole-DOL inventory of every indirect virtual dispatch pattern. Therefore the correct result is **no caller found in the audited ownership paths**, not “the game never calls these destructors.” The virtual ModelX dtor may be invoked through an untraced owner or actor subclass.
+
+#### Heap identity at allocation and destruction
+
+`__nw` (`0x80409B14`) and `__nwa` (`0x80409B38`) pass a null heap to `JKRHeap::alloc`; the null-heap branch at `0x80409698` reads `JKRHeap::sCurrentHeap` from SDA slot `0x806A26DC`. `__dl` (`0x80409B5C`) likewise passes a null heap to `JKRHeap::free`, whose null-heap branch at `0x804096C8` reads the current heap. The object/array allocation site does not store a heap identity in the pointer, and the audited ModelX deleting destructor does not restore or select the allocation heap before `__dl`.
+
+For ordinary placement creation, the PAL scene initialization path selected the Scene heap before placement actors/models are initialized; it is therefore the evidenced current-heap allocation context for that path. This is not a runtime measurement of a custom renderer constructor. At explicit deletion, the free path uses whichever `sCurrentHeap` is current then. No PAL code in the audited destructor preserves the allocator heap identity across object lifetime. If creation and deletion happen under different current heaps, the wrapper can route free to the wrong heap. Scene heap bulk reclamation avoids per-allocation `__dl` for those arena allocations, but does not by itself prove safe ordering with resource-holder removal or callbacks.
+
+| Event | PAL heap evidence | What remains unknown |
+|---|---|---|
+| ModelX, J3DMtxBuffer, packet, and matrix allocation from normal scene placement | `__nw/__nwa` → null-heap `JKRHeap::alloc` → `sCurrentHeap`; Scene is selected before placement | No measured per-object allocation record; any exceptional explicit heap argument/branch must be checked at the exact callsite |
+| ModelX deleting destructor | `__dt__9J3DModelX` reaches conditional `__dl(this)`; `__dl` resolves current heap at deletion time | Which owner invokes it in ordinary gameplay, and whether deletion's current heap equals allocation heap |
+| Matrix arrays / packets | Their native constructors allocate through current-heap wrappers; audited destructors do not release all children | Whether another owner explicitly frees them before arena teardown |
+| Scene end | Scene-associated resources are removed, then scene heap handles are destroyed | Whether all model/animation callbacks have stopped using those resources before removal |
+
+#### `newJ3DModel` invalidation and shared model data
+
+`MR::newJ3DModel` is at `0x803E9668`. It obtains a `J3DModelData*` through the resource table, then calls `invalidateMtxCalc` at `0x803E9698` and `invalidateJointCallback` at `0x803E96A0` before the `J3DModelX` allocation/constructor (`__nw` at `0x803E992C`, constructor at `0x803E9948`). Exact PAL functions:
+
+| Function | PAL address / size / file offset | Exact mutation established by DOL |
+|---|---|---|
+| `invalidateMtxCalc(J3DModelData*)` | `0x803E7FC4`, `0x34`, file `0x3E3504` | Reads the joint count from model data `+0x2C` and joint pointer array from `+0x28`; loops over that count and stores zero at each referenced joint `+0x54`. |
+| `invalidateJointCallback(J3DModelData*)` | `0x803E7FF8`, `0x34`, file `0x3E3538` | Traverses the same model-data joint array/count and stores zero at each referenced joint `+0x04`. |
+
+The DOL proves these writes target joint objects reached through the supplied `J3DModelData`; Petari identifies the fields as the joint matrix-calculation procedure and joint callback. Thus the factory mutates model-data-reachable joint state. The pointer/array is shared if two model instances are passed the same `J3DModelData*`; these invalidations are not instance-local matrix writes.
+
+For the animated branch, Petari's `ModelManager::initModelAndAnimation` passes the model resource/name to `MR::newXanimePlayer`, and `ModelManager::initJointTransform` calls `XanimeCore::enableJointTransform(getJ3DModelData())`. The PAL symbol map places these at `0x8016979C` (factory), `0x80169678` (joint-transform setup), and `0x80018D98` (`XanimeCore::enableJointTransform`). This establishes the source-level dataflow and PAL function identities, not every call instruction or every mutation inside `enableJointTransform`. The exact post-invalidation joint writes performed by every animation mode, and whether separate players can coexist without overwriting one another's shared joint callbacks/calculators, are not fully established by this audit.
+
+**Finding:** a second instance cannot currently be described as sharing immutable model data safely. The PAL factory itself clears two per-joint model-data fields. Another initialization/animation path receives and enables transforms on the same model data. A second construction could reset state used by an existing model; subsequent animation setup could then replace shared joint behavior. This is a concrete shared-mutable-state hazard, not proof that every pair of instances visibly fails. Do not call `newJ3DModel` for a duplicate or implement model-data cloning until field-level coexistence and ownership are proven.
+
+#### Evidence-backed ownership status
+
+| Resource | Verified PAL behavior | Unknown / not claimed |
+|---|---|---|
+| `J3DModelX` object | vtable dtor target `0x802A8070`; body destroys embedded vertex buffer and conditionally frees `this` via current-heap `__dl` | Normal owner dispatch; complete base/child teardown; allocator-heap restoration |
+| `J3DModel` base portion | standalone dtor exists at `0x802A8134`, but ModelX dtor does not call it in the inspected body | Whether an external owner explicitly invokes it after a ModelX deletion |
+| `J3DMtxBuffer` object | created/stored by `entryModelData`; dtor exists at `0x80431FE0` | ModelX/Model owner invocation and who frees its internal arrays |
+| draw/normal/animation/bump arrays | created based on model data through current-heap allocators | Individual frees; any other explicit allocator owner |
+| shape/material packets and nested display-list storage | per-instance packet construction and vtable destructor targets exist | Matching destructor dispatch, nested buffer frees, and all shared-data mutations |
+| `J3DModelData`/archive | borrowed by `J3DModel`; resource-holder manager removes scene-owned holders before heap destruction | Correct ordering against any remaining model/animation readers; safety of a second user |
+| actor's ModelManager pointer | assigned by actor initialization in Petari; LiveActor PAL destructor does not delete it | Whether actor subclasses or alternate owners separately delete/clean it |
+| Scene allocation arena | bulk scene-heap destruction after holder removal | Per-actor destructor completion before destruction |
+
 ### Native ownership and release matrix
 
 | Resource/allocation | Creation and owner evidence | Native release evidence | Hazards / status |
@@ -163,9 +261,9 @@ The CLI crate's `render_ownership` module models a validated immutable resource 
 
 These host tests prove Rust ownership behavior for this model only. `Arc`, host allocations, synthetic heap IDs, and RAII are not the Wii allocator ABI, JKRHeap semantics, GX cache protocol, Dolphin behavior, or proof that actual `J3DModelX` destruction releases PAL allocations. In particular, the synthetic transactional rollback is not evidence that PAL `entryModelData` rolls back partial allocations. The model deliberately refuses to encode an executable construction/cleanup recipe.
 
-## Specific next experiment
+## One bounded follow-up experiment
 
-Run one **bounded, read-only PAL destructor-owner audit**: inspect the exact `J3DModelX` vtable destructor slots, all direct constructor callers, `ModelManager`/actor teardown call paths, and the scene-destroy order already identified in the PAL DOL. Determine whether any owner explicitly invokes ModelX, J3DModel, J3DMtxBuffer, shape-packet, or material-packet destructors before heap destruction, and whether that invocation runs with the allocation heap current. This resolves the missing destructor edge without touching live memory. If virtual dispatch or heap identity still cannot be proven statically, the next permitted experiment is a bounded observer of the exact model/manager/resource-holder pointers plus scene heap identity across one transition—read-only, no dereference beyond separately verified layouts. Stop if their lifetime cannot be tied to the same scene generation; runtime remains NO-GO.
+The static audit leaves one specific edge unresolved: whether any runtime owner dispatches the ModelX virtual destructor and what heap is current at that moment. The smallest permitted experiment is one opt-in, read-only observation of a single already-existing local model across one controlled scene transition: record the verified actor → `ModelManager` → `J3DModelX` pointer chain, the already-validated scene-generation/group identity, the scene heap handle, and `sCurrentHeap` immediately before transition and after the destination scene is stable. Use only fields whose PAL offsets are independently verified; do not follow a pointer merely because it lies in MEM1. The observations can establish object disappearance/reuse and heap identity around the transition, but cannot prove a destructor ran. If proving virtual dispatch remains necessary, the next required evidence is debugger instruction/branch tracing at the verified destructor entry; no memory write or forced deletion is allowed. Stop if the chain cannot be revalidated at every sample. This is not authorization for actor spawning or renderer implementation; runtime remains **NO-GO**.
 
 ## Exact synchronization and lifecycle contract
 
