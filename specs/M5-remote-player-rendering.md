@@ -2,7 +2,7 @@
 
 Status: research/specification only. No game-memory writes, executable patches, hooks, actor creation, or runtime rendering changes are authorized by this phase.
 
-M5 Phase 1.5 status: blocked before live actor-pointer inspection. See [PAL actor lifecycle investigation](../docs/references/pal-actor-lifecycle-investigation.md). A Penguin in Beach Bowl Galaxy's Sunken Treasure mission is the selected observation candidate; its constructor/init/vtable symbols are present in the PAL map, but its live pointer and lifecycle have not been established.
+M5 Phase 1.5 selected the Beach Bowl Sunken Treasure Penguin; Phase 1.6 implemented bounded read-only MEM1 inspection. In Phase 1.7, the user validated live game-ID and DOL-signature reads, but no live Penguin or actor pointer was observed. See [PAL actor lifecycle investigation](../docs/references/pal-actor-lifecycle-investigation.md) and [Penguin live investigation](../docs/references/penguin-live-investigation.md). The safe candidate path currently stops at the `SceneObjHolder + 0xC0` AllLiveActorGroup slot because the inherited group-array layout and live Penguin identity checks are unresolved.
 
 ## 1. Objective
 
@@ -116,7 +116,7 @@ Future runtime proof requires all of the following on PAL Rev 0, stock Dolphin 2
 
 Phase 1: validate symbol-map names/addresses against the local pinned PAL map and source links; review all proposed state rejection cases; `git diff --check`. No game runtime changes.
 
-Phase 1.5: do not add actor-pointer traversal until the AllLiveActorGroup layout and vtable address point are confirmed against the exact PAL build, and an arbitrary-range read-only backend is bounded and PID/game validated. Current 64 KiB stock mapping and M4 mailbox are insufficient for actor objects. The safe stop condition and manual workflow are documented in the Phase 1.5 investigation note.
+Phase 1.5/1.7: use only the bounded `inspect-memory` reader after PID, executable, session, mapping, RMGP01, DOL, and AllStars checks pass. The user has live-validated the game ID and a non-actor DOL code signature. The root chain may be sampled one pointer at a time through the verified `SceneObjHolder + 0xC0` group slot; do not read group internals until the exact PAL `NameObjGroup` layout, index bounds, and live type/address-point check are verified. No live actor pointer/lifetime evidence is claimed yet.
 
 Before actor implementation: produce a PAL instruction-signature manifest and resolve prototypes for constructor, model initialization, scheduler connect/disconnect, scene creation/destruction, and draw submission. Read-only Dolphin inspection must observe a known non-player actor's scene/scheduler lifetime in a playable scene. Confirm allocator ownership and archive lifetime from matching Petari source/disassembly.
 

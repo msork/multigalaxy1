@@ -1,8 +1,8 @@
 # PAL actor lifecycle investigation (M5 Phase 1.5)
 
-Status: **blocked before live actor-pointer inspection**. This work made no game-memory writes, hooks, patches, actor creation, allocator calls, scheduler changes, or Dolphin configuration changes. M4, the Gecko mailbox, AllStars, and isolated profiles are unchanged.
+Status: **blocked before live Penguin identity/lifecycle inspection**. M5 Phase 1.7 adds a read-only root-chain workflow, but no Dolphin process was running during this investigation and no live actor pointer was captured. This work made no game-memory writes, hooks, patches, actor creation, allocator calls, scheduler changes, or Dolphin configuration changes. M4, the Gecko mailbox, AllStars, and isolated profiles are unchanged.
 
-Evidence classification: symbol addresses and source layouts below are static evidence; the Beach Bowl/Penguin pairing is a reproducible test candidate; no live actor pointer, vtable, model pointer, scheduler entry, pause behavior, or transition behavior was observed in Dolphin during this phase.
+Evidence classification: symbol addresses and source layouts below are static evidence. The user has now live-validated the read-only backend with RMGP01 at `0x80000000` and a PAL DOL code signature at `0x800103A0`; no live actor/group pointer, Penguin identity, vtable, model pointer, scheduler entry, pause behavior, or transition behavior was observed. Beach Bowl/Sunken Treasure remains a reproducible test candidate.
 
 ## Target selected for a future read-only observation
 
@@ -35,24 +35,21 @@ Source-verified Petari layout:
 - `AllLiveActorGroup` constructs a `LiveActorGroup` named `AllLiveActorGroup` with capacity 2560. Its source iterates group entries to initialize actor system/clipping data. `LiveActorGroup::getActor(index)` returns an entry from its object array; group source also checks actor dead/alive state.
 - `NameObjExecuteHolder` has an execute-info array pointer at `+0x0C`, max size `+0x10`, count `+0x14`. An execute-info begins with its executed `NameObj*`; it stores scheduler category fields after that pointer. The PAL source has separate scene and draw connect/disconnect paths.
 
-Sources and local symbol map establish these fields and access patterns, but they do **not** establish the live `AllLiveActorGroup` allocation, its exact base-class array offsets/stride, live object-pointer membership, or scheduler array membership in the running scene. The relevant Petari base-class header is not present in this checkout, and its fetch was unavailable in this investigation. Those details must be validated from the matching header, exact PAL instruction bytes, and runtime identity checks before a host-side pointer walk is allowed.
+Sources, the local symbol map, and the PAL `getActor` bytes establish the group accessor's array-pointer load at `this + 0x14` and four-byte entry stride. They do **not** establish the live `AllLiveActorGroup` allocation/base-subobject relation, array allocation bounds, live count offset, object-pointer membership, or scheduler array membership in the running scene. The relevant Petari base-class header is not present in this checkout. Those details still require matching layout/count evidence and runtime identity checks before any group-body read.
 
 ## Safety assessment and blocker
 
-The existing stock Dolphin shared-memory reader deliberately maps only `0x10000` bytes from the MEM1 base. It exposes the game ID and Gecko handler/mailbox region. It cannot directly read the GameSystem singleton at `0x806A1228`, the `SceneObjHolder`, dynamically allocated actor objects, model managers, or scheduler arrays. The M4 client consumes the already-published position snapshot and does not expose actor object pointers.
+The bounded `inspect-memory` command can now read explicit ranges throughout the conservative 24 MiB retail MEM1 region. The user validated the basic live path with game ID and DOL signature reads. This does not itself validate any live object pointer; it is not a scanner and does not follow pointers. The M4 client consumes the already-published position snapshot and does not expose non-player actor object pointers.
 
 The existing GDB `probe-mario` is read-only and verifies PAL inputs plus the known Mario path, but it does not validate a non-player group layout or actor identity, and GDB performance has previously been a concern. Scanning RAM for a vtable-like word would not establish a live object: it risks matching stale heap data, interior pointers, copied vtables, or another instance of the class. A host pointer is never derived from a guest address; all future reads must remain explicit guest-address reads with bounded lengths and checks at each hop.
 
-**Therefore no generic actor reader or lifecycle command was added.** Safe inspection is blocked until one of these is supplied:
+**Therefore no generic actor reader or lifecycle command was added.** The statically supported candidate chain is GameSystem singleton `0x806A1228` -> `GameSystem +0x24` -> SceneController `+0xAC` -> Scene `+0x10` -> SceneObjHolder `+0xC0` (AllLiveActorGroup slot). This path is grounded in the PAL Mario root chain and Petari's SceneObjHolder enum. Each pointer still requires an individual bounded read and validation in the current live session. The safe stop point is the group slot: the live group type/base relationship, count offset, array allocation bounds, and actor identity check are unresolved. See [Penguin live investigation](penguin-live-investigation.md) for exact PowerShell commands and output handling.
 
-1. A read-only guest-memory backend that can read bounded arbitrary MEM1 ranges efficiently while validating PID, Dolphin 2609a identity, RMGP01 Rev 0, and mapping size; and
-2. Exact verified `AllLiveActorGroup`/`LiveActorGroup` member offsets and live object vtable address-point evidence, plus a validated way to distinguish the selected Beach Bowl `Penguin` placement from other instances.
-
-Without those, the requested pause/transition lifecycle trace cannot be reported. No guessed offset or scanned pointer is used as a substitute.
+The smallest safe next step is for the user to run that root-only sample in Sunken Treasure, while paused/resumed, and after a transition. If it returns validated live pointers, record them as user-observed runtime evidence. Do not inspect a group body or enumerate actors until exact PAL base-class layout and instance-identification evidence is obtained. Without that, Penguin identity and lifecycle remain unverified.
 
 ## Candidate future diagnostic contract
 
-Once unblocked, a diagnostic can read only the validated chain: `GameSystem -> active Scene -> SceneObjHolder -> AllLiveActorGroup -> bounded actor entry -> candidate Penguin`. It must cap group count at the verified capacity (and a smaller tool-side limit), check every 32-bit guest pointer for alignment and an allowed MEM1/MEM2 range before issuing a read, validate the actor type using verified live vtable evidence, validate the model-manager pointer similarly, and emit no data unless all checks pass. Reads are guest-memory API calls; the host must never cast a guest address into a host pointer.
+Once the group layout is verified, a diagnostic may read a bounded group entry only after validating count, capacity, array span, pointer alignment/range, and the correct live type/address-point. It must use a small tool-side cap, distinguish the group code/vtable symbols from heap objects, and emit no actor data unless all checks pass. Reads are explicit guest-memory requests; the host must never cast a guest address into a host pointer.
 
 Each record should include host timestamp, Dolphin PID, `RMGP01` identity status, scene pointer/epoch if verifiable, group count, actor pointer, vtable value, name pointer/string (bounded and terminated), position/rotation/gravity, model-manager pointer, and scheduler membership only if each path is independently validated. On invalid/missing evidence it must emit `unavailable` or a specific validation failure, never fall back to a memory scan.
 
@@ -90,7 +87,7 @@ Completed checks for this documentation-only phase:
 - `cargo run -p multigalaxy -- validate-mario-map reference\original\main.dol target\petari-rmgp01-symbols.txt`: passed; PAL RMGP01 Rev 0 DOL and Petari symbol fingerprints and existing Mario-chain signatures verified.
 - No Dolphin lifecycle test was run because no safely validated non-player pointer path is implemented. No runtime observation is claimed.
 
-To reproduce the visual target manually, launch the already-prepared isolated profile using the normal MultiGalaxy launcher, select **Beach Bowl Galaxy > Sunken Treasure**, and leave a Penguin in view. Do not use `--gecko-bridge-probe` for this read-only check because that diagnostic exchanges mailbox acknowledgements. The missing actor diagnostic means no actor-pointer fields will be printed yet. Pause/resume and transition out of and back into the galaxy; these are visual controls only in this phase, not actor lifecycle measurements.
+For root-only pointer observation, follow [Penguin live investigation](penguin-live-investigation.md). Launch the already-prepared isolated profile, select **Beach Bowl Galaxy > Sunken Treasure**, and sample the chain while a Penguin is visible, paused/resumed, and after a transition. Do not use `--gecko-bridge-probe`; that diagnostic exchanges mailbox acknowledgements. Stop at the AllLiveActorGroup slot: the current commands deliberately print no actor entries or Penguin fields.
 
 ## Sources
 
