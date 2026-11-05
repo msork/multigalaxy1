@@ -2,6 +2,8 @@
 
 Status: research plus opt-in read-only actor-class and scheduler-metadata observers. No game-memory writes, executable patches, hooks, actor creation, or runtime rendering changes are authorized by this phase.
 
+M5 Phase 1.15: scene-init reservation architecture and exact GameScene placement → callback-buffer allocation → initial connection ordering are documented in [M5 scene-init reservation](M5-scene-init-reservation.md). Three inert reserved actors are a static design deduction only; capacity safety, resource ownership, and runtime activation/hide behavior remain unverified.
+
 M5 Phase 1.14: user-reported live callback metadata from PID 119908 is documented in [Penguin rendering research](../docs/references/penguin-rendering-path.md): movement `0x28` 25/52, calcAnim `0x06` 13/18, draw-buffer `0x10` executors 7/80 and active 3/80, execute-holder 1702/4096, all five pending flags zero. These aggregate counts do not identify Penguins or prove spare slots safe to consume. The observer remains read-only; no registration/spawn was tested.
 
 M5 Phase 1.13: added the opt-in callback-list metadata observer specified in [M5 callback-list observer](M5-callback-list-observer.md). It targets movement `0x28`, calcAnim `0x06`, and Penguin draw-buffer group `0x10`, and reads metadata only.
