@@ -77,6 +77,51 @@ The opt-in read-only `observe-heaps` implementation and its exact PAL global/fie
 
 ## Scheduler and model-resource ownership assessment
 
+### User-reported mission-transition sample
+
+PID `86776` was sampled by the user on PAL RMGP01 Rev 0. In Beach Bowl, the live group was `0x80FA07D8` with 1164 registered actors and 16 Penguin-vptr matches. After entering the destination, the group was `0x80FA074C` with 166 registered actors and no Penguin matches. The scene address remained `0x80F8EF70`; the Scene Napa/current-heap value remained `0x80F8EEF0`.
+
+This is evidence that the observed group contents and group address differed between the two samples. It does **not** prove that the Scene heap was destroyed, that the same scene instance persisted, or that an allocation used that heap during construction. The observer compares addresses and has no scene-generation counter; address reuse is possible. `sCurrentHeap` was sampled during gameplay, not at an actor constructor/allocation call. No constructor-time heap identity or heap-destruction event is claimed. This is user-reported evidence, not a capture independently made in this documentation pass.
+
+### Execute-info creation and scheduler registration (static PAL trace)
+
+The ordinary registration route is scene-owned and record-based. It is not a general-purpose “add actor” API:
+
+| Step | PAL symbol/address | DOL file offset | Verified behavior |
+|---|---:|---:|---|
+| Create the scene object registry | `Scene::initSceneObjHolder` `0x80343890` | `0x33EDD0` | Initializes the per-scene `SceneObjHolder`. |
+| Lazily create scheduler holder | `SceneObjHolder::create` `0x80344A14` | `0x33FF54` | Constructs a requested SceneObj once, invokes its init path, then stores it in its slot. |
+| Scheduler holder slot | SceneObj id `0x58` | holder base `+0x160` | `SceneObj_NameObjExecuteHolder`; Petari constructs `NameObjExecuteHolder(4096)` for this slot. |
+| Allocate execute-info array | `NameObjExecuteHolder::NameObjExecuteHolder` `0x802629BC` | `0x25DEFC` | Sets max `4096` at holder `+0x10`, count `0` at `+0x14`, and allocates 12-byte records through the array pointer at `+0x0C`. |
+| Append record | `NameObjExecuteHolder::registerActor` `0x80262140` | `0x25D680` | Uses current count to select `array + count*12`, calls `NameObjExecuteInfo::setConnectInfo`, stores the index in `NameObj::mExecutorIdx` at `+0x0A`, then increments count. **The PAL routine has no capacity check before append.** |
+| Fill a record | `NameObjExecuteInfo::setConnectInfo` `0x80261C50` | `0x25D190` | Record: object pointer `+0x00`; connection/status bytes `+0x04/+0x05`; movement `+0x06`; calcAnim `+0x07`; draw `+0x08`; draw-buffer `+0x09`; draw-buffer result `+0x0A`. |
+| Enter the common registration route | `registerNameObjToExecuteHolder` `0x8026266C` | `0x25DBAC` | Resolves SceneObj id `0x58` and calls holder registration. |
+| Register execution/draw categories | `NameObjExecuteInfo::connectToScene` `0x80261F48`; `connectToDraw` `0x80262040` | `0x25D488`; `0x25D580` | Adds selected movement/calcAnim callbacks and draw/draw-buffer callbacks to separate `NameObjListExecutor` lists. Matching disconnect routines are `0x80261FC4` and `0x802620C0`. |
+
+The category tuple passed by the existing `connectToSceneNpc` helper at `0x803EF020` is `(movement=0x28, calcAnim=0x06, drawBuffer=0x10, draw=-1)`. Its branch reaches `registerNameObjToExecuteHolder`. These values describe the existing NPC route only. They are **not** authorized defaults for a cosmetic proxy: category indices select scheduler lists and must be matched to the intended methods and side effects. `LiveActor::makeActorAppeared`/`makeActorDead` use temporary connect/disconnect operations on an already registered record; they do not create or remove the record, its AllLiveActorGroup entry, or clipping registration.
+
+Petari source corroborates the record layout and callback-list behavior in [`NameObjExecuteHolder.hpp`](https://github.com/SMGCommunity/Petari/blob/master/include/Game/NameObj/NameObjExecuteHolder.hpp), [`NameObjExecuteHolder.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/NameObj/NameObjExecuteHolder.cpp), and [`SceneObjHolder.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/Scene/SceneObjHolder.cpp). The PAL disassembly independently establishes the addresses, record stride, holder fields, and unchecked append. Source semantics do not prove safe dynamic registration during arbitrary runtime phases.
+
+Scene transition destroys the scene object holder and executor-owned scheduler tables before the scene heaps are destroyed. The execute-info array is owned by that scene scheduler; it is not an actor owner. A `NameObj`'s `mExecutorIdx` is meaningful only with the matching live holder/scene. Pending/deferred connection requirements and callback lists make mid-teardown registration or disconnection hazardous. Host-side actor/scheduler handles must be discarded before any possible scene teardown; numeric address equality cannot be used as a generation token.
+
+### Resource/model prerequisites
+
+The normal placement path calls `requestMountObjectArchives` before constructing and initializing actors (`PlacementInfoOrdered::requestFileLoad`, `0x80341FD4`; `initPlacement`, `0x8034207C`). A runtime-created remote visual would bypass this prefetch. `ModelManager::init` (`0x80169AD0`, file offset `0x165010`) creates one resource holder for its model archive and, when separate, another for animation. `ResourceHolderManager::createAndAddInner` (`0x803A6DE4`) obtains the current heap when no explicit heap is supplied; teardown removes holders associated with the Scene heap before bulk heap destruction (`removeIfIsEqualHeap`, `0x803A6BCC`). Petari [`ModelManager.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/ModelManager.cpp) and [`ResourceHolderManager.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/Util/ResourceHolderManager.cpp) describe this path.
+
+Still unresolved: an archive known to be mounted in a selected test scene; complete transitive ownership of J3D model/animation/display-list/GX allocations; the scheduler category and minimal callback implementation for a non-gameplay visual; and whether dynamic registration during the intended phase is safe. The NPC category tuple must not be copied by assumption.
+
+### Smallest future registration proof and stop conditions
+
+Before any runtime write or spawn, a separately authorized phase must perform read-only checks that:
+
+1. Re-resolve the active scene and SceneObjHolder chain and validate the execute-holder vptr, array pointer, record stride, count, and capacity for that exact scene. `registerActor` itself does not check `count < 4096`; stop if capacity cannot be proven with headroom. Never call it based only on the advertised maximum.
+2. Confirm a candidate category tuple from exact PAL callbacks and prove each list’s capacity/registration behavior. Require a custom update path that only consumes a bounded snapshot and sets a transform; it must not invoke NPC AI, gameplay gravity, sensors, collision, camera, sound, or progression.
+3. Confirm an already mounted model/archive and its ownership/cleanup path. Do not copy another actor’s model-manager pointer.
+4. Prove the registration phase, deferred connect/disconnect processing, draw-buffer setup, and teardown ordering for a scene-scoped object. On disconnect, hide only after its side effects are known; retain storage until proven scene cleanup. Invalidate all host handles on scene transition.
+5. Use one local synthetic bounded pose in one fixed mission first. Stop on scene/group/holder identity change, stale record index, pending scheduler state, count near capacity, missing archive, invalid heap context, callback after teardown, or any change to an existing actor/Mario/camera/input/gameplay state.
+
+The smallest next *read-only* evidence step is a targeted execute-holder observation using the existing validated MEM1 reader: derive the current scene and SceneObjHolder afresh, then inspect only the `0x58` slot and its `+0x0C/+0x10/+0x14` fields with vptr, alignment, address-range, count/capacity, and consistency checks. Sample once in the source scene and once after the transition, not continuously. No such observer was added in this research-only pass. Until those observations and callback/resource prerequisites are proven, dynamic registration and actor creation remain blocked.
+
 The exact PAL `NameObjExecuteInfo` routines register movement and calc-animation callbacks separately from draw and draw-buffer callbacks according to fields in an existing execute-info record. Their matching disconnect routines remove those callback registrations. `NameObjExecuteHolder` resolves a record for a `NameObj` before connecting it. Petari's [`NameObjExecuteHolder.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/NameObj/NameObjExecuteHolder.cpp) and [`LiveActor.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/LiveActor.cpp) corroborate that lifecycle.
 
 Static facts and deductions:

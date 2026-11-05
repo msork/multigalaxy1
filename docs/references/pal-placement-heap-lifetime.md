@@ -115,6 +115,19 @@ The future experiment must be isolated to a reversible patch/profile. On failure
 
 ## Smallest further experiment
 
+### User-reported mission transition comparison (PID 86776)
+
+The user reports these read-only PAL RMGP01 Rev 0 observations:
+
+| Sample | Scene | AllLiveActorGroup | Registered count | Penguin matches | Scene Napa / current heap |
+|---|---:|---:|---:|---:|---:|
+| Beach Bowl | `0x80F8EF70` | `0x80FA07D8` | 1164 | 16 | `0x80F8EEF0` |
+| Destination | `0x80F8EF70` | `0x80FA074C` | 166 | 0 | `0x80F8EEF0` |
+
+These are user-reported samples, not a capture independently repeated in this pass. They show a different live actor-group address and contents between the observations while the reported scene and Scene Napa/current-heap numeric addresses stayed the same. They do not establish whether the Scene instance was reused, whether heap memory was destroyed/recreated, or whether either address was reused by an allocator. The current heap was sampled during gameplay; there was no observation at Penguin constructor/allocation time. Do not infer constructor-time heap selection or heap destruction from these values.
+
+The pair is useful as a transition diagnostic, but the observer is address-based and does not track a scene-generation counter. An unchanged address is inconclusive. A future safe reader should re-resolve the scene/group chain within each single sample and discard inconsistent reads; the user should record mission names and sample after gameplay has settled. It should not poll continuously or follow pointers from a prior sample.
+
 The read-only `observe-heaps` command performs a bounded, double-sampled correlation of `sCurrentHeap`, both Scene heap handles, active scene address, and AllLiveActorGroup address. For a mission-transition comparison, use one Dolphin PID and sample once after gameplay is established in the source mission. Leave it through normal in-game flow, load a different mission, wait until gameplay is established again, and sample once more. Each invocation re-resolves the entire GameSystem → controller → scene → holder → group chain and discards the result if scene/group/heap pointers change during that sample. No continuous polling is needed, and the command does not observe constructor calls.
 
 This comparison is address-based: a changed scene/group/heap pointer is evidence that the sampled identity changed. An unchanged address is inconclusive because memory can be reused; it does not prove no transition occurred. Record mission names separately. A sample during the transition may fail because there is no active scene/group; that is a safe failure, not a reason to retry in a tight loop. The tool does not keep a scene generation counter.
