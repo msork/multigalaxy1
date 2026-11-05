@@ -1,50 +1,40 @@
-# Architecture
+﻿# Architecture
 
 ## Product shape
 
-MultiGalaxy1 is an online-only Rust launcher/mod stack. Each participant runs a separate local PAL Galaxy 1 session in Dolphin and renders their own full-screen camera. There is no local split-screen and no Dolphin NetPlay. Game simulation executes in each client; the custom online layer communicates actor snapshots and shared events.
+MultiGalaxy1 is a Rust-first, online-only mod for PAL Super Mario Galaxy 1. Each participant runs one official, unmodified Dolphin instance and receives a full-screen local camera. There is no Dolphin NetPlay and no local split-screen.
 
 ```text
 Rust launcher/client
   ├─ lobby, identity, game/revision/localization validation
-  ├─ Rust transport, prediction, and reconciliation
-  ├─ Dolphin process lifecycle (one instance per player)
-  └─ versioned local IPC
-       └─ injected game-side bridge (verified PPC/C++ shim; Rust where target permits)
-            └─ SMG1 actor, input, progression, and rendering hooks
+  ├─ Rust transport, prediction, reconciliation, authority
+  ├─ official Dolphin process lifecycle and isolated profiles
+  └─ candidate stock-compatible guest/host bridge (not yet proven)
+       └─ verified PAL PPC hooks and remote actor presentation, if feasible
 
 Authoritative session server
   ├─ lobby/membership/character reservations
-  ├─ tick and protocol negotiation
-  ├─ shared progression and contested interaction arbitration
-  └─ validation, snapshots, reconnect policy
+  ├─ protocol and tick negotiation
+  ├─ progression and contested interaction arbitration
+  └─ sequenced events, snapshots, reconnect policy
 ```
 
 ## Rust-first workspace
 
-- `multigalaxy-patch`: safe DOL parsing, PAL revision fingerprints, hook conflict validation.
-- `multigalaxy` CLI/launcher: game validation, Dolphin lifecycle, local IPC startup.
-- Planned `multigalaxy-protocol`: versioned wire messages and state types.
-- Planned `multigalaxy-network`: client/server transport, lobby, authoritative session model.
-- Planned `multigalaxy-game-bridge`: launcher-side IPC client and bridge protocol.
-- Game runtime modules contain only narrow verified hooks/bindings. Keep portable character rules in Rust when Wii toolchain capabilities permit; C++/PPC may be unavoidable.
-
-No standard Rust target establishes Wii Broadway ABI/link compatibility. Rust runtime support is conditional on proving big-endian PPC EABI, compiler/linker, runtime, panic handling, and DOL integration. Launcher, networking, protocol, tests, and patch tools remain Rust.
+Rust owns the launcher, protocol, networking, lobby, portable character rules, patch tooling, validation, and tests. Minimal PPC assembly or C/C++ is permitted only for verified game ABI integration. Platform-specific code remains isolated. No stock Dolphin source modifications, custom builds, or Dolphin binary redistribution are allowed.
 
 ## State and authority
 
-Player slots are stable session identities and own transform, velocity, facing, animation, gravity frame, ability state, health, and life state. Bridge messages include session tick and build identity. Camera and locale are per-client presentation state and excluded from authoritative simulation hashes.
+Player slots are stable identities with transform, velocity, facing, animation, gravity frame, ability, health, and life state. Camera and locale are per-client presentation state and excluded from authoritative simulation hashes. Clients can predict responsive local motion; the server arbitrates progression, stars, boss transitions, shared item ownership, death/respawn, stage changes, and contested interactions. This architecture is a target only: no live bridge or online gameplay is verified.
 
-Clients predict responsive local movement and cosmetic animation where correction is safe. The server arbitrates progression, stars, boss phase transitions, shared item ownership, death/respawn, stage transitions, and contested interactions. It publishes sequenced authoritative events and periodic snapshots. Client reconciliation occurs through verified bridge hooks; never write arbitrary game memory through guessed offsets.
+## Stock Dolphin boundary
 
-## Dolphin integration
+A launcher alone cannot expose or render game actors. Stock Dolphin exposes GDB diagnostics, but GDB's runtime cost is not quantified and it pauses on startup. MemoryWatcher is not compiled into Windows 2609a and is one-way. Gecko/DOL patches can execute guest code, but do not inherently provide host IPC. External process memory is unsupported and may race the emulation thread. A low-overhead bidirectional bridge must pass a stock-only feasibility test before implementation. See [stock bridge research](stock-dolphin-bridge.md).
 
-A separate launcher cannot expose game actors by itself. The minimal runtime proof needs a game-side bridge to read local Mario state, represent remote characters as rendered actors, and accept authoritative events. BSMSO documents a RAM-mailbox bridge between its launcher and game module, with a custom PPC module and relay server. It is a reference only; retain its GPL-3.0 license and do not incorporate its code without a separate review. Independently investigate Dolphin debugger, memory and source IPC options before selecting a versioned mailbox/injected bridge or a small emulator fork. Do not rely on brittle UI automation or unbounded raw memory scanning.
+## PAL and localization
 
-## PAL and localization identity
+Bind support only to verified PAL game ID, revision, DOL hash, provenance, and instruction signatures. Unknown builds fail closed. Gameplay data must match across peers; Russian, French, and English presentation assets remain client-local only after proving they do not affect simulation. Required multilingual interoperability is not yet tested.
 
-Support only PAL SMG1 builds with exact verified ID/revision/DOL maps. Reject unknown versions. Gameplay payloads must match across peers. Russian, French, and English presentation assets remain local and can differ only after audit proves they cannot affect simulation. See `docs/localization.md` and `docs/references/russian-patch.md`.
+## Mandatory controller patch
 
-## Runtime investigation status
-
-The launcher has an opt-in `--mute` argument strictly for test/debug sessions. GDB remains a development-only diagnostic. The preferred Dolphin-integrated bridge is an opt-in 2609a source patch under `tools/dolphin-bridge/`; it initializes a Windows mapping before emulation and publishes from the frame-end CPU callback. The payload contains only title identity, callback counters, and a guarded MEM1 test word. The Rust reader checks ABI/schema and heartbeat freshness. Source patch application/build, live publication, 60 Hz cadence, and full-speed gameplay remain unverified because no Dolphin source checkout is available. The `bench-dolphin` harness is ready for interactive CPU/OSD measurements. The launcher uses isolated profiles and refuses launches from a noninteractive desktop. Mario coordinates and emulated writes remain out of scope. See [runtime research](research.md), [performance design](performance.md), and [Dolphin bridge instructions](../tools/dolphin-bridge/README.md).
+The PAL AllStars Classic Controller patch remains mandatory on launcher gameplay paths, with both L/ZL and R/ZR swaps enabled. Third-party patch files remain external and separately licensed/attributed. Exact PAL Rev 0 fingerprints are checked before launch. The patch does not provide the online bridge.

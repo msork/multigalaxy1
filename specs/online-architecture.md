@@ -1,41 +1,38 @@
-# Online architecture specification
+﻿# Online architecture specification
 
 ## Objective
 
-Implement online-only co-op for up to four PAL SMG1 players. Every player runs their own Dolphin instance with a full-screen camera. Dolphin NetPlay and local split-screen are excluded.
+Implement online-only co-op for up to four PAL SMG1 players. Each participant runs official, unmodified Dolphin with their own full-screen camera. Dolphin NetPlay and local split-screen are excluded. The product requirement depends on proving a stock-Dolphin-compatible game bridge first.
 
 ## Verified research
 
-- Dolphin runs game instances but the project has not established a supported generic remote game-state API; a verified game-side bridge is required to create remote actors.
-- SM64CoopDX documents a client/server model, network player records, reliable packets, and mod/game-level synchronization. Better Sunshine Online is a relevant GameCube-era reference; its code/license need direct audit before reuse.
-- Galaxy 1 engine hooks and exact supported PAL revision remain unverified. Rust PPC runtime compatibility is not proven.
-- Russian patch archive `SuperMarioGalaxy_wii.rar` is not locally available; its contents/revision/license remain unaudited.
+- Stock Dolphin 2609a GDB provides guest-memory protocol operations, but pauses at startup and is development-only here; actual overhead is not numerically benchmarked.
+- Windows Dolphin 2609a does not compile MemoryWatcher; upstream's UNIX implementation is one-way changed-value reporting.
+- Gecko/DOL patches can execute guest code but do not inherently establish host IPC.
+- External process memory is unsupported as a general guest-memory interface and may race emulation.
+- SM64CoopDX and Better Sunshine Online are architecture references only; their licenses and engine/tool compatibility require separate audit before code reuse.
+- Exact game hooks and remote actor lifecycle remain unverified.
 
 ## Functional requirements
 
-- Host/join lobby supports 1–4 uniquely identified players and reserves Mario/Luigi/Wario/Waluigi.
-- Every client operates one local Dolphin process and has independent input, camera, locale, and rendering.
-- Clients exchange sequenced transforms, orientation, animation, gravity, abilities, health/life state, and stage identity.
-- Server arbitrates shared rewards, progression, contested interactions, boss phases, deaths/respawns, and transitions.
-- Clients predict local motion where safe and reconcile against server state.
-- Russian/French/English PAL assets stay client-side and are admitted only through a manifest/allowlist after gameplay isolation audit.
+- Lobby supports 1–4 player identities and Mario/Luigi/Wario/Waluigi reservations.
+- Each user runs one official Dolphin, with independent input, camera, locale, and rendering.
+- Clients exchange sequenced state and shared events through a verified bridge.
+- Server arbitrates rewards, progression, boss phases, shared ownership, death/respawn, transitions, and contested interactions.
+- Russian/French/English PAL presentation remains client-side only after gameplay isolation audit.
 
 ## Technical design
 
-Rust workspace owns launcher, protocol, networking, lobby, state validation, prediction/reconciliation, patching, and tests. The preferred bridge is an opt-in Dolphin 2609a source patch using a verified frame-end CPU callback, guarded MMU reads, and the existing versioned shared-memory ABI. A minimal C++ publisher and Rust read-only watcher are implemented; the Dolphin patch has not been applied or built. It publishes only RMGP01 Rev 0 identity, callback counters, and a guarded MEM1 test word. GDB remains development-only. Never use guessed memory offsets.
+Rust owns launcher, protocol, networking, lobby, state validation, prediction/reconciliation, patching, and tests. No Dolphin source patch, fork, custom build, or modified Dolphin executable is allowed. The transport between injected guest code and Rust host remains an open feasibility question; investigate stock interfaces and benchmark before implementing it. Never use guessed guest or host addresses.
 
-## Dependencies
+## Dependencies and risks
 
-Exact PAL game/revision reference; Dolphin executable/source investigation; compatible injection and bridge mechanism; controller patch integration; local game files supplied by users; licensed/distributable character assets.
+Needs exact PAL hooks, a stock bridge mechanism, actor/render integration, controller patch compatibility, latency/reconciliation design, and licensed character assets. Key risks are singleton assumptions, simulation divergence, locale data affecting gameplay, and the possibility that stock Dolphin has no supported low-overhead bidirectional channel.
 
-## Risks
+## Acceptance
 
-Engine singleton assumptions; actor creation/render integration; incompatible per-client translated gameplay data; latency and gravity-dependent movement; desyncs; revision fragmentation; Rust Wii toolchain/ABI; scope of Dolphin fork.
+Two official Dolphin instances join one local server, exchange live verified game state, and visibly render each other's character with independent cameras and controls. Later acceptance covers four players, progression/reconnect, and Russian/French/English PAL. No compile-only claim satisfies this requirement.
 
-## Acceptance criteria
+## Testing
 
-Two Dolphin instances join one local server, exchange real bridge-derived player state, and visibly render each other's character while retaining independent local cameras/controls. Four-player lobby and authority tests pass. Russian, French, and English PAL clients can share one session without cross-locale UI changes or gameplay divergence. No completion claim before runtime evidence.
-
-## Testing strategy
-
-Protocol and authority tests use synthetic states and loss/reorder fixtures. Runtime testing uses two then four Dolphin processes and a legally supplied matching PAL build. Record boot, remote rendering, latency, reconnect, progression, language, and desync outcomes separately.
+Use synthetic protocol tests first. Runtime verification must record official Dolphin build, PAL identity/revision, bridge cadence, gameplay Speed/FPS/VPS, network latency, state correction, locale, and desync behavior separately.

@@ -56,4 +56,4 @@ The four-condition benchmark procedure and source-level GDB overhead investigati
 
 ## Dolphin integrated bridge
 
-The 2609a source patch, exact source paths, ABI layout, and fork licensing are documented in [tools/dolphin-bridge/README.md](../tools/dolphin-bridge/README.md). Automated Rust tests validate the fixed outer layout, payload schema, PAL identity/revision, allowed MEM1 test address, and stale-heartbeat threshold. `git apply --stat tools/dolphin-bridge/integration-2609a.patch` validates patch syntax. There is no Dolphin source checkout/compiler in this workspace, so the C++ patch is not built and live publication, callback cadence, and emulation speed are not verified.
+The retired Dolphin source patch/shared-memory design is not part of the supported build. Stock-Dolphin options, verified limitations, and the required interactive feasibility benchmark are documented in [stock-dolphin-bridge.md](stock-dolphin-bridge.md). No live bridge publication, 60 Hz game-state exchange, or stock-Dolphin performance result is verified.

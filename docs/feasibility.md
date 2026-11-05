@@ -1,27 +1,27 @@
-# Feasibility
+﻿# Feasibility
 
 ## Current assessment
 
-Four-player online play is technically plausible but requires modifying the game engine path. Each user runs their own Dolphin and the mod renders remote actors locally. SMG1 was built around one Mario and global state; a second character requires understanding actor lifecycle, update, collision, gravity, interactions, camera ownership, HUD, and progression.
+Four-player online play depends on game-engine integration. Each client runs its own official Dolphin and must render remote actors locally. SMG1 assumes one Mario and global state; actor lifecycle, collision, gravity, interactions, camera ownership, HUD, and progression need reverse engineering.
 
-BSMSO provides a concrete GameCube/Dolphin precedent: a PPC game module exports local player state and renders remote players, a launcher communicates through a RAM mailbox, and a relay server forwards state. Its GPL-3.0 code is not incorporated into this MIT project. Galaxy-specific bridge feasibility remains unproven.
+BSMSO is a precedent for a game module, launcher mailbox, and relay server, but its architecture relies on game-specific integration and its GPL-3.0 code is not incorporated. It does not prove a stock SMG1 bridge.
 
-The largest integration risk is a reliable game-side data path. A launcher alone cannot see structured gameplay state. First investigate Dolphin source/debugger/memory APIs, then prefer an injected bridge with versioned IPC. A small Dolphin fork is an option only if the needed lifecycle, memory, or process APIs are unavailable upstream. Do not use unverified address scanning.
+## Stock Dolphin go/no-go
 
-Classic Controller input uses the external Dolphin AllStars per-frame patch, with both requested shoulder swaps merged deterministically. The patch's sites are statically checked against the exact PAL Rev 0 DOL and future registered hooks; Dolphin 2609a runtime behavior and conventional pad mappings still need gameplay validation. The patch itself stays outside the repository.
+MultiGalaxy1 must use official, unmodified Dolphin. Do not restore the former source fork or build pipeline. Gecko/DOL patches can execute guest PPC code but do not supply host IPC. Dolphin 2609a GDB is available for development but pauses on startup and its performance impact is unquantified. Windows 2609a excludes MemoryWatcher, whose UNIX implementation is one-way. External process memory has no supported guest-RAM mapping and risks races. See [stock bridge feasibility](stock-dolphin-bridge.md).
 
-## Rust-first go/no-go gates
+Before implementing the online game bridge, test a stock-only option for verified PAL hook activation, bidirectional state at approximately 60 Hz, and no noticeable slowdown. If this cannot be achieved, document the limitation and alternatives rather than reintroducing a Dolphin fork.
 
-1. Continue Rust for launcher, networking, protocol, patch tooling, simulation data, and host tests.
-2. Prove object generation/linking for the Wii Broadway ABI before putting Rust in injected runtime.
-3. Select narrow C/C++/PPC hooks if Rust target, ABI, or linker feasibility fails.
-4. Boot a harmless verified hook on Dolphin before depending on it for multiplayer.
+## Controller and Rust feasibility
+
+Classic Controller input uses externally supplied Dolphin-compatible AllStars patches, including both requested shoulder swaps. Exact PAL Rev 0 DOL composition is statically checked; runtime behavior and conventional controller mapping need gameplay validation. Patch files remain external.
+
+Rust remains primary for launcher, networking, protocol, patch tooling, simulation, and tests. Prove Wii Broadway ABI/compiler/linker support before using Rust in injected runtime; narrow C/PPC hooks remain possible if needed.
 
 ## Not established
 
-- Exact PAL revision mapping and hook semantics.
-- Dolphin bridge mechanism and any requirement for a fork.
-- Real game-state exchange or remote actor rendering.
-- Online latency, authority/prediction, four-player stability, progression, or locale separation.
+- Live Mario coordinates, verified actor hooks, or remote actor rendering.
+- Stock Dolphin bidirectional bridge or its performance.
+- Online latency, four-player stability, progression, or localization isolation.
 - Rust Wii runtime compilation.
 - Russian patch contents, revision, and license.

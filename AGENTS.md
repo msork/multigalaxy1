@@ -3,7 +3,7 @@
 - MultiGalaxy1 is PAL-only and **online-only**. Do not add Dolphin NetPlay or local split-screen requirements/plans. Each participant runs one Dolphin instance with a full-screen local camera.
 - Rust is default for portable logic, launcher, transport, protocol, patch tooling, and tests. Use minimal C/C++/PPC only for verified engine integration; isolate and document FFI and `unsafe`.
 - Never apply guessed addresses or offsets. PAL maps bind exact game ID, disc revision, DOL hash, provenance, and original instruction signatures. Unknown builds fail closed.
-- The online design needs a game-side bridge: Dolphin does not provide an established supported general-purpose remote game-state API. Investigate debugger/memory/source APIs; prefer versioned IPC from an injected bridge over brittle memory scanning.
+- Stock Dolphin only: never build, modify, or distribute custom Dolphin binaries/source patches. Dolphin does not expose a supported general-purpose game-state API; investigate stock-compatible mechanisms and document limitations before implementing a bridge. Do not use guessed memory scanning.
 - Network identity, transport, lobby, prediction, interpolation, authority, and resync belong in Rust crates. The server arbitrates shared progression and contested interactions; clients may predict local movement and reconcile authoritative state.
 - Every player has independent controls, character, camera, and client-local presentation. Locale assets must not affect gameplay state. Russian/French/English PAL is a required test, not a compatibility claim.
 - Character slots: Mario, Luigi, Wario, Waluigi. Keep portable character rules separate from engine bindings.

@@ -1,17 +1,17 @@
-# Milestones
+﻿# Milestones
 
-| ID | Scope | Status |
+| Milestone | Scope | Status |
 |---|---|---|
-| M0 | Research, reverse engineering, PAL feasibility, architecture | In progress; DOL analysis verified; exact PAL build and game bridge unresolved |
-| M1 | Rust launcher foundation, reproducible patching, verified PAL injection | Not started |
-| M2 | Dolphin lifecycle and versioned game-side IPC bridge | Exact Dolphin 2609a source acquired; bridge patch applies cleanly; VS 2026 release Dolphin builds successfully. Live GUI boot, snapshot cadence, and performance verification remain blocked on interactive desktop launch |
-| M3 | Two-Dolphin state exchange and visible remote character | Not started; first runtime online proof |
-| M4 | Four-player sessions, lobby, identity, character assignment | Not started |
-| M5 | Server authority, prediction/reconciliation, progression and recovery | Not started |
-| M6 | Character-specific movement and Wario/Waluigi abilities | Not started |
-| M7 | Russian/French/English client-local PAL localization validation | Research only; Russian archive audit pending |
-| M8 | Dolphin Classic Controller per-frame patch and conventional gamepad mapping | AllStars + both shoulder swaps statically checked for exact PAL Rev 0 and isolated-profile configuration implemented; Dolphin 2609a runtime and bindings unverified |
-| M9 | Campaign compatibility, interactions, deaths, transitions, stability | Not started |
-| M10 | Performance, packaging, documentation, release | Not started |
+| M0 | Research, reverse engineering, PAL feasibility, architecture | In progress; official DolphinTool validates RMGP01 Rev 0; stock bridge remains unproven |
+| M1 | Reproducible Rust patch tooling and verified PAL maps | Partial; DOL parser/differ and safe patch composition tests exist; no runtime hook is accepted |
+| M2 | Stock Dolphin bridge feasibility | In progress; fork/shared-memory implementation retired; GDB/MemoryWatcher/Gecko/external-memory tradeoffs documented; interactive performance test pending |
+| M3 | Two-client state exchange and visible remote character | Not started; blocked on M2 and verified game-side hooks |
+| M4 | Generalized four-player engine | Not started |
+| M5 | Independent per-client camera/render integration | Not started |
+| M6 | Wario/Waluigi models and abilities | Not started |
+| M7 | Online authority and synchronization | Not started |
+| M8 | AllStars Classic Controller and conventional gamepads | Static AllStars + shoulder-swap validation and isolated profile support exist; runtime input validation pending |
+| M9 | Campaign, cutscenes, progression, stability | Not started |
+| M10 | Performance, packaging, release | Not started |
 
-No milestone is complete until acceptance criteria and evidence are recorded. Dolphin NetPlay and local split-screen are out of scope.
+No milestone is complete until its acceptance criteria and evidence are recorded. Dolphin NetPlay and local split-screen are permanently out of scope. Official Dolphin binaries and the user's RVZ remain unmodified.
