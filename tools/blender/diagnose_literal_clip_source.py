@@ -30,6 +30,8 @@ def cli():
     p.add_argument("--target-rig", default="LiteralWalk_Waluigi_Target")
     p.add_argument("--fit-report", required=True)
     p.add_argument("--frames", nargs="+", type=float, required=True)
+    p.add_argument("--use-target-action", action="store_true",
+                   help="sample the preview rig's saved action instead of fit-report poses")
     p.add_argument("--output-dir", required=True)
     p.add_argument("--output-report", required=True)
     return p.parse_args(argv)
@@ -75,6 +77,16 @@ def quat_delta_angle(pose_matrix, rest_matrix):
     delta = qp @ qr.inverted()
     delta.normalize()
     return 2.0 * math.acos(min(1.0, max(-1.0, abs(float(delta.w)))))
+
+
+def rest_delta_axis_angle(pose_matrix, rest_matrix):
+    rest = rest_matrix.to_3x3().to_quaternion().normalized()
+    pose = pose_matrix.to_3x3().to_quaternion().normalized()
+    delta = rest.inverted() @ pose
+    delta.normalize()
+    axis, angle = delta.to_axis_angle()
+    return {"axis": [float(v) for v in axis], "angle_rad": float(angle),
+            "rotation_vector": [float(v * angle) for v in axis]}
 
 
 def bone_head(pose_matrices, name):
@@ -184,12 +196,31 @@ def main():
     source_eval = duplicate_rig(source, "ClipCompare_Source_Evaluator")
     for original, clone in zip(source.pose.bones, source_eval.pose.bones):
         clone.rotation_mode = original.rotation_mode
+    source_eval_meshes = [duplicate_mesh(obj, source_eval, scene.collection,
+                                         "ClipCompare_SourceMesh_")
+                          for obj in source_meshes]
 
     def pose_source(rig, frame):
         evaluate_curves(rig, source_curves, frame)
 
     def pose_target(rig, frame):
-        set_pose_from_report(rig, fit, frame)
+        if args.use_target_action:
+            row = target_pose_samples[float(frame)]
+            for name, matrix in row["basis"].items():
+                rig.pose.bones[name].matrix_basis = Matrix(matrix)
+            rig.location = row["location"]
+        else:
+            set_pose_from_report(rig, fit, frame)
+
+    target_pose_samples = {}
+    if args.use_target_action:
+        for frame in args.frames:
+            scene.frame_set(math.floor(frame), subframe=frame-math.floor(frame))
+            bpy.context.view_layer.update()
+            target_pose_samples[float(frame)] = {
+                "basis": {pb.name: [list(r) for r in pb.matrix_basis]
+                          for pb in target.pose.bones},
+                "location": [float(v) for v in target.location]}
 
     source_paths = setup_render_scene(scene, source, source_meshes, "Luigi", args.output_dir,
                                       args.frames, pose_source)
@@ -202,12 +233,27 @@ def main():
                 "renders": source_paths + target_paths}
     source_mats = {}
     target_mats = {}
+    source_mesh_stats = {}
+    target_mesh_stats = {}
     for frame in args.frames:
         scene.frame_set(math.floor(frame), subframe=frame-math.floor(frame))
         pose_source(source_eval, frame)
         source_mats[frame] = pose_matrices_from_basis(source_eval)
-        set_pose_from_report(target, fit, frame)
+        if args.use_target_action:
+            scene.frame_set(math.floor(frame), subframe=frame-math.floor(frame))
+            bpy.context.view_layer.update()
+        else:
+            set_pose_from_report(target, fit, frame)
         target_mats[frame] = pose_matrices_from_basis(target)
+        def mesh_summary(meshes):
+            points = world_vertices(meshes)
+            lo = [min(float(p[i]) for p in points) for i in range(3)]
+            hi = [max(float(p[i]) for p in points) for i in range(3)]
+            center = [sum(float(p[i]) for p in points)/len(points) for i in range(3)]
+            return {"vertex_count":len(points), "world_bounds_min":lo,
+                    "world_bounds_max":hi, "world_centroid":center}
+        source_mesh_stats[str(frame)] = mesh_summary(source_eval_meshes)
+        target_mesh_stats[str(frame)] = mesh_summary(target_meshes)
         semantic = {}
         pairs = [("shoulder_l", "ShoulderL", "bone_22"),
                  ("upper_arm_l", "ArmL1", "bone_23"),
@@ -220,7 +266,11 @@ def main():
                  ("leg_l1", "LegL1", "bone_7"),
                  ("leg_l2", "LegL2", "bone_8"),
                  ("leg_r1", "LegR1", "bone_13"),
-                 ("leg_r2", "LegR2", "bone_14")]
+                 ("leg_r2", "LegR2", "bone_14"),
+                 ("hip", "Hip", "bone_19"),
+                 ("spine1", "Spine1", "bone_20"),
+                 ("spine2", "Spine2", "bone_21"),
+                 ("head", "Head", "bone_53")]
         for label, src_name, dst_name in pairs:
             if src_name not in source_mats[frame] or dst_name not in target_mats[frame]:
                 continue
@@ -228,10 +278,28 @@ def main():
                                          source.data.bones[src_name].matrix_local)
             dst_angle = quat_delta_angle(target_mats[frame][dst_name],
                                          target.data.bones[dst_name].matrix_local)
+            src_torso = source_mats[frame].get("Spine1", source_mats[frame][src_name])
+            dst_torso = target_mats[frame].get("bone_20", target_mats[frame][dst_name])
+            src_position = src_torso.inverted_safe() @ source_mats[frame][src_name].translation
+            dst_position = dst_torso.inverted_safe() @ target_mats[frame][dst_name].translation
             semantic[label] = {"source_rest_relative_angle_rad": src_angle,
-                               "target_rest_relative_angle_rad": dst_angle}
-        geometry["frame"][str(frame)] = semantic
+                               "target_rest_relative_angle_rad": dst_angle,
+                               "source_rest_delta": rest_delta_axis_angle(
+                                   source_mats[frame][src_name], source.data.bones[src_name].matrix_local),
+                               "target_rest_delta": rest_delta_axis_angle(
+                                   target_mats[frame][dst_name], target.data.bones[dst_name].matrix_local),
+                               "source_torso_relative_position":list(src_position),
+                               "target_torso_relative_position":list(dst_position)}
+        geometry["frame"][str(frame)] = {"joints":semantic,
+            "source_evaluated_mesh":source_mesh_stats[str(frame)],
+            "target_evaluated_mesh":target_mesh_stats[str(frame)]}
     source_data = source_eval.data
+    source_mesh_data = [obj.data for obj in source_eval_meshes]
+    for obj in source_eval_meshes:
+        bpy.data.objects.remove(obj, do_unlink=True)
+    for data in source_mesh_data:
+        if data.users == 0:
+            bpy.data.meshes.remove(data)
     bpy.data.objects.remove(source_eval, do_unlink=True)
     if source_data.users == 0:
         bpy.data.armatures.remove(source_data)

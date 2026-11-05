@@ -1,0 +1,27 @@
+{
+  "schema": "mg1.literal-retarget-clip-corrections.v3",
+  "method": "smoothly windowed positive quaternion slerp toward the existing baked local pose identity; only listed bone channels and windows are changed",
+  "clips": {
+    "luigi_armature_luigirun": {
+      "reason": "V2 comparison shows left forearm/hand branch rotation diverges from Luigi in the two reported windows; retain source rhythm while reducing only the exaggerated left arm pose amplitude.",
+      "windows": [
+        {"bones": ["bone_22", "bone_23", "bone_24", "bone_25", "bone_26", "bone_27", "bone_29", "bone_30"], "start": 5.0, "end": 12.0, "fade": 2.0, "factor": 0.88},
+        {"bones": ["bone_22", "bone_23", "bone_24", "bone_25", "bone_26", "bone_27", "bone_29", "bone_30"], "start": 28.0, "end": 44.0, "fade": 2.0, "factor": 0.86}
+      ]
+    },
+    "luigi_armature_luigijump": {
+      "reason": "Source comparison does not support reducing the torso curl (V2 spine/head angular excursions are already slightly smaller than Luigi). The measured local outliers are the left hand twist and right hand backward-facing pose.",
+      "windows": [
+        {"bones": ["bone_30"], "start": 9.0, "end": 24.0, "fade": 2.0, "factor": 0.78},
+        {"bones": ["bone_65"], "start": 12.0, "end": 16.0, "fade": 1.0, "factor": 0.78}
+      ]
+    },
+    "luigi_armature_swimbreast": {
+      "reason": "V2 left arm angles diverge sharply from Luigi in the reported swim glitch windows (forearm up to 0.81 rad and hand up to 0.73 rad); damp only the left arm deformation branches during those windows.",
+      "windows": [
+        {"bones": ["bone_22", "bone_23", "bone_24", "bone_25", "bone_26", "bone_27", "bone_29", "bone_30"], "start": 4.0, "end": 6.0, "fade": 1.0, "factor": 0.86},
+        {"bones": ["bone_22", "bone_23", "bone_24", "bone_25", "bone_26", "bone_27", "bone_29", "bone_30"], "start": 11.0, "end": 14.0, "fade": 1.0, "factor": 0.76}
+      ]
+    }
+  }
+}
