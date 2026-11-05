@@ -4,7 +4,7 @@
 |---|---|---|
 | M0 | Research, reverse engineering, PAL feasibility, architecture | In progress; DOL analysis verified; exact PAL build and game bridge unresolved |
 | M1 | Rust launcher foundation, reproducible patching, verified PAL injection | Not started |
-| M2 | Dolphin lifecycle and versioned game-side IPC bridge | Not started; debugger/memory/source APIs need research |
+| M2 | Dolphin lifecycle and versioned game-side IPC bridge | Source-level 2609a Windows publisher + Rust reader prototyped; source application/build/runtime and cadence unverified |
 | M3 | Two-Dolphin state exchange and visible remote character | Not started; first runtime online proof |
 | M4 | Four-player sessions, lobby, identity, character assignment | Not started |
 | M5 | Server authority, prediction/reconciliation, progression and recovery | Not started |

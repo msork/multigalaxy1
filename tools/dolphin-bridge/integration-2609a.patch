@@ -1,0 +1,55 @@
+diff --git a/Source/Core/Core/CMakeLists.txt b/Source/Core/Core/CMakeLists.txt
+--- a/Source/Core/Core/CMakeLists.txt
++++ b/Source/Core/Core/CMakeLists.txt
+@@ -1,4 +1,6 @@
+ add_library(core
++  SharedMemoryBridge.cpp
++  SharedMemoryBridge.h
+   AchievementManager.cpp
+   AchievementManager.h
+   ActionReplay.cpp
+diff --git a/Source/Core/Core/Core.cpp b/Source/Core/Core/Core.cpp
+--- a/Source/Core/Core/Core.cpp
++++ b/Source/Core/Core/Core.cpp
+@@ -68,6 +68,7 @@
+ #include "Core/PowerPC/JitInterface.h"
+ #include "Core/PowerPC/PowerPC.h"
+ #include "Core/State.h"
++#include "Core/SharedMemoryBridge.h"
+ #include "Core/System.h"
+ #include "Core/WiiRoot.h"
+ #ifdef USE_MEMORYWATCHER
+@@ -89,6 +90,7 @@
+ namespace Core
+ {
+ static bool s_wants_determinism;
++static MultiGalaxy1::SharedMemoryBridge s_multi_galaxy_bridge;
+ 
+ // Declarations and definitions
+ static std::thread s_emu_thread;
+@@ -150,5 +150,11 @@ void OnFrameEnd(Core::System& system)
+   }
+ #endif
++  if (s_multi_galaxy_bridge.IsEnabled())
++  {
++    ASSERT(IsCPUThread());
++    const CPUThreadGuard guard(system);
++    s_multi_galaxy_bridge.PublishFrame(guard);
++  }
+ }
+ 
+ // Display messages and return values
+@@ -220,4 +220,6 @@ bool Init(Core::System& system, std::unique_ptr<BootParameters> boot, const Wind
+   // Drain any left over jobs
+   HostDispatchJobs(system);
++  s_multi_galaxy_bridge.Initialize(SConfig::GetInstance().GetGameID(),
++                                   SConfig::GetInstance().GetRevision());
+ 
+   INFO_LOG_FMT(BOOT, "Starting core = {} mode", system.IsWii() ? "Wii" : "GameCube");
+@@ -858,5 +858,6 @@ void Shutdown(Core::System& system)
+   if (s_emu_thread.joinable())
+     s_emu_thread.join();
++  s_multi_galaxy_bridge.Shutdown();
+   // Make sure there's nothing left over in case we're about to exit.
+   HostDispatchJobs(system);
+ }

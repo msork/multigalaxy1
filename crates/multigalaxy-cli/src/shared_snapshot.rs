@@ -243,7 +243,7 @@ pub mod windows_mapping {
             // ERROR_ALREADY_EXISTS
             // SAFETY: GetLastError has no arguments and reads the last Win32 status.
             let created = unsafe { GetLastError() } != 183;
-            let mapped = Self::map_handle(handle, size);
+            let mapped = Self::map_handle(handle, size, 0x000f001f);
             match mapped {
                 Ok(mapping) => {
                     if created {
@@ -276,14 +276,15 @@ pub mod windows_mapping {
             let _lock = InitializationLock::acquire(name)?;
             // FILE_MAP_ALL_ACCESS
             // SAFETY: object_name is a nul-terminated UTF-16 string.
-            let handle = unsafe { OpenFileMappingW(0x000f001f, 0, object_name.as_ptr()) };
+            // FILE_MAP_READ: readers cannot modify the producer's mapping.
+            let handle = unsafe { OpenFileMappingW(0x0004, 0, object_name.as_ptr()) };
             if handle == 0 {
                 return Err(format!(
                     "OpenFileMappingW failed with Windows error {}",
                     std::io::Error::last_os_error()
                 ));
             }
-            match Self::map_handle(handle, size_of::<SharedSnapshot>()) {
+            match Self::map_handle(handle, size_of::<SharedSnapshot>(), 0x0004) {
                 Ok(mapping) => match mapping.snapshot().validate() {
                     Ok(()) => Ok(mapping),
                     Err(error) => {
@@ -299,10 +300,9 @@ pub mod windows_mapping {
             }
         }
 
-        fn map_handle(handle: Handle, size: usize) -> Result<Self, String> {
-            // FILE_MAP_ALL_ACCESS
+        fn map_handle(handle: Handle, size: usize, access: u32) -> Result<Self, String> {
             // SAFETY: handle is an owned mapping handle and size is the exact ABI size.
-            let address = unsafe { MapViewOfFile(handle, 0x000f001f, 0, 0, size) };
+            let address = unsafe { MapViewOfFile(handle, access, 0, 0, size) };
             let view = NonNull::new(address.cast::<SharedSnapshot>()).ok_or_else(|| {
                 format!(
                     "MapViewOfFile failed with Windows error {}",
@@ -337,6 +337,42 @@ mod tests {
 
     #[test]
     fn reads_only_initialized_versioned_snapshots_and_bounds_payloads() {
+        assert_eq!(std::mem::size_of::<SharedSnapshot>(), 192);
+        assert_eq!(std::mem::align_of::<SharedSnapshot>(), 64);
+        let uninit = std::mem::MaybeUninit::<SharedSnapshot>::uninit();
+        let base = uninit.as_ptr() as usize;
+        // SAFETY: addr_of! computes field addresses without dereferencing the
+        // uninitialized SharedSnapshot value.
+        unsafe {
+            assert_eq!(
+                std::ptr::addr_of!((*uninit.as_ptr()).magic) as usize - base,
+                0
+            );
+            assert_eq!(
+                std::ptr::addr_of!((*uninit.as_ptr()).version) as usize - base,
+                8
+            );
+            assert_eq!(
+                std::ptr::addr_of!((*uninit.as_ptr()).reserved) as usize - base,
+                12
+            );
+            assert_eq!(
+                std::ptr::addr_of!((*uninit.as_ptr()).sequence) as usize - base,
+                16
+            );
+            assert_eq!(
+                std::ptr::addr_of!((*uninit.as_ptr()).payload_len) as usize - base,
+                24
+            );
+            assert_eq!(
+                std::ptr::addr_of!((*uninit.as_ptr())._padding) as usize - base,
+                28
+            );
+            assert_eq!(
+                std::ptr::addr_of!((*uninit.as_ptr()).payload) as usize - base,
+                32
+            );
+        }
         let snapshot = SharedSnapshot::new();
         assert!(snapshot.validate().is_err());
         snapshot.initialize();

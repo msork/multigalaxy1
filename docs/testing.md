@@ -53,3 +53,7 @@ Dolphin 2609a accepts one GDB client per process. If a read times out or the con
 ## Runtime performance benchmark
 
 The four-condition benchmark procedure and source-level GDB overhead investigation are in [performance.md](performance.md). The Rust `bench-dolphin` command measures CPU utilization for an existing Dolphin PID and records operator-read Speed/FPS/VPS OSD averages. No valid gameplay performance numbers have been captured yet: this automation uses a sandbox desktop, and Dolphin must be launched by the user's interactive PowerShell. The GDB-unattached condition is paused on Dolphin 2609a and must not be reported as a running-game FPS comparison.
+
+## Dolphin integrated bridge
+
+The 2609a source patch, exact source paths, ABI layout, and fork licensing are documented in [tools/dolphin-bridge/README.md](../tools/dolphin-bridge/README.md). Automated Rust tests validate the fixed outer layout, payload schema, PAL identity/revision, allowed MEM1 test address, and stale-heartbeat threshold. `git apply --stat tools/dolphin-bridge/integration-2609a.patch` validates patch syntax. There is no Dolphin source checkout/compiler in this workspace, so the C++ patch is not built and live publication, callback cadence, and emulation speed are not verified.

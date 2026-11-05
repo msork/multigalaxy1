@@ -8,6 +8,18 @@ pub struct CpuSample {
     pub total_cpu_percent: f64,
 }
 
+pub fn valid_condition(value: &str) -> bool {
+    matches!(
+        value,
+        "normal"
+            | "gdb-unattached"
+            | "gdb-idle"
+            | "gdb-sampling"
+            | "bridge-enabled"
+            | "bridge-disabled"
+    )
+}
+
 pub fn cpu_percent(cpu_delta_100ns: u64, wall_delta_100ns: u64, processors: u32) -> f64 {
     if wall_delta_100ns == 0 || processors == 0 {
         return 0.0;
@@ -177,7 +189,7 @@ pub fn sample(_pid: u32, _seconds: u64) -> Result<Vec<CpuSample>, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{cpu_percent, is_dolphin_executable};
+    use super::{cpu_percent, is_dolphin_executable, valid_condition};
     use std::path::Path;
 
     #[test]
@@ -194,5 +206,12 @@ mod tests {
         assert!(!is_dolphin_executable(Path::new(
             r"C:\Games\powershell.exe"
         )));
+    }
+
+    #[test]
+    fn accepts_bridge_benchmark_conditions_and_rejects_unknown_modes() {
+        assert!(valid_condition("bridge-enabled"));
+        assert!(valid_condition("bridge-disabled"));
+        assert!(!valid_condition("production"));
     }
 }

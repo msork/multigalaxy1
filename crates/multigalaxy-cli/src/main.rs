@@ -1,3 +1,4 @@
+mod bridge_protocol;
 mod controller_patch;
 mod dev_config;
 mod gdb;
@@ -389,6 +390,7 @@ fn spawn_game(
     port: u16,
     mute: bool,
     patch: &controller_patch::PreparedPatch,
+    bridge_enabled: bool,
 ) -> Result<process::Child, String> {
     if let Some(context) = startup::desktop_context() {
         println!(
@@ -428,6 +430,10 @@ fn spawn_game(
             dolphin
                 .parent()
                 .unwrap_or_else(|| std::path::Path::new(".")),
+        )
+        .env(
+            "MULTIGALAXY_BRIDGE_NAME",
+            if bridge_enabled { "rmgp01" } else { "" },
         )
         .arg("-u")
         .arg(&user_dir)
@@ -627,6 +633,60 @@ fn run() -> Result<(), String> {
         #[cfg(not(windows))]
         return Err("bridge-prototype currently requires Windows shared mappings".into());
     }
+    if args.len() == 3 && args[0] == "bridge-watch" {
+        #[cfg(windows)]
+        {
+            use shared_snapshot::windows_mapping::Mapping;
+            let name = args[1].to_str().ok_or("mapping name must be valid UTF-8")?;
+            let seconds = args[2]
+                .to_str()
+                .ok_or("duration must be valid UTF-8")?
+                .parse::<u64>()
+                .map_err(|_| "duration must be an integer number of seconds")?;
+            if !(1..=3600).contains(&seconds) {
+                return Err("bridge-watch duration must be 1..=3600 seconds".into());
+            }
+            let mapping = Mapping::open_existing(name)?;
+            let deadline = Instant::now() + Duration::from_secs(seconds);
+            let mut last_heartbeat = None;
+            let mut last_change = Instant::now();
+            let mut stale_reported = false;
+            while Instant::now() < deadline {
+                let now = Instant::now();
+                if let Some(snapshot) = mapping.snapshot().read()? {
+                    if snapshot.payload.is_empty() {
+                        std::thread::sleep(Duration::from_millis(8));
+                        continue;
+                    }
+                    let state = bridge_protocol::GameSnapshot::decode(&snapshot.payload)?;
+                    if last_heartbeat != Some(state.heartbeat) {
+                        last_heartbeat = Some(state.heartbeat);
+                        last_change = now;
+                        stale_reported = false;
+                        let ram = if state.flags & bridge_protocol::FLAG_RAM_SAMPLE_VALID != 0 {
+                            format!("{:#010x}", state.ram_sample_value)
+                        } else {
+                            "unavailable".to_owned()
+                        };
+                        println!("state=live game={} revision={} frame={} heartbeat={} mem1_80000000={ram}", String::from_utf8_lossy(&state.game_id), state.revision, state.frame, state.heartbeat);
+                    } else if bridge_protocol::GameSnapshot::is_stale(last_change, now)
+                        && !stale_reported
+                    {
+                        println!(
+                            "state=stale heartbeat={} stale_after_ms={}",
+                            state.heartbeat,
+                            bridge_protocol::HEARTBEAT_TIMEOUT.as_millis()
+                        );
+                        stale_reported = true;
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(8));
+            }
+            return Ok(());
+        }
+        #[cfg(not(windows))]
+        return Err("bridge-watch currently requires Windows shared mappings".into());
+    }
     if args.len() == 4 && args[0] == "bench-dolphin" {
         let pid = args[1]
             .to_str()
@@ -639,9 +699,9 @@ fn run() -> Result<(), String> {
             .parse::<u64>()
             .map_err(|_| "duration must be an integer number of seconds")?;
         let condition = args[3].to_str().ok_or("condition must be valid UTF-8")?;
-        if !["normal", "gdb-unattached", "gdb-idle", "gdb-sampling"].contains(&condition) {
+        if !perf_bench::valid_condition(condition) {
             return Err(
-                "condition must be normal, gdb-unattached, gdb-idle, or gdb-sampling".into(),
+                "condition must be normal, gdb-unattached, gdb-idle, gdb-sampling, bridge-enabled, or bridge-disabled".into(),
             );
         }
         println!("benchmark condition={condition} pid={pid} duration_s={seconds}; read-only process CPU sampling starts now");
@@ -786,14 +846,16 @@ fn run() -> Result<(), String> {
         let mut debug = false;
         let mut gdb_unattached = false;
         let mut mute = true;
+        let mut bridge_enabled = true;
         for option in &args[4..] {
             match option.to_str() {
                 Some("--debug") if !debug && !gdb_unattached => debug = true,
                 Some("--debug-unattached") if !debug && !gdb_unattached => gdb_unattached = true,
                 Some("--unmute") if mute => mute = false,
+                Some("--bridge-disabled") if bridge_enabled => bridge_enabled = false,
                 _ => {
                     return Err(
-                        "dev-launch options: [--debug | --debug-unattached] [--unmute]".into(),
+                        "dev-launch options: [--debug | --debug-unattached] [--unmute] [--bridge-disabled]".into(),
                     )
                 }
             }
@@ -837,7 +899,16 @@ fn run() -> Result<(), String> {
             port,
             mute,
             &patch,
+            bridge_enabled,
         )?;
+        println!(
+            "Dolphin bridge publication {} for this development launch.",
+            if bridge_enabled {
+                "enabled"
+            } else {
+                "disabled"
+            }
+        );
         if debug {
             println!("debug stage=gdb-attach; opening the persistent Rust GDB session");
             let mut client =
@@ -1017,6 +1088,7 @@ fn run() -> Result<(), String> {
             port,
             mute,
             &prepared_allstars,
+            true,
         )?;
         return Ok(());
     }
@@ -1215,7 +1287,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port> [--debug | --debug-unattached] [--unmute] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling> | multigalaxy bridge-prototype <write|read> <mapping-name> <seconds> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port> [--debug | --debug-unattached] [--unmute] [--bridge-disabled] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|bridge-enabled|bridge-disabled> | multigalaxy bridge-prototype <write|read> <mapping-name> <seconds> | multigalaxy bridge-watch <mapping-name> <seconds> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;

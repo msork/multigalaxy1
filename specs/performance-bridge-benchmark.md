@@ -26,7 +26,7 @@ Measure Dolphin's actual runtime cost with no GDB, GDB enabled but unattached, G
 
 The Rust `bench-dolphin` command samples the verified Dolphin PID's process CPU time at one-second intervals, then records the operator-read Speed/FPS/VPS values in a CSV row. Dolphin's development-only GFX OSD displays those metrics. The four conditions are run sequentially by the operator from the interactive Windows desktop so identical gameplay and the user's actual graphics load can be held constant. A separate `SharedSnapshot` host prototype defines a versioned atomic seqlock payload and Windows named mapping; the `bridge-prototype` commands exercise this synthetic IPC without reading or writing emulated memory. It establishes the transport ABI only, not Dolphin integration or an end-to-end speedup.
 
-The preferred production prototype is a minimal GPL-compatible Dolphin fork bridge: at a safe emulation-frame callback, use verified game-specific bindings and Dolphin's guarded MMU reads to create one bounded `repr(C)` state snapshot. Publish that snapshot to a versioned shared-memory mapping with sequence counters; do not perform a socket operation or wait on the Rust host in the emulation callback. Host-side Rust reads snapshots and sends commands through a separate bounded queue. Dolphin consumes commands at a safe callback; any future game-state writes must be typed semantic operations tied to validated bindings and are out of scope here. Use source-level `HostTryRead`, not GDB polling or external-process scanning.
+The preferred production prototype is a minimal GPL-compatible Dolphin fork bridge. A 2609a patch now uses `Core::OnFrameEnd` and guarded `HostTryRead` to publish identity, callback heartbeat, and a single read-only MEM1 word. Mapping setup is outside the callback; Rust reads the fixed ABI. The patch has not yet been applied or compiled. Remote-state commands and all emulated writes remain out of scope. Use source-level MMU access, not GDB polling or external-process scanning.
 
 Direct Windows `ReadProcessMemory` remains a diagnostic possibility only. It would require a version-stable, validated way to discover the host mapping of emulated RAM and coherent snapshots while the CPU runs. Dolphin's relocatable host pointer is not derivable from a guest address alone, and external reads race game updates. Do not scan or write memory until that mapping and consistency contract are demonstrated.
 
@@ -48,9 +48,11 @@ Direct Windows `ReadProcessMemory` remains a diagnostic possibility only. It wou
 ## Acceptance criteria
 
 - Rust benchmark command produces CPU samples and a machine-readable summary for each condition.
-- Synthetic shared-memory writer/reader demonstrate cross-view snapshot consistency and bounded throughput without guest-memory access.
+- Synthetic shared-memory writer/reader demonstrate cross-process snapshot consistency and bounded throughput without guest-memory access.
+- The 2609a Dolphin patch builds and emits a live heartbeat and guarded RAM sample through the same Rust ABI.
 - Isolated dev profile enables Speed/FPS/VPS OSD in all modes.
-- All four conditions have data from the same playable scene; unattached mode is explicitly marked paused if 2609a does not run.
+- All running conditions have data from the same playable scene; unattached mode is explicitly marked paused if 2609a does not run.
+- Bridge-enabled and disabled gameplay runs show no material slowdown at the measured PAL field cadence.
 - Any measured GDB regression is documented with per-condition results and causes the production architecture to use source-level IPC instead.
 - No Dolphin gameplay or coordinate claim is made without visible runtime evidence.
 
