@@ -88,6 +88,12 @@ Calling `directDraw` for a separate `J3DModelX` inside a local draw hook might a
 
 ## Evidence classes and remaining questions
 
+### Local offline callsite audit addition
+
+`multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt>` checks the exact PAL input fingerprint/symbol map, then verifies the four candidate call instructions and decoded relative branch targets documented above. For the draw call it also checks the two preceding argument setup words (`mr r3,r29; li r4,0`). The Rust implementation has synthetic DOL fixtures for valid sites and mismatched/truncated/unmapped input. This is an offline static audit only: it neither writes a DOL nor creates a Gecko/PPC hook. Passing it confirms only those signatures, not safe register preservation, displaced call behavior, model state restoration, or runtime compatibility.
+
+The independent matrix/animation state remains an unresolved lifetime and ABI blocker. In particular, Petari's `J3DMtxBuffer` source shape and allocator behavior do not prove that a copied `J3DMtxBuffer2`/model pointer is valid in PAL, that its allocations can be safely freed, or that cache/GX state is restored. Therefore no experimental executable patch is emitted or enabled.
+
 - **Verified upstream source facts:** static matrix-buffer and XanimePlayer arrays; per-remote animation/matrix calculation; direct draw loop for active/non-clipped peers; one separate static `NetPlayerActor` used for sensors/interactions; upstream build/docs specify USA-oriented Riivolution package and multiplayer dependency forks.
 - **Verified target DOL facts:** exact PAL function symbols, code words, file offsets, and decoded call targets in the table. The map tool validates the PAL DOL identity and symbols. This review did not create a PAL patch.
 - **Static deductions:** the first model-sharing renderer can bypass one scheduler entry per remote because it executes inside local Mario's scheduled callbacks. It likely preserves each full-screen client's own camera because calls occur in that client's normal render pass.

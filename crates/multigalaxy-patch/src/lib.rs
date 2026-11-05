@@ -1,6 +1,7 @@
 //! Safe, read-only DOL inspection and comparison primitives.
 mod dolphin_patch;
 mod revision;
+mod shared_render;
 
 use std::fmt;
 
@@ -11,6 +12,10 @@ pub use dolphin_patch::{
 pub use revision::{
     BuildFingerprint, DiscIdentity, HookSite, HookSiteStatus, RevisionCatalog, RevisionError,
     VersionMap,
+};
+pub use shared_render::{
+    audit_pal_shared_model_calls, AuditedRenderCall, RenderAuditError, RenderCallSite,
+    PAL_SHARED_MODEL_CALLS,
 };
 
 pub const DOL_HEADER_SIZE: usize = 0x100;
