@@ -75,15 +75,33 @@ struct Metadata {
     array: u32,
 }
 
-/// Resolve and independently recheck the known PAL scene/group chain without
-/// reading actor entries. Consumers still re-resolve it around their own reads.
-pub fn validated_scene_group(memory: &mut impl GuestMemory) -> Result<(u32, u32), String> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SceneContext {
+    pub scene: u32,
+    pub scene_object_holder: u32,
+    pub all_live_actor_group: u32,
+}
+
+/// Re-resolve and validate the PAL scene ownership chain and its known actor
+/// group twice. This deliberately returns addresses, never host pointers.
+pub fn validated_scene_context(memory: &mut impl GuestMemory) -> Result<SceneContext, String> {
     let before = metadata(memory)?;
     let after = metadata(memory)?;
     if before != after {
         return Err("scene/group changed during identity check".into());
     }
-    Ok((before.chain.scene, before.chain.group))
+    Ok(SceneContext {
+        scene: before.chain.scene,
+        scene_object_holder: before.chain.holder,
+        all_live_actor_group: before.chain.group,
+    })
+}
+
+/// Resolve and independently recheck the known PAL scene/group chain without
+/// reading actor entries. Consumers still re-resolve it around their own reads.
+pub fn validated_scene_group(memory: &mut impl GuestMemory) -> Result<(u32, u32), String> {
+    let context = validated_scene_context(memory)?;
+    Ok((context.scene, context.all_live_actor_group))
 }
 
 pub fn verify_penguin_pal(dol: &[u8], symbols: &[u8]) -> Result<(), String> {

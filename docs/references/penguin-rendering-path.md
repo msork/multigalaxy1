@@ -120,7 +120,32 @@ Before any runtime write or spawn, a separately authorized phase must perform re
 4. Prove the registration phase, deferred connect/disconnect processing, draw-buffer setup, and teardown ordering for a scene-scoped object. On disconnect, hide only after its side effects are known; retain storage until proven scene cleanup. Invalidate all host handles on scene transition.
 5. Use one local synthetic bounded pose in one fixed mission first. Stop on scene/group/holder identity change, stale record index, pending scheduler state, count near capacity, missing archive, invalid heap context, callback after teardown, or any change to an existing actor/Mario/camera/input/gameplay state.
 
-The smallest next *read-only* evidence step is a targeted execute-holder observation using the existing validated MEM1 reader: derive the current scene and SceneObjHolder afresh, then inspect only the `0x58` slot and its `+0x0C/+0x10/+0x14` fields with vptr, alignment, address-range, count/capacity, and consistency checks. Sample once in the source scene and once after the transition, not continuously. No such observer was added in this research-only pass. Until those observations and callback/resource prerequisites are proven, dynamic registration and actor creation remain blocked.
+The opt-in `observe-scheduler` command now performs that targeted read-only sample. It derives the full scene/group chain for each pass, validates the holder vptr and metadata, checks the entire advertised record span against canonical MEM1 using checked arithmetic, and compares two samples for consistency. It reports the live count and remaining capacity but reads no record or callback list. Sample once in a playable scene and once after a mission transition; do not poll continuously. This validates metadata only, not safe registration or allocator ownership. Until callback/resource prerequisites are proven, dynamic registration and actor creation remain blocked.
+
+Windows PowerShell, with official stock Dolphin 2609a already running in the isolated profile at a playable PAL scene:
+
+```powershell
+$DolphinPid = 12345 # replace with the isolated Dolphin.exe PID
+cargo run -p multigalaxy -- observe-scheduler .\development.local.toml $DolphinPid
+```
+
+Expected prefix: `scheduler_observer=validated_read_only`, followed by scene, SceneObjHolder, AllLiveActorGroup, execute-holder and array addresses, `capacity=4096`, live `count`, `remaining`, five pending-operation flags, and `callback_lists=not_read`. A null SceneObj slot means the holder is not initialized in that scene; invalid vptrs, capacity/count, pointers, MEM1 span, or inconsistent double samples fail closed. This is a new command; no live result is claimed until the user runs it.
+
+### Exact holder and registration evidence
+
+The implementation validates exact PAL RMGP01 Rev 0 symbols and DOL bytes before reading memory, then compares the same scheduler signatures against live MEM1 before and after the sample. The DOL text mapping used by the repository is section 1 file offset `0x25E0` -> guest `0x800070A0`; the full DOL hash and symbol-file hash are enforced by `verify_pal_inputs`.
+
+| Evidence | PAL address | DOL file offset | Result |
+|---|---:|---:|---|
+| `SceneObjHolder::create` | `0x80344A14` | `0x33FF54` | Exact function bytes validated; it returns an existing slot object or constructs/initializes it and stores it in the slot. |
+| `SceneObjHolder::getObj` | `0x80344A70` | `0x33FFB0` | Exact index-times-four accessor validated. |
+| `SceneObjHolder::newEachObj` | `0x80344B30` | `0x340070` | Exact symbol validated; Petari's `SceneObj_NameObjExecuteHolder` enum value is `0x58`, hence pointer slot `0x58*4 = +0x160`. |
+| Factory case for SceneObj `0x58` | `0x80345410` | `0x340950` | Exact 24-byte sequence validated: allocates a `0x20`-byte object, loads constructor argument `0x1000`, then branches to the verified holder constructor at `0x802629BC`. |
+| `NameObjExecuteHolder` constructor | `0x802629BC` | `0x25DEFC` | Full 0x9C bytes validated. Writes vptr `0x80593178`, array pointer `+0x0C`, max `4096` at `+0x10`, zero count at `+0x14`, and zeroed flags `+0x18..+0x1C`. |
+| `NameObjExecuteHolder::registerActor` | `0x80262140` | `0x25D680` | Full 0x5C bytes validated. Uses count at `+0x14`, computes `count*12`, stores the NameObj executor index, increments count. No capacity comparison occurs before indexing/appending. |
+| `NameObjExecuteInfo::setConnectInfo` | `0x80261C50` | `0x25D190` | Full 0xD4 bytes and symbol validated. Static record size is 12 bytes; fields are `NameObj* +0`, status `+4/+5`, movement `+6`, calcAnim `+7`, draw `+8`, draw-buffer `+9`, returned buffer index `+0xA`. |
+
+The five holder bytes at `+0x18..+0x1C` are the source-documented deferred connect/disconnect flags for movement and draw, including delayed draw disconnection. The observer reports these bytes only after checking each is 0 or 1. They are **not callback-list counts**. The callback lists belong to `NameObjListExecutor`; this observer does not read its pointer, arrays, counters, or entries because their bounds and ownership have not been separately validated. The complete execute-info storage *address span* is checked as `array + 4096*12` within canonical MEM1. That does not recover an allocator boundary or prove that the memory was allocated for the array; it is only a safe mapped-address-range check. It does not imply any available slot is safe to use: the validated PAL `registerActor` path appends without checking the maximum.
 
 The exact PAL `NameObjExecuteInfo` routines register movement and calc-animation callbacks separately from draw and draw-buffer callbacks according to fields in an existing execute-info record. Their matching disconnect routines remove those callback registrations. `NameObjExecuteHolder` resolves a record for a `NameObj` before connecting it. Petari's [`NameObjExecuteHolder.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/NameObj/NameObjExecuteHolder.cpp) and [`LiveActor.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/LiveActor.cpp) corroborate that lifecycle.
 

@@ -9,6 +9,7 @@ mod memory_inspection;
 mod penguin_observer;
 mod perf_bench;
 mod player_probe;
+mod scheduler_observer;
 mod startup;
 #[cfg(windows)]
 mod stock_memory;
@@ -352,9 +353,106 @@ fn run_observe_heaps(config_path: &std::path::Path, pid: u32) -> Result<(), Stri
     Ok(())
 }
 
+#[cfg(windows)]
+fn run_observe_scheduler(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
+    const EXPECTED_HANDLER_SHA256: &str =
+        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
+    let config_text = fs::read_to_string(config_path)
+        .map_err(|error| format!("cannot read development config: {error}"))?;
+    let config = dev_config::parse(&config_text)?;
+    validate_dev_inputs(&config)?;
+    let dol =
+        fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
+    let symbols = fs::read(&config.pal_symbols)
+        .map_err(|error| format!("cannot read Petari symbol map: {error}"))?;
+    scheduler_observer::verify_pal_layout(&dol, &symbols)?;
+    let patch = controller_patch::prepare_allstars(&config.patch_folder, &dol)?;
+    let writes = parse_onframe_patch(&patch.settings)
+        .map_err(|error| format!("invalid prepared AllStars patch: {error}"))?;
+    penguin_observer::ensure_patch_disjoint(&writes)?;
+
+    let dolphin = config
+        .dolphin
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve configured Dolphin executable: {error}"))?;
+    if !dolphin
+        .file_name()
+        .is_some_and(|name| name.to_string_lossy().eq_ignore_ascii_case("Dolphin.exe"))
+    {
+        return Err("configured executable is not named Dolphin.exe".into());
+    }
+    let image = startup::process_image_path(pid)?
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve PID {pid} executable: {error}"))?;
+    if !image
+        .to_string_lossy()
+        .eq_ignore_ascii_case(&dolphin.to_string_lossy())
+    {
+        return Err(format!(
+            "PID {pid} executable does not match configured Dolphin: {}",
+            image.display()
+        ));
+    }
+    let current_session = startup::desktop_context()
+        .ok_or("cannot determine current Windows session")?
+        .session_id;
+    let process_session = startup::process_session_id(pid)
+        .ok_or_else(|| format!("cannot determine Windows session for Dolphin PID {pid}"))?;
+    if current_session != process_session {
+        return Err(format!("Dolphin PID {pid} is in session {process_session}, current session is {current_session}"));
+    }
+    let handler_path = dolphin
+        .parent()
+        .ok_or("configured Dolphin executable has no parent directory")?
+        .join("Sys")
+        .join("codehandler.bin");
+    let handler = fs::read(&handler_path)
+        .map_err(|error| format!("cannot read Dolphin's 2609a codehandler: {error}"))?;
+    let handler_hash = sha256(&handler)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
+        return Err(format!(
+            "Dolphin 2609a codehandler validation failed (size={}, sha256={handler_hash})",
+            handler.len()
+        ));
+    }
+    let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid).map_err(|error| {
+        format!("cannot open compatible Dolphin MEM1 mapping read-only: {error:?}")
+    })?;
+    player_probe::verify_live_pal_signatures(&mut memory, &dol)?;
+    scheduler_observer::verify_live_signatures(&mut memory, &dol)?;
+    let sample = scheduler_observer::observe(&mut memory)?;
+    player_probe::verify_live_pal_signatures(&mut memory, &dol)?;
+    scheduler_observer::verify_live_signatures(&mut memory, &dol)?;
+    println!(
+        "scheduler_observer=validated_read_only pid={pid} game=RMGP01 revision=0 scene=0x{:08x} scene_object_holder=0x{:08x} all_live_actor_group=0x{:08x} execute_holder=0x{:08x} execute_array=0x{:08x} capacity={} count={} remaining={} pending_movement_connect={} pending_movement_disconnect={} pending_draw_connect={} pending_draw_disconnect={} pending_delayed_draw_disconnect={} callback_lists=not_read",
+        sample.scene,
+        sample.scene_object_holder,
+        sample.all_live_actor_group,
+        sample.execute_holder,
+        sample.execute_array,
+        sample.capacity,
+        sample.count,
+        sample.remaining,
+        sample.pending_flags[0],
+        sample.pending_flags[1],
+        sample.pending_flags[2],
+        sample.pending_flags[3],
+        sample.pending_flags[4],
+    );
+    Ok(())
+}
+
 #[cfg(not(windows))]
 fn run_observe_heaps(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
     Err("observe-heaps requires official stock Dolphin 2609a on Windows".into())
+}
+
+#[cfg(not(windows))]
+fn run_observe_scheduler(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
+    Err("observe-scheduler requires official stock Dolphin 2609a on Windows".into())
 }
 
 #[cfg(not(windows))]
@@ -1763,6 +1861,17 @@ fn run() -> Result<(), String> {
         }
         return run_observe_heaps(std::path::Path::new(&args[1]), pid);
     }
+    if args.len() == 3 && args[0] == "observe-scheduler" {
+        let pid = args[2]
+            .to_str()
+            .ok_or("Dolphin PID must be valid UTF-8")?
+            .parse::<u32>()
+            .map_err(|_| "Dolphin PID must be a positive integer")?;
+        if pid == 0 {
+            return Err("Dolphin PID must be positive".into());
+        }
+        return run_observe_scheduler(std::path::Path::new(&args[1]), pid);
+    }
     if (args.len() == 5 || args.len() == 6) && args[0] == "inspect-memory" {
         let pid = args[2]
             .to_str()
@@ -2124,6 +2233,7 @@ fn run() -> Result<(), String> {
         let symbols = fs::read(&args[2]).map_err(|e| format!("cannot read Petari symbols: {e}"))?;
         let map = player_probe::verify_pal_inputs(&dol, &symbols)?;
         heap_observer::verify_pal_heap_layout(&dol, &symbols)?;
+        scheduler_observer::verify_pal_layout(&dol, &symbols)?;
         println!("PAL RMGP01 Rev 0 DOL and Petari symbol file fingerprints verified.");
         println!(
             "DOL BSS: 0x{:08x}..0x{:08x}",
@@ -2139,6 +2249,7 @@ fn run() -> Result<(), String> {
         println!(
             "PAL JKRHeap current-heap global and HeapMemoryWatcher scene heap layout verified."
         );
+        println!("PAL NameObjExecuteHolder constructor, 4096 capacity, 12-byte entry stride, unchecked registration path, SceneObj slot, and scene access signatures verified.");
         return Ok(());
     }
     if args.len() == 3 && args[0] == "inspect-allstars" {
@@ -2449,7 +2560,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
