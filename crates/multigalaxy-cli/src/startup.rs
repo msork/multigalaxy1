@@ -81,6 +81,14 @@ mod win {
     #[link(name = "kernel32")]
     extern "system" {
         fn ProcessIdToSessionId(process_id: u32, session_id: *mut u32) -> Bool;
+        fn OpenProcess(access: u32, inherit: Bool, process_id: u32) -> Hwnd;
+        fn QueryFullProcessImageNameW(
+            process: Hwnd,
+            flags: u32,
+            name: *mut u16,
+            size: *mut u32,
+        ) -> Bool;
+        fn CloseHandle(handle: Hwnd) -> Bool;
     }
 
     #[link(name = "wtsapi32")]
@@ -176,6 +184,33 @@ mod win {
         // SAFETY: session_id points to writable storage for the API result.
         let ok = unsafe { ProcessIdToSessionId(pid, &mut session_id) };
         (ok != 0).then_some(session_id)
+    }
+
+    pub fn process_image_path(pid: u32) -> Result<std::path::PathBuf, String> {
+        const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+        // SAFETY: this opens the process with query-only rights and closes the
+        // handle after obtaining its full image name.
+        let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+        if process == 0 {
+            return Err(format!(
+                "cannot query PID {pid}: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let mut buffer = vec![0u16; 32768];
+        let mut length = buffer.len() as u32;
+        // SAFETY: `buffer` is writable for `length` UTF-16 units.
+        let ok =
+            unsafe { QueryFullProcessImageNameW(process, 0, buffer.as_mut_ptr(), &mut length) };
+        let error = (ok == 0).then(|| std::io::Error::last_os_error().to_string());
+        // SAFETY: `process` is the handle returned by OpenProcess above.
+        unsafe { CloseHandle(process) };
+        if let Some(error) = error {
+            return Err(format!("cannot query image path for PID {pid}: {error}"));
+        }
+        Ok(std::path::PathBuf::from(String::from_utf16_lossy(
+            &buffer[..length as usize],
+        )))
     }
 
     struct Query {
@@ -280,6 +315,11 @@ pub fn process_session_id(pid: u32) -> Option<u32> {
     win::process_session_id(pid)
 }
 
+#[cfg(windows)]
+pub fn process_image_path(pid: u32) -> Result<std::path::PathBuf, String> {
+    win::process_image_path(pid)
+}
+
 #[cfg(test)]
 mod context_tests {
     use super::DesktopContext;
@@ -323,6 +363,11 @@ pub fn desktop_context() -> Option<DesktopContext> {
 #[cfg(not(windows))]
 pub fn process_session_id(_pid: u32) -> Option<u32> {
     None
+}
+
+#[cfg(not(windows))]
+pub fn process_image_path(_pid: u32) -> Result<std::path::PathBuf, String> {
+    Err("process image path validation is currently Windows-only".into())
 }
 
 #[cfg(not(windows))]

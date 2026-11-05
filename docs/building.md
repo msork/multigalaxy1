@@ -37,4 +37,35 @@ cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-
 cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0 --gecko-bridge-probe
 ```
 
-The probe polls for the game ID for 60 seconds by default. Adjust this with `--bridge-startup-timeout-secs=90`; the supported range is 5–300 seconds. It logs elapsed time, PID, mapped-view bytes, observed ID bytes, and validation state. The bridge command prints changing counters, update frequency, acknowledged frequency, and measured shared-memory read/write and round-trip timing. Type `Q` to stop. Compare paired OSD FPS/VPS/speed and CPU via `bench-dolphin <PID> 30 stock-bridge-off` and `bench-dolphin <PID> 30 stock-bridge-on`, in the same scene. This is a proof candidate, not a supported Dolphin API. Synthetic tests pass; no live exchange or performance result is claimed until this interactive run succeeds. See [stock-dolphin-bridge.md](stock-dolphin-bridge.md) for safeguards and detailed procedure.
+The probe polls for the game ID for 60 seconds by default. Adjust this with `--bridge-startup-timeout-secs=90`; the supported range is 5–300 seconds. It logs elapsed time, PID, mapped-view bytes, observed ID bytes, and validation state. The bridge command prints changing counters, acknowledgements, validated X/Y/Z, update frequency, and round-trip timing. Type `Q` to stop. See [performance.md](performance.md) for user-reported bridge-on/off measurements and [stock-dolphin-bridge.md](stock-dolphin-bridge.md) for safeguards.
+
+## M4 localhost position relay
+
+M4 adds two-player TCP position relay but no remote actor spawning or gameplay writes. First prepare two profiles, each using the required external AllStars patch:
+
+```powershell
+cargo run -p multigalaxy -- dev-setup development.local.toml 'target\mg1-sync-mario'
+cargo run -p multigalaxy -- dev-setup development.local.toml 'target\mg1-sync-luigi'
+```
+
+Use five PowerShell windows. Start the server:
+
+```powershell
+cargo run -p multigalaxy -- sync-server 127.0.0.1:39845
+```
+
+In two windows, launch separate Dolphins and note their printed PIDs:
+
+```powershell
+cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-sync-mario' 0 --gecko-bridge-probe
+cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-sync-luigi' 0 --gecko-bridge-probe
+```
+
+In two other windows, attach a read-only network client to each matching PID:
+
+```powershell
+cargo run -p multigalaxy -- sync-client development.local.toml <MARIO_DOLPHIN_PID> 127.0.0.1:39845 Mario
+cargo run -p multigalaxy -- sync-client development.local.toml <LUIGI_DOLPHIN_PID> 127.0.0.1:39845 Luigi
+```
+
+The clients validate the Dolphin executable path, PAL inputs, handler fingerprint, live game ID, and mailbox. The server binds only to localhost. Each distinct profile keeps its own configuration. Full interactive two-instance verification has not yet been recorded; synthetic loopback integration tests pass. See [networking.md](networking.md) and [specs/M4-two-player-position-sync.md](../specs/M4-two-player-position-sync.md) for protocol and recovery details.

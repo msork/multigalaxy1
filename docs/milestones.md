@@ -2,16 +2,17 @@
 
 | Milestone | Scope | Status |
 |---|---|---|
-| M0 | Research, reverse engineering, PAL feasibility, architecture | In progress; official DolphinTool validates RMGP01 Rev 0; stock bridge remains unproven |
-| M1 | Reproducible Rust patch tooling and verified PAL maps | Partial; DOL parser/differ and safe patch composition tests exist; no runtime hook is accepted |
-| M2 | Stock Dolphin bridge feasibility | In progress; user-reported paired bridge-off/on playable benchmark is 100%/59.94 FPS/VPS in both runs, CPU 3.289% vs 3.383%; title/menu, pause/resume, and transition lifecycle checks remain pending |
-| M3 | Two-client state exchange and visible remote character | Not started; PAL position mailbox is implemented with synthetic tests, but real Dolphin X/Y/Z movement validation is still required before client state exchange |
-| M4 | Generalized four-player engine | Not started |
-| M5 | Independent per-client camera/render integration | Not started |
-| M6 | Wario/Waluigi models and abilities | Not started |
-| M7 | Online authority and synchronization | Not started |
-| M8 | AllStars Classic Controller and conventional gamepads | Static AllStars + shoulder-swap validation and isolated profile support exist; runtime input validation pending |
-| M9 | Campaign, cutscenes, progression, stability | Not started |
-| M10 | Performance, packaging, release | Not started; counter/ACK benchmark is recorded, coordinate payload and release performance remain unverified |
+| M0 | Research, reverse engineering, PAL feasibility, architecture | In progress; official DolphinTool and exact Petari map validate PAL RMGP01 Rev 0; broader localization and lifecycle evidence remain open |
+| M1 | Reproducible Rust patch tooling and verified PAL maps | Partial; DOL parser/differ, safe patch composition, and exact PAL map checks pass; no gameplay actor injection is accepted |
+| M2 | Stock Dolphin bridge feasibility | In progress; user-reported live mailbox and paired bridge-off/on benchmark are recorded; title/menu, pause/resume, and transition lifecycle checks remain pending |
+| M3 | Verified PAL Mario coordinate extraction | User reports the mailbox yielded real X/Y/Z at ~60 Hz; source/DOL checks and synthetic snapshot tests are recorded, while this turn did not independently repeat gameplay |
+| M4 | Two-player online position relay | In progress; Rust localhost binary server/client and synthetic two-client reconnect/removal tests pass; separate live Dolphin clients remain unverified |
+| M5 | Generalized four-player engine | Not started |
+| M6 | Independent per-client camera/render integration | Not started |
+| M7 | Wario/Waluigi models and abilities | Not started |
+| M8 | Online authority, progression, and synchronization | Not started; M4 relays positions only and does not synchronize shared progression |
+| M9 | AllStars Classic Controller and conventional gamepads | Static AllStars + shoulder-swap validation and isolated profile support exist; runtime input validation pending |
+| M10 | Campaign, cutscenes, progression, stability | Not started |
+| M11 | Performance, packaging, release | Not started; counter/ACK benchmark is recorded, coordinate relay performance remains unverified |
 
 No milestone is complete until its acceptance criteria and evidence are recorded. Dolphin NetPlay and local split-screen are permanently out of scope. Official Dolphin binaries and the user's RVZ remain unmodified.

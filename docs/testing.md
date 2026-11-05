@@ -68,7 +68,7 @@ The first bridge attempt read six zero bytes from the shared MEM1 view and exite
 
 The paired counter/ACK performance benchmark has since been reported by the user: bridge OFF and ON both showed 100% speed and 59.94 FPS/VPS; CPU was 3.289% OFF and 3.383% ON. ACK statistics were 6,667 samples, mean 16.626 ms, p95 30.422 ms, p99 31.237 ms, maximum 141.461 ms. See `performance.md` for measured-vs-derived distinctions. This does not cover the larger coordinate payload.
 
-The Rust launcher now emits a versioned Gecko payload that follows the statically verified PAL chain. Synthetic tests cover PPC payload signatures/cave bounds, stable seqlock decoding, invalid pointers, invalid floats, and unavailable actor state. The Rust reader samples coordinates only when the sequence is unchanged/even, the frame counter matches around the read, the actor pointer is bounded/aligned, and all floats are finite. **Actual X/Y/Z coordinates have not been verified in Dolphin.**
+The Rust launcher emits a versioned Gecko payload that follows the statically verified PAL chain. Synthetic tests cover PPC payload signatures/cave bounds, stable seqlock decoding, invalid pointers, invalid floats, and unavailable actor state. The Rust reader samples coordinates only when the sequence is unchanged/even, the frame counter matches around the read, the actor pointer is bounded/aligned, and all floats are finite. The user now reports live PAL X/Y/Z at about 60 Hz. This is user-verified runtime evidence, not a measurement independently repeated in this turn; the two-client relay remains unverified.
 
 For live testing, use a PowerShell opened on the normal interactive Windows desktop. Do not start Dolphin in an automation desktop. From the repo:
 
@@ -79,4 +79,10 @@ cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-
 
 Wait for Dolphin to boot PAL RMGP01 with the mandatory AllStars patch. On the title screen, `player_unavailable` is expected if the Mario scene actor does not exist. Enter a playable scene. Watch the launcher's timestamped `state=player_position` lines; stand still, walk in one direction, stop, then jump. Confirm X/Y/Z remain stable while still, change during walking, and Y responds during a jump and return. At a pause, scene transition, missing holder, or stopped game, coordinates must stop being reported as live; the bridge should report unavailable/waiting and recover when the counter advances again. Type `Q` in the launcher console to stop.
 
-Save the full console output for evidence. A successful compile or synthetic fixture does not satisfy this interactive acceptance test. Do not claim the live Mario chain, coordinate movement, pause/recovery, or coordinate-payload performance until this test has been observed.
+Save the full console output for evidence when repeating the test. A successful compile or synthetic fixture does not establish pause/recovery or coordinate-payload performance. The user has reported live coordinates; further claims about lifecycle and performance still require an observed run.
+
+## M4 relay tests
+
+`cargo test --workspace` runs the version-1 binary codec tests plus a synthetic loopback server with Mario and Luigi clients. The loopback test checks both directions, disconnect notification, same-ID reconnect, and peer expiry. Separate tests reject duplicate Dolphin PIDs, wrong game/revision, stale/future timestamps, out-of-order sequence, oversized frames, malformed IDs, nonfinite values, and invalid coordinate ranges. A Windows named-mapping test confirms network clients' read-only view refuses ACK writes. These are automated synthetic results and do not prove two Dolphin processes can run together.
+
+For an interactive run, follow the two-profile/five-console procedure in `networking.md`. Record both Dolphin PIDs, both `sync_local=validated` lines, remote `update_hz`, and disconnect/pause/scene transition behavior. Live two-client position relay and coordinate-payload performance remain unverified.

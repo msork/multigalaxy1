@@ -38,20 +38,34 @@ extern "system" {
 pub struct StockMem1 {
     handle: NonNull<c_void>,
     view: NonNull<u8>,
+    writable: bool,
 }
 
 impl StockMem1 {
     pub fn open_dolphin(pid: u32) -> Result<Self, MappingOpenError> {
-        Self::open_name(&format!("dolphin-emu.{pid}"))
+        Self::open_name_access(&format!("dolphin-emu.{pid}"), true)
     }
 
+    #[cfg(test)]
     fn open_name(name: &str) -> Result<Self, MappingOpenError> {
+        Self::open_name_access(name, true)
+    }
+
+    pub fn open_dolphin_read_only(pid: u32) -> Result<Self, MappingOpenError> {
+        Self::open_name_access(&format!("dolphin-emu.{pid}"), false)
+    }
+
+    fn open_name_access(name: &str, writable: bool) -> Result<Self, MappingOpenError> {
         let wide: Vec<u16> = OsStr::new(name).encode_wide().chain(Some(0)).collect();
+        let access = if writable {
+            FILE_MAP_READ | FILE_MAP_WRITE
+        } else {
+            FILE_MAP_READ
+        };
         // SAFETY: `wide` is a nul-terminated UTF-16 name and remains alive for
         // the duration of the call. The requested access is limited to the
         // caller's same-session Dolphin page-file mapping.
-        let raw_handle =
-            unsafe { OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, 0, wide.as_ptr()) };
+        let raw_handle = unsafe { OpenFileMappingW(access, 0, wide.as_ptr()) };
         let handle = NonNull::new(raw_handle).ok_or_else(|| {
             let error = std::io::Error::last_os_error();
             let diagnostic = format!("cannot open stock Dolphin shared memory {name:?}: {error}");
@@ -66,15 +80,7 @@ impl StockMem1 {
         // SAFETY: the section is Dolphin's MEM1-first mapping; `VIEW_BYTES` is
         // aligned to the Windows allocation granularity and the Dolphin 2609a
         // Wii section is substantially larger than this bounded view.
-        let raw_view = unsafe {
-            MapViewOfFile(
-                handle.as_ptr(),
-                FILE_MAP_READ | FILE_MAP_WRITE,
-                0,
-                0,
-                VIEW_BYTES,
-            )
-        };
+        let raw_view = unsafe { MapViewOfFile(handle.as_ptr(), access, 0, 0, VIEW_BYTES) };
         let view = match NonNull::new(raw_view.cast::<u8>()) {
             Some(view) => view,
             None => {
@@ -86,7 +92,11 @@ impl StockMem1 {
                 )));
             }
         };
-        Ok(Self { handle, view })
+        Ok(Self {
+            handle,
+            view,
+            writable,
+        })
     }
 
     pub fn mapped_view_bytes(&self) -> usize {
@@ -133,6 +143,9 @@ impl StockMem1 {
     }
 
     pub fn acknowledge(&self, mailbox: Mailbox, value: u32) -> Result<(), String> {
+        if !self.writable {
+            return Err("refusing ACK write through a read-only Dolphin mapping".into());
+        }
         if !mailbox.is_inside_handler()
             || mailbox.acknowledgement_address() < HANDLER_BASE
             || mailbox.acknowledgement_address() + 4 > HANDLER_END
@@ -238,6 +251,11 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(view.read_guest_word(mailbox.counter_address()).unwrap(), 7);
+        let read_only = StockMem1::open_name_access(&name, false).unwrap();
+        assert!(read_only
+            .acknowledge(mailbox, 1)
+            .unwrap_err()
+            .contains("read-only"));
         view.acknowledge(mailbox, 0x89ab_cdef).unwrap();
         assert_eq!(
             view.read_guest_word(mailbox.acknowledgement_address())

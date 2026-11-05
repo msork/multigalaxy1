@@ -9,12 +9,15 @@ mod player_probe;
 mod startup;
 #[cfg(windows)]
 mod stock_memory;
+mod sync_net;
 
 use multigalaxy_patch::{
     branch_target, changed_ranges, parse_dol, sha256, DiscIdentity, RevisionCatalog, SectionKind,
 };
+use std::collections::HashMap;
 use std::io::Write;
 use std::net::TcpListener;
+use std::thread;
 use std::time::{Duration, Instant};
 use std::{env, fs, process};
 
@@ -1023,8 +1026,409 @@ fn run_interactive_gecko_bridge_probe(
     Ok(())
 }
 
+#[cfg(windows)]
+fn run_sync_client(
+    config_path: &std::path::Path,
+    pid: u32,
+    address: std::net::SocketAddr,
+    player: sync_net::PlayerId,
+) -> Result<(), String> {
+    const EXPECTED_HANDLER_SHA256: &str =
+        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
+    let config_text = fs::read_to_string(config_path)
+        .map_err(|e| format!("cannot read development config: {e}"))?;
+    let config = dev_config::parse(&config_text)?;
+    validate_dev_inputs(&config)?;
+    let pal_dol = fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL DOL: {e}"))?;
+    let pal_symbols =
+        fs::read(&config.pal_symbols).map_err(|e| format!("cannot read PAL symbols: {e}"))?;
+    player_probe::verify_pal_inputs(&pal_dol, &pal_symbols)?;
+    let dolphin = config
+        .dolphin
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve configured Dolphin: {e}"))?;
+    let process_image = startup::process_image_path(pid)?
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve Dolphin PID {pid} image path: {e}"))?;
+    if !process_image
+        .to_string_lossy()
+        .eq_ignore_ascii_case(&dolphin.to_string_lossy())
+    {
+        return Err(format!(
+            "PID {pid} belongs to {}, expected configured stock Dolphin {}",
+            process_image.display(),
+            dolphin.display()
+        ));
+    }
+    let handler_path = dolphin
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join("Sys")
+        .join("codehandler.bin");
+    let handler = fs::read(&handler_path).map_err(|e| {
+        format!(
+            "cannot read Dolphin Gecko handler {}: {e}",
+            handler_path.display()
+        )
+    })?;
+    let handler_hash = sha256(&handler)
+        .iter()
+        .map(|v| format!("{v:02x}"))
+        .collect::<String>();
+    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
+        return Err(format!("Dolphin handler does not match the validated 2609a fingerprint (size={}, sha256={handler_hash})", handler.len()));
+    }
+    let view = stock_memory::StockMem1::open_dolphin_read_only(pid)
+        .map_err(|e| format!("cannot open Dolphin PID {pid} MEM1 read-only: {e:?}"))?;
+    let identity_deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        let id = view.read_guest(0x8000_0000, 6)?;
+        if id == b"RMGP01" {
+            break;
+        }
+        if bridge_identity::classify_game_id(id.as_slice().try_into().unwrap_or([0; 6]))
+            == bridge_identity::IdentityStatus::WrongGame
+        {
+            return Err(format!(
+                "Dolphin PID {pid} is not PAL RMGP01: {}",
+                bridge_identity::describe_game_id(id.try_into().unwrap_or([0; 6]))
+            ));
+        }
+        if Instant::now() >= identity_deadline {
+            return Err(format!(
+                "timed out waiting for RMGP01 in Dolphin PID {pid}; observed_game_id={}",
+                bridge_identity::describe_game_id(id.try_into().unwrap_or([0; 6]))
+            ));
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    let handler_addr_len = (gecko_bridge::HANDLER_END - gecko_bridge::HANDLER_BASE) as usize;
+    let mailbox_deadline = Instant::now() + Duration::from_secs(60);
+    let mailbox = loop {
+        let bytes = view.read_guest(gecko_bridge::HANDLER_BASE, handler_addr_len)?;
+        match gecko_bridge::locate_mailbox(gecko_bridge::HANDLER_BASE, handler.len(), &bytes)? {
+            Some(mailbox) => break mailbox,
+            None if Instant::now() < mailbox_deadline => thread::sleep(Duration::from_millis(250)),
+            None => {
+                return Err(format!(
+                    "timed out waiting for validated Gecko mailbox in Dolphin PID {pid}"
+                ))
+            }
+        }
+    };
+    println!("sync_local=validated pid={pid} player={} game=RMGP01 revision=0 mailbox=0x{:08x} mapping=read_only", player.name(), mailbox.snapshot_address());
+
+    struct Remote {
+        frame: sync_net::Frame,
+        received: Instant,
+        updates: u64,
+        rate_started: Instant,
+    }
+    let mut sequence = 0u64;
+    let mut last_observed_counter = None;
+    let mut last_local_status: Option<&'static str> = None;
+    let mut next_process_check = Instant::now();
+    loop {
+        let mut stream = match sync_net::connect_local(address) {
+            Ok(stream) => stream,
+            Err(error) => {
+                println!("sync_network=retry player={} reason={error}", player.name());
+                thread::sleep(Duration::from_secs(1));
+                continue;
+            }
+        };
+        sync_net::write_frame(
+            &mut stream,
+            &sync_net::Frame::Hello {
+                player,
+                game_id: *b"RMGP01",
+                revision: 0,
+                dolphin_pid: pid,
+            },
+        )?;
+        let mut reader = stream
+            .try_clone()
+            .map_err(|e| format!("clone sync socket: {e}"))?;
+        let (event_tx, event_rx) = std::sync::mpsc::channel::<Result<sync_net::Frame, String>>();
+        thread::spawn(move || loop {
+            match sync_net::read_frame(&mut reader) {
+                Ok(frame) => {
+                    if event_tx.send(Ok(frame)).is_err() {
+                        break;
+                    }
+                }
+                Err(error) => {
+                    let _ = event_tx.send(Err(error));
+                    break;
+                }
+            }
+        });
+        println!(
+            "sync_network=connected server={address} player={}",
+            player.name()
+        );
+        let mut remote: HashMap<sync_net::PlayerId, Remote> = HashMap::new();
+        let mut last_sequence: HashMap<sync_net::PlayerId, u64> = HashMap::new();
+        let mut next_sample = Instant::now();
+        let mut next_report = Instant::now() + Duration::from_secs(1);
+        let mut disconnected = None;
+        while disconnected.is_none() {
+            while let Ok(event) = event_rx.try_recv() {
+                match event {
+                    Err(error) => {
+                        disconnected = Some(error);
+                        break;
+                    }
+                    Ok(sync_net::Frame::PeerState {
+                        player: remote_id,
+                        sequence: remote_seq,
+                        timestamp_ms,
+                        counter,
+                        x,
+                        y,
+                        z,
+                    }) => {
+                        if remote_id == player
+                            || !sync_net::fresh_timestamp(timestamp_ms, sync_net::now_ms())
+                            || last_sequence
+                                .get(&remote_id)
+                                .is_some_and(|last| remote_seq <= *last)
+                            || !sync_net::valid_position(x, y, z)
+                        {
+                            disconnected = Some(format!("rejected stale, malformed, self, or out-of-order peer snapshot from {}", remote_id.name()));
+                            break;
+                        }
+                        last_sequence.insert(remote_id, remote_seq);
+                        let entry = remote.entry(remote_id).or_insert(Remote {
+                            frame: sync_net::Frame::PeerState {
+                                player: remote_id,
+                                sequence: remote_seq,
+                                timestamp_ms,
+                                counter,
+                                x,
+                                y,
+                                z,
+                            },
+                            received: Instant::now(),
+                            updates: 0,
+                            rate_started: Instant::now(),
+                        });
+                        entry.frame = sync_net::Frame::PeerState {
+                            player: remote_id,
+                            sequence: remote_seq,
+                            timestamp_ms,
+                            counter,
+                            x,
+                            y,
+                            z,
+                        };
+                        entry.received = Instant::now();
+                        entry.updates += 1;
+                    }
+                    Ok(sync_net::Frame::PeerGone { player: remote_id }) => {
+                        if remote_id == player {
+                            disconnected = Some("server reported this client disconnected".into());
+                            break;
+                        }
+                        if remote.remove(&remote_id).is_some() {
+                            println!("sync_remote=gone player={}", remote_id.name());
+                        }
+                        last_sequence.remove(&remote_id);
+                    }
+                    Ok(sync_net::Frame::Reject { code, .. }) => {
+                        return Err(match code {
+                            1 => "server rejected duplicate player ID".into(),
+                            2 => "server lobby already has two players".into(),
+                            3 => "server rejected both clients attaching to the same Dolphin PID"
+                                .into(),
+                            _ => format!("server rejected client (code {code})"),
+                        });
+                    }
+                    Ok(_) => {
+                        disconnected =
+                            Some("server sent a client-only or malformed message".into());
+                        break;
+                    }
+                }
+            }
+            if disconnected.is_some() {
+                break;
+            }
+
+            if Instant::now() >= next_sample {
+                next_sample = Instant::now() + Duration::from_millis(16);
+                if Instant::now() >= next_process_check {
+                    let current_image = startup::process_image_path(pid)?
+                        .canonicalize()
+                        .map_err(|e| format!("cannot resolve Dolphin PID {pid} image: {e}"))?;
+                    if !current_image
+                        .to_string_lossy()
+                        .eq_ignore_ascii_case(&dolphin.to_string_lossy())
+                    {
+                        return Err(format!(
+                            "Dolphin PID {pid} changed image to {}; stopping sync client",
+                            current_image.display()
+                        ));
+                    }
+                    next_process_check = Instant::now() + Duration::from_secs(1);
+                }
+                let game_id: [u8; 6] = view.read_guest(0x8000_0000, 6)?.try_into().unwrap();
+                if game_id != *b"RMGP01" {
+                    return Err(format!(
+                        "Dolphin PID {pid} game identity changed to {}",
+                        bridge_identity::describe_game_id(game_id)
+                    ));
+                }
+                if Instant::now() >= next_report {
+                    let bytes = view.read_guest(gecko_bridge::HANDLER_BASE, handler_addr_len)?;
+                    if !gecko_bridge::snapshot_matches_mailbox(
+                        gecko_bridge::HANDLER_BASE,
+                        handler.len(),
+                        &bytes,
+                        mailbox,
+                    )? {
+                        return Err(
+                            "Dolphin Gecko mailbox signature changed; stopping sync client".into(),
+                        );
+                    }
+                }
+                let counter = view.read_guest_word(mailbox.counter_address())?;
+                let heartbeat_advanced = last_observed_counter.is_some_and(|last| last != counter);
+                last_observed_counter = Some(counter);
+                let bytes = view.read_guest(mailbox.snapshot_address(), 12 * 4)?;
+                let sequence_after = view.read_guest_word(mailbox.snapshot_address() + 20)?;
+                let counter_after = view.read_guest_word(mailbox.counter_address())?;
+                let snapshot = gecko_bridge::decode_snapshot(&bytes, sequence_after)?;
+                match snapshot {
+                    Ok(sample)
+                        if heartbeat_advanced
+                            && sample.counter == counter
+                            && counter_after == counter =>
+                    {
+                        if last_local_status != Some("live") {
+                            println!(
+                                "sync_local=position_ready player={} counter={}",
+                                player.name(),
+                                sample.counter
+                            );
+                        }
+                        last_local_status = Some("live");
+                        sequence = sequence.wrapping_add(1).max(1);
+                        let frame = sync_net::snapshot_frame(player, sequence, sample);
+                        if let Err(error) = sync_net::write_frame(&mut stream, &frame) {
+                            disconnected = Some(error);
+                        }
+                    }
+                    Ok(_) => {
+                        if last_local_status != Some("waiting") {
+                            println!("sync_local=waiting player={} reason=awaiting_new_frame_or_consistent_snapshot", player.name());
+                        }
+                        last_local_status = Some("waiting");
+                    }
+                    Err(gecko_bridge::SnapshotState::Unavailable) => {
+                        if last_local_status != Some("unavailable") {
+                            println!("sync_local=unavailable player={} reason=mario_holder_or_actor_not_ready", player.name());
+                        }
+                        last_local_status = Some("unavailable");
+                    }
+                    Err(gecko_bridge::SnapshotState::Inconsistent) => {
+                        if last_local_status != Some("waiting") {
+                            println!(
+                                "sync_local=waiting player={} reason=seqlock_inconsistent",
+                                player.name()
+                            );
+                        }
+                        last_local_status = Some("waiting");
+                    }
+                    Err(gecko_bridge::SnapshotState::Invalid) => {
+                        if last_local_status != Some("invalid") {
+                            println!("sync_local=invalid player={} reason=actor_or_coordinate_validation_failed", player.name());
+                        }
+                        last_local_status = Some("invalid");
+                    }
+                }
+            }
+            let now = Instant::now();
+            let stale: Vec<_> = remote
+                .iter()
+                .filter_map(|(id, state)| {
+                    (now.duration_since(state.received) > Duration::from_secs(1)).then_some(*id)
+                })
+                .collect();
+            for id in stale {
+                remote.remove(&id);
+                println!(
+                    "sync_remote=expired player={} reason=no_fresh_position",
+                    id.name()
+                );
+            }
+            if now >= next_report {
+                for (id, state) in &mut remote {
+                    let elapsed = state.rate_started.elapsed().as_secs_f64().max(0.001);
+                    let hz = state.updates as f64 / elapsed;
+                    state.updates = 0;
+                    state.rate_started = Instant::now();
+                    if let sync_net::Frame::PeerState {
+                        x,
+                        y,
+                        z,
+                        sequence: peer_seq,
+                        ..
+                    } = state.frame
+                    {
+                        println!("sync_remote=position player={} seq={} x={x:.4} y={y:.4} z={z:.4} age_ms={} update_hz={hz:.1}", id.name(), peer_seq, state.received.elapsed().as_millis());
+                    }
+                }
+                next_report = now + Duration::from_secs(1);
+            }
+            thread::sleep(Duration::from_millis(2));
+        }
+        println!(
+            "sync_network=disconnected player={} reason={}; reconnecting in 1s",
+            player.name(),
+            disconnected.unwrap_or_default()
+        );
+        remote.clear();
+        last_sequence.clear();
+        thread::sleep(Duration::from_secs(1));
+    }
+}
+
+#[cfg(not(windows))]
+fn run_sync_client(
+    _config_path: &std::path::Path,
+    _pid: u32,
+    _address: std::net::SocketAddr,
+    _player: sync_net::PlayerId,
+) -> Result<(), String> {
+    Err("sync-client requires official stock Dolphin 2609a on Windows".into())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 2 && args[0] == "sync-server" {
+        let address = args[1]
+            .to_str()
+            .ok_or("server address must be valid UTF-8")?
+            .parse::<std::net::SocketAddr>()
+            .map_err(|_| "server address must be an IP:port socket address")?;
+        return sync_net::run_server(address);
+    }
+    if args.len() == 5 && args[0] == "sync-client" {
+        let pid = args[2]
+            .to_str()
+            .ok_or("Dolphin PID must be valid UTF-8")?
+            .parse::<u32>()
+            .map_err(|_| "Dolphin PID must be a positive integer")?;
+        let address = args[3]
+            .to_str()
+            .ok_or("server address must be valid UTF-8")?
+            .parse::<std::net::SocketAddr>()
+            .map_err(|_| "server address must be an IP:port socket address")?;
+        let player =
+            sync_net::PlayerId::parse(args[4].to_str().ok_or("player ID must be valid UTF-8")?)?;
+        return run_sync_client(std::path::Path::new(&args[1]), pid, address, player);
+    }
     if args.len() == 4 && args[0] == "bench-dolphin" {
         let pid = args[1]
             .to_str()
@@ -1652,7 +2056,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
