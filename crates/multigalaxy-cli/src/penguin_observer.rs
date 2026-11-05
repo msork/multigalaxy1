@@ -1,5 +1,5 @@
 //! Opt-in, read-only scan of the currently registered PAL Penguin actor class.
-//! Only entry pointers and each valid object's first word are read.
+//! Only entry pointers, candidate vptrs, and the verified position vector are read.
 use crate::{memory_inspection as mem, player_probe::GuestMemory};
 use multigalaxy_patch::{parse_dol, PatchWrite, SectionKind};
 use std::time::Instant;
@@ -15,21 +15,36 @@ const CAPACITY: u32 = 0xA00;
 const GROUP_CAPACITY: u32 = 0x0C;
 const GROUP_COUNT: u32 = 0x10;
 const GROUP_ARRAY: u32 = 0x14;
+const LIVE_ACTOR_POSITION: u32 = 0x0C;
 const MAX_REPORTED_MATCHES: usize = 16;
 const PENGUIN_CTOR: u32 = 0x8027_90E0;
+const LIVE_ACTOR_CTOR: u32 = 0x8016_5204;
+const LIVE_ACTOR_POSITION_INIT: &[u8] = &[
+    0xD0, 0x5E, 0x00, 0x0C, 0xD0, 0x5E, 0x00, 0x10, 0xD0, 0x5E, 0x00, 0x14,
+];
 const PENGUIN_CTOR_VPTR_STORE: &[u8] = &[
     0x7C, 0x7F, 0x1B, 0x78, 0x48, 0x02, 0x13, 0xBD, 0x3C, 0x60, 0x80, 0x5A, 0x38, 0x80, 0xFF, 0xFF,
     0x38, 0x63, 0xC8, 0x84, 0x38, 0x00, 0x00, 0x00, 0x90, 0x7F, 0x00, 0x00,
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Candidate {
     pub index: u32,
     pub actor: u32,
     pub vptr: u32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PenguinEntry {
+    index: u32,
+    actor: u32,
+    vptr: u32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Report {
     pub elapsed_ms: u128,
     pub scene: u32,
@@ -64,12 +79,22 @@ pub fn verify_penguin_pal(dol: &[u8], symbols: &[u8]) -> Result<(), String> {
     let symbols =
         std::str::from_utf8(symbols).map_err(|e| format!("symbols file is not UTF-8: {e}"))?;
     if !symbols.lines().any(|l| l.trim() == "__ct__7PenguinFPCc = .text:0x802790E0; // type:function size:0x4C scope:global align:4")
-        || !symbols.lines().any(|l| l.trim() == "__vt__7Penguin = .data:0x8059C884; // type:object size:0x78 scope:global align:4") {
-        return Err("Penguin constructor/vtable symbols do not match the reviewed PAL map".into());
+        || !symbols.lines().any(|l| l.trim() == "__vt__7Penguin = .data:0x8059C884; // type:object size:0x78 scope:global align:4")
+        || !symbols.lines().any(|l| l.trim() == "__ct__9LiveActorFPCc = .text:0x80165204; // type:function size:0xE8 scope:global align:4") {
+        return Err("Penguin/LiveActor constructor and vtable symbols do not match the reviewed PAL map".into());
     }
     let bytes = dol_bytes(dol, PENGUIN_CTOR + 0x10, PENGUIN_CTOR_VPTR_STORE.len())?;
     if bytes != PENGUIN_CTOR_VPTR_STORE {
         return Err("PAL Penguin constructor vptr-store signature mismatch".into());
+    }
+    verify_live_actor_position_signature(dol)?;
+    Ok(())
+}
+
+fn verify_live_actor_position_signature(dol: &[u8]) -> Result<(), String> {
+    let position_init = dol_bytes(dol, LIVE_ACTOR_CTOR + 0x3C, LIVE_ACTOR_POSITION_INIT.len())?;
+    if position_init != LIVE_ACTOR_POSITION_INIT {
+        return Err("PAL LiveActor position initialization signature mismatch".into());
     }
     Ok(())
 }
@@ -137,6 +162,24 @@ fn read_u32(memory: &mut impl GuestMemory, address: u32) -> Result<u32, String> 
     validate_guest(address, 4)?;
     let bytes = memory.read_guest(address, 4)?;
     mem::decode_be_u32(address, &bytes)
+}
+
+fn read_position(memory: &mut impl GuestMemory, actor: u32) -> Result<[f32; 3], String> {
+    if actor & 3 != 0 || actor < mem::GUEST_MEM1_BASE || actor >= mem::GUEST_MEM1_LIMIT {
+        return Err(format!("invalid Penguin actor pointer 0x{actor:08x}"));
+    }
+    let address = field(actor, LIVE_ACTOR_POSITION)?;
+    validate_guest(address, 12)?;
+    let bytes = memory.read_guest(address, 12)?;
+    if bytes.len() != 12 {
+        return Err("memory reader returned a short LiveActor position vector".into());
+    }
+    let mut position = [0.0; 3];
+    for (index, value) in position.iter_mut().enumerate() {
+        let at = index * 4;
+        *value = mem::decode_be_f32(address + at as u32, &bytes[at..at + 4])?;
+    }
+    Ok(position)
 }
 
 fn read_ptr(memory: &mut impl GuestMemory, address: u32, label: &str) -> Result<u32, String> {
@@ -215,7 +258,7 @@ struct Counts {
     invalid_entries: u32,
     non_penguin: u32,
     total_matches: u32,
-    matches: Vec<Candidate>,
+    matches: Vec<PenguinEntry>,
     entry_words: Vec<u32>,
 }
 
@@ -260,7 +303,7 @@ fn scan_entries(memory: &mut impl GuestMemory, meta: Metadata) -> Result<Counts,
             if vptr == PENGUIN_VPTR {
                 result.total_matches += 1;
                 if result.matches.len() < MAX_REPORTED_MATCHES {
-                    result.matches.push(Candidate {
+                    result.matches.push(PenguinEntry {
                         index: index + local as u32,
                         actor: raw,
                         vptr,
@@ -279,6 +322,23 @@ pub fn observe(memory: &mut impl GuestMemory) -> Result<Report, String> {
     let started = Instant::now();
     let before = metadata(memory)?;
     let counts = scan_entries(memory, before)?;
+    let mut candidates = Vec::with_capacity(counts.matches.len());
+    for candidate in &counts.matches {
+        // Revalidate object identity immediately before reading the only actor
+        // payload allowed by this observer: LiveActor::mPosition at +0x0C.
+        if read_u32(memory, candidate.actor)? != PENGUIN_VPTR {
+            return Err("Penguin entry changed before position read; sample discarded".into());
+        }
+        let [x, y, z] = read_position(memory, candidate.actor)?;
+        candidates.push(Candidate {
+            index: candidate.index,
+            actor: candidate.actor,
+            vptr: candidate.vptr,
+            x,
+            y,
+            z,
+        });
+    }
     // Recompute every root link and metadata field, then reread the exact registered
     // array range. Any mutation or scene replacement invalidates all candidates.
     let after = metadata(memory)?;
@@ -310,7 +370,7 @@ pub fn observe(memory: &mut impl GuestMemory) -> Result<Report, String> {
         invalid_entries: counts.invalid_entries,
         non_penguin: counts.non_penguin,
         total_matches: counts.total_matches,
-        matches: counts.matches,
+        matches: candidates,
     })
 }
 
@@ -359,8 +419,26 @@ mod tests {
             self.words.insert(0x8001_1000 + index * 4, actor);
             if actor != 0 {
                 self.words.insert(actor, vptr);
+                self.put_position(actor, [1.25, -2.5, 3.75]);
             }
         }
+        fn put_position(&mut self, actor: u32, position: [f32; 3]) {
+            for (index, value) in position.into_iter().enumerate() {
+                self.words.insert(
+                    actor + LIVE_ACTOR_POSITION + (index as u32 * 4),
+                    value.to_bits(),
+                );
+            }
+        }
+    }
+
+    fn dol_with_position_signature(signature: &[u8]) -> Vec<u8> {
+        let mut dol = vec![0_u8; 0x100 + signature.len()];
+        dol[0..4].copy_from_slice(&0x100_u32.to_be_bytes());
+        dol[0x48..0x4c].copy_from_slice(&(LIVE_ACTOR_CTOR + 0x3C).to_be_bytes());
+        dol[0x90..0x94].copy_from_slice(&(signature.len() as u32).to_be_bytes());
+        dol[0x100..].copy_from_slice(signature);
+        dol
     }
     impl GuestMemory for Fixture {
         fn read_guest(&mut self, address: u32, length: usize) -> Result<Vec<u8>, String> {
@@ -393,6 +471,10 @@ mod tests {
         let r = observe(&mut f).unwrap();
         assert_eq!(r.total_matches, 1);
         assert_eq!(r.matches[0].index, 0);
+        assert_eq!(
+            [r.matches[0].x, r.matches[0].y, r.matches[0].z],
+            [1.25, -2.5, 3.75]
+        );
     }
     #[test]
     fn invalid_and_null_entries_are_skipped_safely() {
@@ -443,8 +525,39 @@ mod tests {
         assert_eq!(r.total_matches, 0);
     }
     #[test]
+    fn rejects_nonfinite_position_and_recycled_candidate() {
+        let mut f = Fixture::new(1);
+        f.put_entry(0, 0x8001_2000, PENGUIN_VPTR);
+        f.put_position(0x8001_2000, [1.0, f32::NAN, 2.0]);
+        assert!(observe(&mut f).unwrap_err().contains("not finite"));
+
+        let mut f = Fixture::new(1);
+        f.put_entry(0, 0x8001_2000, PENGUIN_VPTR);
+        f.mutate_after = Some((14, 0x8001_2000, PENGUIN_VPTR + 4));
+        assert!(observe(&mut f)
+            .unwrap_err()
+            .contains("changed during observation"));
+    }
+    #[test]
     fn arithmetic_and_guest_bounds_are_checked() {
         assert!(field(u32::MAX - 1, 4).is_err());
         assert!(validate_guest(mem::GUEST_MEM1_LIMIT - 2, 4).is_err());
+    }
+
+    #[test]
+    fn binds_position_read_to_pal_constructor_signature() {
+        assert!(
+            verify_live_actor_position_signature(&dol_with_position_signature(
+                LIVE_ACTOR_POSITION_INIT
+            ))
+            .is_ok()
+        );
+        let mut wrong = LIVE_ACTOR_POSITION_INIT.to_vec();
+        wrong[0] ^= 1;
+        assert!(
+            verify_live_actor_position_signature(&dol_with_position_signature(&wrong))
+                .unwrap_err()
+                .contains("signature mismatch")
+        );
     }
 }

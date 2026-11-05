@@ -255,8 +255,8 @@ fn run_observe_penguins(config_path: &std::path::Path, pid: u32) -> Result<(), S
         .iter()
         .map(|m| {
             format!(
-                " index={} actor=0x{:08x} vptr=0x{:08x}",
-                m.index, m.actor, m.vptr
+                " index={} actor=0x{:08x} vptr=0x{:08x} x={:.3} y={:.3} z={:.3}",
+                m.index, m.actor, m.vptr, m.x, m.y, m.z
             )
         })
         .collect::<String>();

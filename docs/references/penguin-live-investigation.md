@@ -1,6 +1,6 @@
 # Penguin live-object investigation (M5 Phase 1.7)
 
-Status: **group path live-validated; bounded Penguin observer authorized in this phase**. The user supplied live PAL group metadata and two manually identified non-Penguin entries. The observer described below is opt-in and read-only; it reads only registered actor pointer entries and the first word of valid candidate objects to compare their vptr. It does not read transforms, names, models, scheduler state, or gameplay fields. No game writes, hooks, injected code, actor creation, profile changes, or Dolphin changes are made.
+Status: **group path and Penguin class candidates user-validated; opt-in read-only position observer implemented**. It reads registered actor pointers, candidate vptrs, and only the verified `LiveActor::mPosition` vector at `+0x0C`. It does not read names, models, scheduler state, or other actor fields. No game writes, hooks, injected code, actor creation, profile changes, or Dolphin changes are made.
 
 ## Evidence categories
 
@@ -24,6 +24,8 @@ The user later supplied this live observation from Dolphin 2609a, PAL RMGP01 Rev
 
 These are **user-observed live values**, not a trace independently captured by this tool. No entry indexes or addresses were supplied for those two entries. The values confirm the static group metadata for that session; they do not identify a Penguin or establish pause/transition lifetime. The observed array pointer is 28 bytes after the group object; this adjacency is recorded only as an observation and is not assumed by the reader.
 
+The user later reported a successful Penguin-vptr observation in that PAL scene: scene `0x80F8EF70`, group `0x80FA07D8`, capacity 2560, count 1164, and 16 reported matches for `__vt__7Penguin = 0x8059C884` at indexes within `1013..1058`. This is user-observed evidence; the CLI has not independently reproduced it. No actor addresses or coordinates accompanied the report, and the index range does not mean every index matched.
+
 ### Static PAL/source evidence
 
 The exact PAL DOL and Petari symbol file pass `validate-mario-map`. The existing `player_probe.rs` validates the PAL Mario-root chain's instruction signatures and uses these fields:
@@ -39,6 +41,12 @@ The exact PAL DOL places `getActor__14LiveActorGroupCFi` at `0x80166110`, text s
 ### Penguin vptr address-point check (static PAL evidence)
 
 The PAL symbol map identifies `__ct__7PenguinFPCc` at `0x802790E0` (text section 1 file offset `0x274620`, size `0x4C`) and `__vt__7Penguin` at `0x8059C884` (data symbol size `0x78`). Constructor bytes at `+0x10` through `+0x2B` are `7C 7F 1B 78 48 02 13 BD 3C 60 80 5A 38 80 FF FF 38 63 C8 84 38 00 00 00 90 7F 00 00`: `mr r31,r3` saves `this`; after the base constructor, `lis/addi` forms `0x8059C884` in r3; `stw r3,0(r31)` stores it at object offset zero. Thus the primary Penguin vptr comparison is exactly `0x8059C884`; the constructor resolves the address-point uncertainty for this PAL build. The observer requires the exact PAL DOL/symbol fingerprint and these constructor bytes, and accepts no nearby vptr values.
+
+### Position-field verification and observer limits
+
+The exact Petari PAL symbols identify `__ct__9LiveActorFPCc` at `0x80165204`, size `0xE8`. Its DOL bytes at function `+0x3C` / file offset `0x160780` are `D0 5E 00 0C D0 5E 00 10 D0 5E 00 14`, three `stfs` operations initializing a three-float member at `this+0x0C..+0x17`. Petari's `LiveActor` layout names that member `mPosition`. The observer verifies these bytes and reads one 12-byte vector at actor `+0x0C`, decoding finite big-endian floats. It reports these as the actor's game-space position components; this CLI has not yet validated their live movement behavior.
+
+Before reading coordinates it checks the candidate vptr again. After reading, it recomputes the entire scene/group chain and rescans registered entries; any scene, group, entry, or identity change rejects the whole sample. This guards against stale/recycled pointers, but is not an atomic frame snapshot: the running game may update coordinates during the read.
 
 ### SceneObjHolder root and object layout (static PAL evidence)
 
@@ -82,8 +90,8 @@ The allocation/destruction call targets are in the same verified DOL: `initObjAr
 
 ### Unverified
 
-- The supplied group values are user-observed; this tool has not independently reproduced them or run the observer live.
-- No Penguin candidate has been reported by the observer yet, and no reliable identifier selects the visible Beach Bowl placement among multiple Penguin instances.
+- Group values and 16 Penguin-class matches are user-observed; this tool has not independently reproduced them.
+- No actor addresses or positions were included in the report. There is no reliable identifier selecting the visible Beach Bowl placement among multiple class matches.
 - Penguin name storage, model pointer, scheduler membership, and lifetime through pause/transition remain unverified.
 
 The source references are Petari's [`AllLiveActorGroup.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/AllLiveActorGroup.cpp) and [`LiveActorGroup.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/LiveActorGroup.cpp). The PAL constructors and accessors derive the group fields and array ownership; they do not identify a Penguin entry. Capacity 2560 is not a live count.
@@ -110,11 +118,11 @@ The live group metadata supplied above matches the static PAL layout. This user 
 1. Revalidate Dolphin PID/executable/session, 2609a codehandler, exact PAL RMGP01 Rev 0 DOL and symbols, mandatory AllStars input, live `RMGP01`, and PAL runtime signatures.
 2. Recompute `GameSystem -> SceneController -> Scene -> SceneObjHolder -> AllLiveActorGroup` from the root; no heap pointer is reused between invocations.
 3. Require group vptr `0x8057327C`, capacity `0xA00`, `count <= capacity`, aligned canonical MEM1 array pointer, and checked full-capacity span `array + capacity*4 <= 0x81800000`.
-4. Read only `[0,count)` entries in bounded chunks. For each entry, skip null/misaligned/out-of-range actor pointers. For each valid pointer, read only the 4-byte object word at offset zero; never follow its vptr or inspect other actor fields.
-5. Compare exactly to `0x8059C884`. Emit at most 16 matches containing index, actor pointer, and vptr; report aggregate null/invalid/nonmatching counts. Do not print nonmatching actor pointers.
+4. Read only `[0,count)` entries in bounded chunks. Skip null/misaligned/out-of-range actor pointers. For exact Penguin matches, recheck vptr and read only the 12-byte position at actor `+0x0C`; reject non-finite components.
+5. Compare exactly to `0x8059C884`. Emit at most 16 matches containing index, actor pointer, vptr, and X/Y/Z; report aggregate null/invalid/nonmatching counts. Do not print nonmatching actor pointers.
 6. Re-read the array and complete scene/group metadata. If any changed, discard all candidates and report an unstable scene/group. No candidate pointer survives the command.
 
-The implementation is the separate opt-in `observe-penguins` command. It does not write Dolphin memory, install hooks/injection, create actors, modify Dolphin, change profiles, or affect M4/network behavior. It identifies Penguin-class candidates only; if multiple instances match, it does not choose one by name/location. Candidate pointers exist only for this command invocation.
+The implementation is the separate opt-in `observe-penguins` command. It does not write Dolphin memory, install hooks/injection, create actors, modify Dolphin, change profiles, or affect M4/network behavior. Candidate pointers and positions exist only for the command invocation; it does not select a specific visible placement.
 
 ## Interactive PowerShell observation
 
@@ -126,16 +134,15 @@ $DolphinPid = 12345 # replace with the isolated Dolphin PID
 cargo run -q -p multigalaxy -- observe-penguins .\development.local.toml $DolphinPid
 ```
 
-Expected output is one bounded `penguin_observer=validated` summary with scene/group addresses, capacity/count, aggregate entry counts, and up to 16 matching candidate index/address/vptr triples. A zero-match result means no exact Penguin vptr was found among this scene's registered entries; it does not prove no Penguin is visible. Any wrong game, invalid group metadata, unsafe pointer, mapping failure, or unstable scene/entry list fails the observation without returning candidate pointers. At title/menu, an unavailable chain is expected; do not substitute addresses.
+Expected output is one bounded summary with scene/group addresses, capacity/count, aggregate entry counts, and up to 16 records containing index, actor pointer, vptr, and X/Y/Z. A zero-match result means no exact Penguin vptr was found among registered entries; it does not prove no Penguin is visible. Wrong game, invalid metadata, unsafe pointer, non-finite coordinate, mapping failure, or unstable scene/entry list rejects the whole sample. At title/menu, an unavailable chain is expected; do not substitute addresses.
 
 Run the command once with a Penguin visible, once while paused, once after resuming, and immediately after transitioning out of the mission. Save the command output each time. The command recomputes from the singleton on every invocation and performs an internal second observation before returning; it retains no pointers. A changed scene or entry list invalidates the whole result. Stable roots during pause or changed values during transitions are observations only; they do not establish a specific Penguin's lifetime.
 
-Do not run the Gecko bridge probe for this experiment; it performs ACK writes. This command uses stock Dolphin's existing read-only MEM1 mapping. Do not use `probe-mario` GDB or scan memory. The observer reads only the registered array and candidate vptr words.
+Do not run the Gecko bridge probe for this experiment; it performs ACK writes. This command uses stock Dolphin's existing read-only MEM1 mapping. Do not use `probe-mario` GDB or scan memory. The observer reads only the registered array, candidate vptrs, and verified position vectors.
 
 ## Smallest next experiment to unblock Penguin identity
 
-1. Run `observe-penguins` in the target mission, paused/resumed, and after a scene transition. It validates the static chain/group layout and performs two bounded entry observations.
-2. Report each result. A candidate's exact vptr establishes Penguin class identity only; it does not identify a particular visible placement or prove pause/transition lifetime.
-3. If multiple candidates match, stop at class-level identification. Do not inspect name/model/position fields until a separate review authorizes verified fields and bounded reads.
+1. Run `observe-penguins` in the target mission while walking/jumping nearby, paused/resumed, and after a scene transition.
+2. Compare coordinates across runs. An exact vptr identifies class only; it does not select a visible placement or prove actor lifetime.
 
-The observer's registered-entry scan and single-word vptr read are authorized; broader actor inspection is not. If a layout check fails, stop and resolve the exact PAL evidence rather than relaxing offsets interactively.
+Only the registered-entry scan, vptr check, and verified 12-byte position read are authorized. If a layout check fails, stop and resolve PAL evidence rather than relaxing offsets interactively.
