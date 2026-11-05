@@ -14,7 +14,7 @@ Report bounded movement, calc-animation, and Penguin draw-buffer registration me
 - `NameObjCategoryList::incrementCheck` (`0x80261870`) indexes category records at 20-byte stride and increments `CategoryInfo+0x10`. `allocateBuffer` (`0x8026188C`) allocates each callback pointer array from the prepared check count. `add` (`0x80261914`) reads/writes array pointer `+0`, capacity `+4`, count `+8`, increments count and stores the callback pointer without a capacity guard. The observer reads only those metadata words and the check-count; it never reads array elements.
 - PAL `SceneNameObjListExecutor::initCalcViewAndEntryList` (`0x80345B18`, file `0x341058`) constructs a `DrawBufferHolder` of size `0x30`, stores it at executor `+0x04`, and calls `DrawBufferHolder::initTable` (`0x80396D70`) with table `0x80538A78` and count `0x29`. Petari `DrawBufferHolder.hpp` fixes `mBufferGroups` at `+0` and three camera executor vectors at `+0x08`; the table has 41 indexed groups. Petari `AssignableArray` is pointer plus maximum size at `+0/+4`, with no separate used count, so the observer reports table capacity and does not invent a live group count. The PAL row for type `0x10` at `0x80538AE8` (base plus row 7 x 16; DOL file `0x534BE8`) is `{type=0x10, executorCapacity=0x50, lightType=1, cameraType=0}`. Petari `DrawBufferGroup.hpp` fixes executor vectors at `+0` and active-executor vectors at `+0x0C`, followed by camera/light fields. Each `DrawBufferGroup` is 0x24 bytes. `Vector` stores backing AssignableArray at `+0` and used count at `+8`; backing maximum is at `+4`.
 - PAL `DrawBufferGroup::registerDrawBuffer` (`0x80396610`), `DrawBufferExecuter::add` (`0x803963B8`), and `DrawBufferHolder::active` append to separately bounded arrays. The group metadata observer does not follow individual DrawBufferExecuter pointers, model names, or actor arrays.
-- Live execute-holder values supplied by the user (PID 114728) are recorded in [Penguin rendering research](../docs/references/penguin-rendering-path.md). They are not callback-list measurements.
+- User-reported live callback-list values for PID 119908 are recorded in [Penguin rendering research](../docs/references/penguin-rendering-path.md). They are aggregate occupancy samples, not attribution to Penguin entries.
 
 ## 3. Functional requirements
 
@@ -49,7 +49,11 @@ The snapshot is repeated from the root scene chain. All fields, identities, and 
 
 - Unit tests cover bounds, malformed/null pointers, capacity/count mismatches, pending transitions, changed scene identity, and valid metadata.
 - PAL input/map validation passes; the observer uses no write API and reads no callback/actor array entries.
-- Documentation reports only static or user-observed evidence accurately. No live result is claimed until manually run against Dolphin.
+- Documentation separates static facts, synthetic validation, user-reported live values, and independently captured live output. No independent Dolphin sample was taken in this documentation update.
+
+## 9. User-reported live sample
+
+PAL RMGP01 Rev 0, Dolphin 2609a, PID 119908: movement category `0x28` was `25/52`; calcAnim category `0x06` was `13/18`; Penguin draw category was `-1`; draw-buffer group `0x10` had `7/80` executors and `3/80` active executors; execute holder had `1702/4096`; all five pending flags were zero. These are user-reported live values, not an independent capture in this implementation. Category counts aggregate all connected scene objects. Draw-buffer counts aggregate executor/model registrations, not Penguin actors. The spare counts are not reservations safe to consume: inactive/prepared campaign actors may use them later, and separate per-model actor-array occupancy was not inspected.
 
 ## 8. Testing strategy
 
