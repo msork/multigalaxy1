@@ -24,7 +24,7 @@ The user later supplied this live observation from Dolphin 2609a, PAL RMGP01 Rev
 
 These are **user-observed live values**, not a trace independently captured by this tool. No entry indexes or addresses were supplied for those two entries. The values confirm the static group metadata for that session; they do not identify a Penguin or establish pause/transition lifetime. The observed array pointer is 28 bytes after the group object; this adjacency is recorded only as an observation and is not assumed by the reader.
 
-The user later reported a successful Penguin-vptr observation in that PAL scene: scene `0x80F8EF70`, group `0x80FA07D8`, capacity 2560, count 1164, and 16 reported matches for `__vt__7Penguin = 0x8059C884` at indexes within `1013..1058`. This is user-observed evidence; the CLI has not independently reproduced it. No actor addresses or coordinates accompanied the report, and the index range does not mean every index matched.
+The user later reported a successful Penguin-vptr observation in that PAL scene: scene `0x80F8EF70`, group `0x80FA07D8`, capacity 2560, count 1164, and 16 reported matches for `__vt__7Penguin = 0x8059C884` at indexes within `1013..1058`. In a follow-up, the user reported **16 matches, 0 invalid entries, stable scene/group, and moving positions**. Example candidate index `1046`, actor `0x813EECB8`, moved from `(-272.663,-663.709,453.593)` to `(-162.820,-663.342,73.944)`. This is user-observed live evidence from Dolphin 2609a / PAL RMGP01 Rev 0 in Beach Bowl / Sunken Treasure; the tool did not independently capture the session. No guest-memory writes were performed. It validates that this candidate's reported position changed, but does not identify which visible Penguin it was, prove all 16 are distinct visible placements, establish frame-atomic sampling, or validate pause/scene-transition lifetime.
 
 ### Static PAL/source evidence
 
@@ -90,9 +90,11 @@ The allocation/destruction call targets are in the same verified DOL: `initObjAr
 
 ### Unverified
 
-- Group values and 16 Penguin-class matches are user-observed; this tool has not independently reproduced them.
-- No actor addresses or positions were included in the report. There is no reliable identifier selecting the visible Beach Bowl placement among multiple class matches.
+- The group values, 16 class matches, 0 invalid entries, and the coordinate pair above are user-observed; this tool did not independently capture them.
+- There is no reliable identifier selecting the visible Beach Bowl placement among multiple class matches.
 - Penguin name storage, model pointer, scheduler membership, and lifetime through pause/transition remain unverified.
+
+For the static creation, registration, initialization, rendering, and destruction evidence, see [Penguin actor and rendering path](penguin-rendering-path.md). The separate read-only coordinate observer remains unchanged; this update adds no code or memory writes.
 
 The source references are Petari's [`AllLiveActorGroup.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/AllLiveActorGroup.cpp) and [`LiveActorGroup.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/LiveActorGroup.cpp). The PAL constructors and accessors derive the group fields and array ownership; they do not identify a Penguin entry. Capacity 2560 is not a live count.
 

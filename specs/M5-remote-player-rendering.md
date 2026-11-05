@@ -2,7 +2,7 @@
 
 Status: research plus an opt-in read-only actor-class observer. No game-memory writes, executable patches, hooks, actor creation, or runtime rendering changes are authorized by this phase.
 
-M5 Phase 1.7: user-reported live group values and 16 Penguin-vptr matches in the Beach Bowl scene; the opt-in observer now reads verified `LiveActor::mPosition` for exact Penguin matches. This observer is synthetic-test validated; coordinates have not yet been live-validated by the CLI. See [PAL actor lifecycle investigation](../docs/references/pal-actor-lifecycle-investigation.md) and [Penguin live investigation](../docs/references/penguin-live-investigation.md).
+M5 Phase 1.8 research update: the user reports a read-only observation of 16 Penguin-vptr candidates, zero invalid entries, stable scene/group, and changing `mPosition` for candidate index 1046. Static PAL DOL and Petari evidence now traces factory construction, LiveActor group/clipping registration, Penguin initialization, execute/draw scheduling, model entry, and part of destruction. No remote actor has been constructed or rendered. See [Penguin live investigation](../docs/references/penguin-live-investigation.md) and [Penguin actor/render path](../docs/references/penguin-rendering-path.md).
 
 ## 1. Objective
 
@@ -116,7 +116,9 @@ Future runtime proof requires all of the following on PAL Rev 0, stock Dolphin 2
 
 Phase 1: validate symbol-map names/addresses against the local pinned PAL map and source links; review all proposed state rejection cases; `git diff --check`. No game runtime changes.
 
-Phase 1.5/1.7/1.8: `observe-penguins` is opt-in and uses stock Dolphin's read-only MEM1 mapping after PID, executable, session, mapping, RMGP01, DOL, symbols, and mandatory AllStars checks. It recomputes and validates the root/group chain, scans only `[0,count)`, matches exact constructor-verified vptr `0x8059C884`, reads only the three-float `mPosition` at `+0x0C`, then rechecks candidate identity, chain, and entries. User-reported Penguin matches are recorded; live position sampling remains unverified.
+Phase 1.5/1.7/1.8: `observe-penguins` is opt-in and uses stock Dolphin's read-only MEM1 mapping after PID, executable, session, mapping, RMGP01, DOL, symbols, and mandatory AllStars checks. It recomputes and validates the root/group chain, scans only `[0,count)`, matches exact constructor-verified vptr `0x8059C884`, reads only the three-float `mPosition` at `+0x0C`, then rechecks candidate identity, chain, and entries. Synthetic tests pass. The user reports one candidate's position changed while the scene/group remained stable; this is user-observed live evidence, not independently captured by the CLI. No remote actor rendering is verified.
+
+Research-only actor path: `docs/references/penguin-rendering-path.md` records exact-hash PAL disassembly evidence and Petari source semantics for the Penguin factory, LiveActor registration, Penguin init/model setup, scheduler/draw registration, render entry, and destructor. Unresolved stage-loader ownership and teardown/resource lifetime prevent a safe spawn plan from advancing to implementation.
 
 Before actor implementation: produce a PAL instruction-signature manifest and resolve prototypes for constructor, model initialization, scheduler connect/disconnect, scene creation/destruction, and draw submission. Read-only Dolphin inspection must observe a known non-player actor's scene/scheduler lifetime in a playable scene. Confirm allocator ownership and archive lifetime from matching Petari source/disassembly.
 
