@@ -1,0 +1,62 @@
+{
+  "schema": "mg1.galaxy-skeleton-mesh-bind-profile.v1",
+  "profile_id": "luigi_skeleton_to_waluigi_mesh",
+  "source_rig": "luigi.001_armature",
+  "target_rig": "LiteralWalk_Waluigi_Target",
+  "target_meshes": [
+    "LiteralWalk_ARMTEST_29_0x75c1640_submesh0",
+    "LiteralWalk_ARMTEST_29_0x75c1640_submesh1"
+  ],
+  "landmarks": [
+    ["JointRoot", "bone_6"],
+    ["Hip", "bone_19"],
+    ["Spine1", "bone_20"],
+    ["Spine2", "bone_21"],
+    ["ShoulderL", "bone_22"],
+    ["ArmL1", "bone_23"],
+    ["ArmL2", "bone_26"],
+    ["HandL", "bone_30"],
+    ["ShoulderR", "bone_57"],
+    ["ArmR1", "bone_58"],
+    ["ArmR2", "bone_61"],
+    ["HandR", "bone_65"],
+    ["LegL1", "bone_7"],
+    ["LegL2", "bone_8"],
+    ["FootL", "bone_9"],
+    ["LegR1", "bone_13"],
+    ["LegR2", "bone_14"],
+    ["FootR", "bone_15"],
+    ["Head", "bone_53"]
+  ],
+  "weight_groups": {
+    "bone_5": "Center",
+    "bone_7": "LegL1", "bone_8": "LegL2", "bone_9": "FootL",
+    "bone_10": "FootL", "bone_11": "FootL",
+    "bone_13": "LegR1", "bone_14": "LegR2", "bone_15": "FootR",
+    "bone_16": "FootR", "bone_17": "FootR",
+    "bone_19": "Hip", "bone_20": "Spine1",
+    "bone_22": "ShoulderL", "bone_23": "ArmL1", "bone_24": "ArmL1",
+    "bone_25": "ArmL1", "bone_26": "ArmL2", "bone_27": "ArmL2",
+    "bone_29": "ArmL2", "bone_30": "HandL",
+    "bone_31": "HandL", "bone_32": "HandL", "bone_33": "HandL",
+    "bone_35": "HandL", "bone_36": "HandL", "bone_37": "HandL",
+    "bone_39": "HandL", "bone_40": "HandL", "bone_41": "HandL",
+    "bone_43": "HandL", "bone_44": "HandL", "bone_45": "HandL",
+    "bone_47": "HandL", "bone_48": "HandL", "bone_49": "HandL",
+    "bone_52": "Head", "bone_53": "Head", "bone_56": "Head",
+    "bone_57": "ShoulderR", "bone_58": "ArmR1", "bone_59": "ArmR1",
+    "bone_60": "ArmR1", "bone_61": "ArmR2", "bone_62": "ArmR2",
+    "bone_64": "ArmR2", "bone_65": "HandR",
+    "bone_66": "HandR", "bone_67": "HandR", "bone_68": "HandR",
+    "bone_70": "HandR", "bone_71": "HandR", "bone_72": "HandR",
+    "bone_74": "HandR", "bone_75": "HandR", "bone_76": "HandR",
+    "bone_78": "HandR", "bone_79": "HandR", "bone_80": "HandR",
+    "bone_82": "HandR", "bone_83": "HandR", "bone_84": "HandR"
+  },
+  "notes": [
+    "All original mesh vertices, materials, and source files remain unchanged; only disposable mesh copies receive consolidated source-rig vertex groups.",
+    "Overlapping upper-arm and forearm branch weights are merged onto single Galaxy controls; this is a hypothesis to measure, not a claim of equivalent deformation.",
+    "Finger groups are merged to each Galaxy hand control so the Sluggers mesh retains its authored fist shape; individual finger articulation is unavailable on the 30-bone Galaxy skeleton.",
+    "Additional joint-specific/manual weight cleanup may be required at shoulders, elbows, wrists, head accessories, and the submesh1 attachment."
+  ]
+}
