@@ -1,6 +1,6 @@
 # Penguin live-object investigation (M5 Phase 1.7)
 
-Status: **static group-discovery path derived; live group/Penguin observation pending**. The read-only `inspect-memory` path passed the user's game-ID and code-signature checks, but no Dolphin process was available during this investigation to observe the live group or a Penguin. No actor-array entries or actor object fields are read in this phase. No game writes, hooks, injected code, actor creation, profile changes, or Dolphin changes were made.
+Status: **group path live-validated; bounded Penguin observer authorized in this phase**. The user supplied live PAL group metadata and two manually identified non-Penguin entries. The observer described below is opt-in and read-only; it reads only registered actor pointer entries and the first word of valid candidate objects to compare their vptr. It does not read transforms, names, models, scheduler state, or gameplay fields. No game writes, hooks, injected code, actor creation, profile changes, or Dolphin changes are made.
 
 ## Evidence categories
 
@@ -13,6 +13,17 @@ On Dolphin 2609a with PAL RMGP01 Rev 0, the user reports:
 
 These validate the explicit read path and two known bytes/identity checks. They do not validate heap pointers, actor layout, or a Penguin.
 
+The user later supplied this live observation from Dolphin 2609a, PAL RMGP01 Rev 0, Beach Bowl Galaxy / Sunken Treasure:
+
+- AllLiveActorGroup object: `0x80FA07D8`;
+- vptr: `0x8057327C`;
+- capacity: `0xA00` (2560);
+- registered count: `0x48C` (1164), distinct from capacity;
+- owned array pointer: `0x80FA07F4`;
+- two manually inspected registered entries were identified as `MessageSensorHolder` and `CenterScreenBlur`.
+
+These are **user-observed live values**, not a trace independently captured by this tool. No entry indexes or addresses were supplied for those two entries. The values confirm the static group metadata for that session; they do not identify a Penguin or establish pause/transition lifetime. The observed array pointer is 28 bytes after the group object; this adjacency is recorded only as an observation and is not assumed by the reader.
+
 ### Static PAL/source evidence
 
 The exact PAL DOL and Petari symbol file pass `validate-mario-map`. The existing `player_probe.rs` validates the PAL Mario-root chain's instruction signatures and uses these fields:
@@ -21,9 +32,13 @@ The exact PAL DOL and Petari symbol file pass `validate-mario-map`. The existing
 
 The Petari scene-object enum identifies `SceneObj_AllLiveActorGroup` as ID `0x30`, so its pointer slot is statically `SceneObjHolder + 0xC0`. The matching source says `AllLiveActorGroup` derives from `LiveActorGroup`, initializes a capacity of 2560, and `LiveActorGroup::getActor(index)` returns `mObjects[index]`. These establish a plausible discovery route, not a live object.
 
-The PAL symbol file names `getAllLiveActorGroup`, the group constructors/accessors, `Penguin` constructor/init, and `__vt__7Penguin` at `0x8059C884`. These are code/data symbols in the DOL, not heap actor addresses. A vtable symbol address alone does not establish the exact ABI address-point or prove that the first word of a live object equals that value.
+The PAL symbol file names `getAllLiveActorGroup`, the group constructors/accessors, `Penguin` constructor/init, and `__vt__7Penguin` at `0x8059C884`. The Penguin constructor's verified instruction sequence stores that exact address in `this + 0`; this resolves the vptr address-point uncertainty for this build. This remains static evidence until a live candidate is observed.
 
 The exact PAL DOL places `getActor__14LiveActorGroupCFi` at `0x80166110`, text section 1 file offset `0x161650`, size `0x10`. Its bytes are `80 63 00 14 54 80 10 3A 7C 63 00 2E 4E 80 00 20`, which decode to `lwz r3,0x14(r3); rlwinm r0,r4,2,0,29; lwzx r3,r3,r0; blr`. This statically shows that the accessor loads an array pointer from `this + 0x14` and indexes four-byte entries.
+
+### Penguin vptr address-point check (static PAL evidence)
+
+The PAL symbol map identifies `__ct__7PenguinFPCc` at `0x802790E0` (text section 1 file offset `0x274620`, size `0x4C`) and `__vt__7Penguin` at `0x8059C884` (data symbol size `0x78`). Constructor bytes at `+0x10` through `+0x2B` are `7C 7F 1B 78 48 02 13 BD 3C 60 80 5A 38 80 FF FF 38 63 C8 84 38 00 00 00 90 7F 00 00`: `mr r31,r3` saves `this`; after the base constructor, `lis/addi` forms `0x8059C884` in r3; `stw r3,0(r31)` stores it at object offset zero. Thus the primary Penguin vptr comparison is exactly `0x8059C884`; the constructor resolves the address-point uncertainty for this PAL build. The observer requires the exact PAL DOL/symbol fingerprint and these constructor bytes, and accepts no nearby vptr values.
 
 ### SceneObjHolder root and object layout (static PAL evidence)
 
@@ -61,18 +76,17 @@ The relevant exact PAL functions and instructions show:
 - Thus the statically derived layout is: `+0x00` vptr; `+0x0C` capacity (`0xA00` for this group); `+0x10` registered count (dynamic and not equal to capacity); `+0x14` owned pointer-array address; `+0x18` AllLiveActorGroup actor-system-info initialization progress, **not** the registered count.
 - The AllLiveActorGroup constructor writes its vptr symbol value `0x8057327C` at `this + 0`. This gives a PAL-specific live type check for the group object before reading its count or array field.
 
-The array's allocation size is statically `capacity * 4 = 10,240` bytes. A live read of the pointer plus checked arithmetic can verify that the claimed full capacity span lies in the conservative MEM1 range, but this phase will not read any array entries. `capacity` is not `count`; count must be read separately and rejected if greater than capacity. The exact instructions establish field semantics, while the matching Petari source explains the group/accessor lifecycle. These facts have not yet been observed in live heap memory.
+The array's allocation size is statically `capacity * 4 = 10,240` bytes. The user's live observation confirms the metadata values for one session. `capacity` is not `count`; the observer reads them separately and rejects `count > capacity`.
 
 The allocation/destruction call targets are in the same verified DOL: `initObjArray` calls `__nwa__FUl` at `0x80409B38` after multiplying capacity by four; `NameObjGroup::~NameObjGroup` loads the array from `+0x14` and calls `__dla__FPv` at `0x80409B64`. This supports array ownership by the NameObjGroup base. It does not establish a safe lifetime beyond the owning scene.
 
 ### Unverified
 
-- No live GameSystem, SceneController, Scene, SceneObjHolder, group, or Penguin pointer/metadata was observed in this turn.
-- No reliable identifier currently selects the Beach Bowl Sunken Treasure Penguin among group entries.
-- No reliable identifier currently selects the Beach Bowl Sunken Treasure Penguin among other group members.
-- Penguin live vtable address-point semantics, name storage, model pointer, scheduler membership, and lifetime through pause/transition remain unverified.
+- The supplied group values are user-observed; this tool has not independently reproduced them or run the observer live.
+- No Penguin candidate has been reported by the observer yet, and no reliable identifier selects the visible Beach Bowl placement among multiple Penguin instances.
+- Penguin name storage, model pointer, scheduler membership, and lifetime through pause/transition remain unverified.
 
-The source references are Petari's [`AllLiveActorGroup.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/AllLiveActorGroup.cpp) and [`LiveActorGroup.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/LiveActorGroup.cpp). The PAL constructors and accessors now statically derive the group fields and array ownership; they do not identify a Penguin entry. Capacity 2560 is not a live count and is not permission to enumerate.
+The source references are Petari's [`AllLiveActorGroup.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/AllLiveActorGroup.cpp) and [`LiveActorGroup.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/LiveActor/LiveActorGroup.cpp). The PAL constructors and accessors derive the group fields and array ownership; they do not identify a Penguin entry. Capacity 2560 is not a live count.
 
 ## Safe candidate path and stop point
 
@@ -84,120 +98,44 @@ The narrow path to test is:
 4. Read only the pointer at `SceneObjHolder + 0xC0`, the AllLiveActorGroup slot.
 5. Read the candidate group's first word and require the validated `AllLiveActorGroup` vptr `0x8057327C`. Stop on mismatch.
 6. Only after the vptr matches, read capacity at `+0x0C` (must be `0xA00`), registered count at `+0x10` (must be `<= capacity`), and array pointer at `+0x14` (non-null, aligned, canonical MEM1). Checked arithmetic must confirm `array + capacity*4 <= 0x81800000`.
-7. **Stop after metadata.** Do not read array entries or actor fields until a separate bounded entry-observation step is reviewed. The vptr/capacity/count/array checks can validate the group container but cannot identify a Penguin.
+7. Re-read the chain and metadata after enumeration; discard results if the scene, holder, group, array, count, or capacity changed.
+8. The bounded entry observer authorized below reads only `[0,count)` pointers and, after validating each pointer, the first 4-byte object word. Invalid entries are counted and skipped without dereference. Compare that word exactly with constructor-verified `0x8059C884`; stop on any failed validation or mapping error.
 
 Every command below opens a new bounded read-only view and rechecks the Dolphin PID/executable/session, mapping extent, `RMGP01`, PAL code signatures, local DOL fingerprint, and mandatory AllStars compatibility. `pointer` decoding rejects null only as unavailable and rejects nonaligned/out-of-range non-null pointers. It never follows a pointer itself. The PowerShell helper follows only the explicitly reviewed offsets above, one read at a time, and recomputes the path on every sample.
 
+### Bounded entry-observation design review / authorization
+
+The live group metadata supplied above matches the static PAL layout. This user request explicitly authorizes this one-shot, read-only observer:
+
+1. Revalidate Dolphin PID/executable/session, 2609a codehandler, exact PAL RMGP01 Rev 0 DOL and symbols, mandatory AllStars input, live `RMGP01`, and PAL runtime signatures.
+2. Recompute `GameSystem -> SceneController -> Scene -> SceneObjHolder -> AllLiveActorGroup` from the root; no heap pointer is reused between invocations.
+3. Require group vptr `0x8057327C`, capacity `0xA00`, `count <= capacity`, aligned canonical MEM1 array pointer, and checked full-capacity span `array + capacity*4 <= 0x81800000`.
+4. Read only `[0,count)` entries in bounded chunks. For each entry, skip null/misaligned/out-of-range actor pointers. For each valid pointer, read only the 4-byte object word at offset zero; never follow its vptr or inspect other actor fields.
+5. Compare exactly to `0x8059C884`. Emit at most 16 matches containing index, actor pointer, and vptr; report aggregate null/invalid/nonmatching counts. Do not print nonmatching actor pointers.
+6. Re-read the array and complete scene/group metadata. If any changed, discard all candidates and report an unstable scene/group. No candidate pointer survives the command.
+
+The implementation is the separate opt-in `observe-penguins` command. It does not write Dolphin memory, install hooks/injection, create actors, modify Dolphin, change profiles, or affect M4/network behavior. It identifies Penguin-class candidates only; if multiple instances match, it does not choose one by name/location. Candidate pointers exist only for this command invocation.
+
 ## Interactive PowerShell observation
 
-Use the existing isolated Dolphin profile and a Dolphin process on the interactive desktop. Set `$DolphinPid` to that exact process. Enter **Beach Bowl Galaxy > Sunken Treasure**, bring a Penguin into view, then run:
+Use the existing isolated Dolphin profile and a Dolphin process on the interactive desktop. Set `$DolphinPid` to that exact process. Enter **Beach Bowl Galaxy > Sunken Treasure**, bring a Penguin into view, then run the dedicated observer:
 
 ```powershell
 Set-Location C:\Users\maxim\Projects\multigalaxy1
 $DolphinPid = 12345 # replace with the isolated Dolphin PID
-
-function Read-GuestPointer([string]$AddressHex, [string]$Label) {
-    $addressValue = [Convert]::ToUInt64(($AddressHex -replace '^0[xX]'), 16)
-    $address = '0x{0:x8}' -f $addressValue
-    $output = & cargo run -q -p multigalaxy -- inspect-memory .\development.local.toml $DolphinPid $address 4 pointer 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        $output | ForEach-Object { Write-Host $_ }
-        throw "Read failed at $address ($Label); stop this sample."
-    }
-    $line = $output | Where-Object { "$_" -match '^memory_read=validated .* pointer=' } | Select-Object -First 1
-    if (-not $line) { throw "No validated pointer result for $Label at $address; stop this sample." }
-    if ("$line" -match 'pointer=null') {
-        Write-Host "$Label=null (unavailable)"
-        return $null
-    }
-    if ("$line" -notmatch 'pointer=(0x[0-9a-fA-F]{8})') { throw "Malformed pointer output for $Label; stop this sample." }
-    $pointer = [Convert]::ToUInt64($Matches[1].Substring(2), 16)
-    Write-Host ("{0}=0x{1:x8}" -f $Label, $pointer)
-    return $pointer
-}
-
-function Read-GuestU32([string]$AddressHex, [string]$Label) {
-    $addressValue = [Convert]::ToUInt64(($AddressHex -replace '^0[xX]'), 16)
-    $address = '0x{0:x8}' -f $addressValue
-    $output = & cargo run -q -p multigalaxy -- inspect-memory .\development.local.toml $DolphinPid $address 4 u32 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        $output | ForEach-Object { Write-Host $_ }
-        throw "Read failed at $address ($Label); stop this sample."
-    }
-    $line = $output | Where-Object { "$_" -match '^memory_read=validated .* u32=' } | Select-Object -First 1
-    if (-not $line -or "$line" -notmatch 'u32=0x([0-9a-fA-F]{8})') { throw "No validated u32 result for $Label at $address; stop this sample." }
-    $value = [Convert]::ToUInt32($Matches[1], 16)
-    Write-Host ("{0}=0x{1:x8}" -f $Label, $value)
-    return $value
-}
-
-function Sample-PenguinDiscoveryRoot {
-    $sampleTime = (Get-Date).ToString('o')
-    $gameSystem = Read-GuestPointer '806A1228' 'game_system'
-    if ($null -eq $gameSystem) { Write-Host "sample_time=$sampleTime group_slot=unavailable"; return }
-    $sceneController = Read-GuestPointer ('{0:x8}' -f ($gameSystem + 0x24)) 'scene_controller'
-    if ($null -eq $sceneController) { Write-Host "sample_time=$sampleTime group_slot=unavailable"; return }
-    $scene = Read-GuestPointer ('{0:x8}' -f ($sceneController + 0xAC)) 'scene'
-    if ($null -eq $scene) { Write-Host "sample_time=$sampleTime group_slot=unavailable"; return }
-    $sceneHolder = Read-GuestPointer ('{0:x8}' -f ($scene + 0x10)) 'scene_object_holder'
-    if ($null -eq $sceneHolder) { Write-Host "sample_time=$sampleTime group_slot=unavailable"; return }
-    $group = Read-GuestPointer ('{0:x8}' -f ($sceneHolder + 0xC0)) 'all_live_actor_group_slot'
-    if ($null -eq $group) { Write-Host "sample_time=$sampleTime group_slot=null"; return }
-    $vtable = Read-GuestPointer ('{0:x8}' -f $group) 'group_vptr'
-    if ($null -eq $vtable -or $vtable -ne [Convert]::ToUInt64('8057327C', 16)) {
-        Write-Host ("sample_time={0} state=stop reason=group_vptr_mismatch" -f $sampleTime)
-        return
-    }
-    $capacity = Read-GuestU32 ('{0:x8}' -f ($group + 0x0C)) 'group_capacity'
-    if ($capacity -ne 0xA00) {
-        Write-Host ("sample_time={0} state=stop reason=capacity_mismatch actual=0x{1:x8}" -f $sampleTime, $capacity)
-        return
-    }
-    $count = Read-GuestU32 ('{0:x8}' -f ($group + 0x10)) 'registered_count'
-    if ($count -gt $capacity) {
-        Write-Host ("sample_time={0} state=stop reason=count_exceeds_capacity count=0x{1:x8} capacity=0x{2:x8}" -f $sampleTime, $count, $capacity)
-        return
-    }
-    $array = Read-GuestPointer ('{0:x8}' -f ($group + 0x14)) 'owned_array'
-    if ($null -eq $array) {
-        Write-Host ("sample_time={0} state=stop reason=array_pointer_null" -f $sampleTime)
-        return
-    }
-    $arrayEnd = [uint64]$array + ([uint64]$capacity * 4)
-    $mem1End = [Convert]::ToUInt64('81800000', 16)
-    if ($arrayEnd -gt $mem1End) {
-        Write-Host ("sample_time={0} state=stop reason=array_capacity_span_outside_mem1" -f $sampleTime)
-        return
-    }
-    $gameSystemAgain = Read-GuestPointer '806A1228' 'game_system_recheck'
-    if ($null -eq $gameSystemAgain -or $gameSystemAgain -ne $gameSystem) { Write-Host "sample_time=$sampleTime state=stop reason=game_system_changed_during_sample"; return }
-    $controllerAgain = Read-GuestPointer ('{0:x8}' -f ($gameSystemAgain + 0x24)) 'scene_controller_recheck'
-    if ($null -eq $controllerAgain) { Write-Host "sample_time=$sampleTime state=stop reason=scene_controller_disappeared"; return }
-    $sceneAgain = Read-GuestPointer ('{0:x8}' -f ($controllerAgain + 0xAC)) 'scene_recheck'
-    if ($null -eq $sceneAgain) { Write-Host "sample_time=$sampleTime state=stop reason=scene_disappeared"; return }
-    if ($controllerAgain -ne $sceneController -or $sceneAgain -ne $scene) { Write-Host "sample_time=$sampleTime state=stop reason=scene_changed_during_sample"; return }
-    $holderAgain = Read-GuestPointer ('{0:x8}' -f ($sceneAgain + 0x10)) 'scene_object_holder_recheck'
-    if ($null -eq $holderAgain) { Write-Host "sample_time=$sampleTime state=stop reason=scene_object_holder_disappeared"; return }
-    $groupAgain = Read-GuestPointer ('{0:x8}' -f ($holderAgain + 0xC0)) 'all_live_actor_group_recheck'
-    if ($null -eq $groupAgain) { Write-Host "sample_time=$sampleTime state=stop reason=group_disappeared"; return }
-    if ($holderAgain -ne $sceneHolder -or $groupAgain -ne $group) { Write-Host "sample_time=$sampleTime state=stop reason=group_changed_during_sample"; return }
-    Write-Host ("sample_time={0} group_layout=validated vptr=0x{1:x8} capacity=0x{2:x8} count=0x{3:x8} array=0x{4:x8} span_bytes={5} actor_entries=not_read" -f $sampleTime, $vtable, $capacity, $count, $array, ($capacity * 4))
-}
-
-Sample-PenguinDiscoveryRoot
+cargo run -q -p multigalaxy -- observe-penguins .\development.local.toml $DolphinPid
 ```
 
-Expected output is a set of `memory_read=validated ...` records followed by `group_layout=validated vptr=0x8057327c capacity=0x00000a00 count=0x........ array=0x........ span_bytes=10240 actor_entries=not_read`. Group count and heap pointers are dynamic; no fixed values are expected for them. If any link is null, out of range, or fails validation, the sample stops at that link. At title/menu, an unavailable link is acceptable; do not substitute a guessed address.
+Expected output is one bounded `penguin_observer=validated` summary with scene/group addresses, capacity/count, aggregate entry counts, and up to 16 matching candidate index/address/vptr triples. A zero-match result means no exact Penguin vptr was found among this scene's registered entries; it does not prove no Penguin is visible. Any wrong game, invalid group metadata, unsafe pointer, mapping failure, or unstable scene/entry list fails the observation without returning candidate pointers. At title/menu, an unavailable chain is expected; do not substitute addresses.
 
-Repeat `Sample-PenguinDiscoveryRoot` once with a Penguin visible, once while paused, once after resuming, and immediately after transitioning out of the mission. Save the timestamp and complete console output from each sample. The script recomputes from the singleton each time and caches no pointers. A changed scene or group candidate invalidates the previous values. Stable root pointers during pause or changed values during transitions are observations only; neither proves Penguin membership or actor lifetime.
+Run the command once with a Penguin visible, once while paused, once after resuming, and immediately after transitioning out of the mission. Save the command output each time. The command recomputes from the singleton on every invocation and performs an internal second observation before returning; it retains no pointers. A changed scene or entry list invalidates the whole result. Stable roots during pause or changed values during transitions are observations only; they do not establish a specific Penguin's lifetime.
 
-Do not run the Gecko bridge probe for this experiment; it performs ACK writes. The `inspect-memory` commands above are read-only. Do not use `probe-mario` GDB or scan memory. The candidate actor list remains unread.
+Do not run the Gecko bridge probe for this experiment; it performs ACK writes. This command uses stock Dolphin's existing read-only MEM1 mapping. Do not use `probe-mario` GDB or scan memory. The observer reads only the registered array and candidate vptr words.
 
 ## Smallest next experiment to unblock Penguin identity
 
-1. Run the group-metadata PowerShell sample above in the target mission, paused/resumed, and after a scene transition. This tests the static root chain and live group layout without reading the array.
-2. Review the returned live vptr/capacity/count/array pointer and checked span. Any mismatch stops the investigation; no field offset is relaxed to make the data fit.
-3. Design a separately reviewed read-only entry observer only after the user supplies those outputs and a safe bound for reading individual entries is established.
-4. For Penguin identity, correlate candidate entries with a verified type/name field or exact constructor registration path. Track only that identified entry across pause/resume/transition; discard all pointers when the scene changes.
+1. Run `observe-penguins` in the target mission, paused/resumed, and after a scene transition. It validates the static chain/group layout and performs two bounded entry observations.
+2. Report each result. A candidate's exact vptr establishes Penguin class identity only; it does not identify a particular visible placement or prove pause/transition lifetime.
+3. If multiple candidates match, stop at class-level identification. Do not inspect name/model/position fields until a separate review authorizes verified fields and bounded reads.
 
-No actor scan or actor-field read is authorized by this phase. If step 2 cannot establish the object layout, stop and obtain the matching source/header or better static analysis evidence rather than trying offsets interactively.
+The observer's registered-entry scan and single-word vptr read are authorized; broader actor inspection is not. If a layout check fails, stop and resolve the exact PAL evidence rather than relaxing offsets interactively.

@@ -1,8 +1,8 @@
 # M5 Phase 1: Remote-player rendering specification
 
-Status: research/specification only. No game-memory writes, executable patches, hooks, actor creation, or runtime rendering changes are authorized by this phase.
+Status: research plus an opt-in read-only actor-class observer. No game-memory writes, executable patches, hooks, actor creation, or runtime rendering changes are authorized by this phase.
 
-M5 Phase 1.5 selected the Beach Bowl Sunken Treasure Penguin; Phase 1.6 implemented bounded read-only MEM1 inspection; Phase 1.7 recorded user-verified live game ID/code bytes. Phase 1.8 statically derived the SceneObjHolder root and AllLiveActorGroup vptr/capacity/count/array layout from the exact PAL DOL. No live group metadata or Penguin pointer has yet been observed. See [PAL actor lifecycle investigation](../docs/references/pal-actor-lifecycle-investigation.md) and [Penguin live investigation](../docs/references/penguin-live-investigation.md). The next read-only check validates live group metadata and stops before array entries.
+M5 Phase 1.5 selected the Beach Bowl Sunken Treasure Penguin; Phase 1.6 implemented bounded read-only MEM1 inspection; Phase 1.7 records user-validated live group metadata and adds an opt-in bounded Penguin-class observer. The user observed group `0x80FA07D8`, vptr `0x8057327C`, capacity `0xA00`, count `0x48C`, array `0x80FA07F4`, and two non-Penguin entries. The observer is implemented and synthetically tested; no Penguin candidate has yet been independently observed through it. See [PAL actor lifecycle investigation](../docs/references/pal-actor-lifecycle-investigation.md) and [Penguin live investigation](../docs/references/penguin-live-investigation.md).
 
 ## 1. Objective
 
@@ -116,7 +116,7 @@ Future runtime proof requires all of the following on PAL Rev 0, stock Dolphin 2
 
 Phase 1: validate symbol-map names/addresses against the local pinned PAL map and source links; review all proposed state rejection cases; `git diff --check`. No game runtime changes.
 
-Phase 1.5/1.7/1.8: use only the bounded `inspect-memory` reader after PID, executable, session, mapping, RMGP01, DOL, and AllStars checks pass. The user live-validated game ID and a non-actor code signature. Static PAL instructions prove the root chain, group vptr, capacity (`0xA00`), count (`+0x10`), owned array pointer (`+0x14`), and four-byte entry stride. The interactive checklist validates those live metadata values and checked array span; do not read array entries until those stages pass and a separate entry-identification plan is reviewed. No live group or Penguin observation is claimed yet.
+Phase 1.5/1.7/1.8: `observe-penguins` is opt-in and uses the stock Dolphin read-only MEM1 reader after PID, executable, session, mapping, RMGP01, DOL, symbols, and mandatory AllStars checks pass. Static PAL instructions prove the root chain, group vptr, capacity (`0xA00`), count (`+0x10`), owned array pointer (`+0x14`), and four-byte entry stride. The user supplied live metadata for one session. The observer reads only `[0,count)` entries and the first word of valid candidate objects, compares exact constructor-verified Penguin vptr `0x8059C884`, and revalidates the full chain and entry set before reporting. No live Penguin candidate is claimed yet.
 
 Before actor implementation: produce a PAL instruction-signature manifest and resolve prototypes for constructor, model initialization, scheduler connect/disconnect, scene creation/destruction, and draw submission. Read-only Dolphin inspection must observe a known non-player actor's scene/scheduler lifetime in a playable scene. Confirm allocator ownership and archive lifetime from matching Petari source/disassembly.
 
