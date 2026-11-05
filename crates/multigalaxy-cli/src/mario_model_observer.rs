@@ -22,6 +22,10 @@ const MODEL_MANAGER_MODEL: u32 = 0x1C;
 const XANIME_PLAYER_MODEL: u32 = 0x00;
 const MODEL_DATA_OFFSET: u32 = 0x04;
 const MODEL_MTX_BUFFER: u32 = 0x84;
+const MODEL_DATA_JOINT_TREE: u32 = 0x10;
+const MATRIX_BUFFER_JOINT_TREE: u32 = 0x00;
+const MATRIX_BUFFER_VPTR_OFFSET: u32 = 0x38;
+const MATRIX_BUFFER_SIZE: usize = 0x3C;
 
 const MARIO_ACTOR_VPTR: u32 = 0x805A_399C;
 const J3D_MODEL_X_VPTR: u32 = 0x805A_31B0;
@@ -29,6 +33,7 @@ const J3D_MODEL_X_VPTR: u32 = 0x805A_31B0;
 const J3D_MODEL_VPTR: u32 = 0x805D_4F38;
 const J3D_MODEL_DATA_VPTR: u32 = 0x805D_4F18;
 const J3D_MTX_BUFFER_VPTR: u32 = 0x805D_4F5C;
+const J3D_JOINT_TREE_VPTR: u32 = 0x805D_4F04;
 
 const GET_J3D_MODEL: u32 = 0x8016_9744;
 const GET_J3D_MODEL_SIG: &[u8] = &[
@@ -50,6 +55,24 @@ const ENTRY_MODEL_DATA_STORE: u32 = 0x8043_1130;
 const ENTRY_MODEL_DATA_STORE_SIG: &[u8] = &[0x90, 0x83, 0x00, 0x04];
 const ENTRY_MTX_BUFFER_STORE: u32 = 0x8043_1168;
 const ENTRY_MTX_BUFFER_STORE_SIG: &[u8] = &[0x93, 0xBE, 0x00, 0x84];
+const MODEL_DATA_JOINT_TREE_INIT: u32 = 0x8043_00A4;
+const MODEL_DATA_JOINT_TREE_INIT_SIG: &[u8] = &[0x38, 0x63, 0x00, 0x10, 0x4B, 0xFF, 0xFC, 0x51];
+const MODEL_DATA_JOINT_TREE_VPTR_INIT_TARGET: u32 = 0x8042_FCF8;
+const JOINT_TREE_VPTR_STORE: u32 = 0x8042_FD1C;
+const JOINT_TREE_VPTR_STORE_SIG: &[u8] = &[0x93, 0xE3, 0x00, 0x04, 0x90, 0x83, 0x00, 0x00];
+const MATRIX_BUFFER_INITIALIZE: u32 = 0x8043_035C;
+const MATRIX_BUFFER_INITIALIZE_SIG: &[u8] = &[
+    0x38, 0x80, 0x00, 0x00, 0x38, 0x00, 0x00, 0x01, 0x90, 0x83, 0x00, 0x00,
+];
+const MATRIX_BUFFER_CREATE: u32 = 0x8043_03B4;
+const MATRIX_BUFFER_CREATE_SIG: &[u8] = &[
+    0x38, 0x04, 0x00, 0x10, 0x90, 0xA3, 0x00, 0x2C, 0x7C, 0x7C, 0x1B, 0x78, 0x7C, 0x9D, 0x23, 0x78,
+    0x90, 0x03, 0x00, 0x00,
+];
+const ENTRY_MTX_BUFFER_VPTR_STORE: u32 = 0x8043_1158;
+const ENTRY_MTX_BUFFER_VPTR_STORE_SIG: &[u8] = &[
+    0x3C, 0x80, 0x80, 0x5D, 0x38, 0x84, 0x4F, 0x5C, 0x90, 0x83, 0x00, 0x38, 0x4B, 0xFF, 0xF1, 0xF9,
+];
 const MARIO_ACTOR_VPTR_STORE: u32 = 0x802A_E888;
 const MARIO_ACTOR_VPTR_STORE_SIG: &[u8] = &[
     0x3C, 0x80, 0x80, 0x5A, 0x38, 0x00, 0xFF, 0xFF, 0x38, 0x84, 0x39, 0x9C, 0x90, 0x1F, 0x01, 0xB0,
@@ -110,6 +133,22 @@ const EXPECTED_SYMBOLS: &[(&str, &str)] = &[
         "__vt__12J3DModelData = .data:0x805D4F18; // type:object size:0xC scope:global align:4",
     ),
     (
+        "J3DJointTree constructor",
+        "__ct__12J3DJointTreeFv = .text:0x8042FCF8; // type:function size:0x88 scope:global align:4",
+    ),
+    (
+        "J3DJointTree vtable",
+        "__vt__12J3DJointTree = .data:0x805D4F04; // type:object size:0x14 scope:global align:4",
+    ),
+    (
+        "J3DMtxBuffer::initialize",
+        "initialize__12J3DMtxBufferFv = .text:0x8043035C; // type:function size:0x44 scope:global align:4",
+    ),
+    (
+        "J3DMtxBuffer::create",
+        "create__12J3DMtxBufferFP12J3DModelDataUl = .text:0x804303A0; // type:function size:0x108 scope:global align:4",
+    ),
+    (
         "J3DMtxBuffer vtable",
         "__vt__12J3DMtxBuffer = .data:0x805D4F5C; // type:object size:0xC scope:global align:4",
     ),
@@ -125,6 +164,11 @@ const MODEL_CODE_SIGNATURES: &[(u32, &[u8])] = &[
     (MODEL_X_VPTR_STORE, MODEL_X_VPTR_STORE_SIG),
     (ENTRY_MODEL_DATA_STORE, ENTRY_MODEL_DATA_STORE_SIG),
     (ENTRY_MTX_BUFFER_STORE, ENTRY_MTX_BUFFER_STORE_SIG),
+    (MODEL_DATA_JOINT_TREE_INIT, MODEL_DATA_JOINT_TREE_INIT_SIG),
+    (JOINT_TREE_VPTR_STORE, JOINT_TREE_VPTR_STORE_SIG),
+    (MATRIX_BUFFER_INITIALIZE, MATRIX_BUFFER_INITIALIZE_SIG),
+    (MATRIX_BUFFER_CREATE, MATRIX_BUFFER_CREATE_SIG),
+    (ENTRY_MTX_BUFFER_VPTR_STORE, ENTRY_MTX_BUFFER_VPTR_STORE_SIG),
     (MARIO_ACTOR_VPTR_STORE, MARIO_ACTOR_VPTR_STORE_SIG),
     (ACTOR_MANAGER_STORE, ACTOR_MANAGER_STORE_SIG),
     (ACTOR_MANAGER_LOAD, ACTOR_MANAGER_LOAD_SIG),
@@ -155,7 +199,10 @@ struct ModelPointers {
     model_vptr: u32,
     model_data: u32,
     model_data_vptr: u32,
+    joint_tree: u32,
+    joint_tree_vptr: u32,
     matrix_buffer: u32,
+    matrix_buffer_joint_tree: u32,
     matrix_buffer_vptr: u32,
 }
 
@@ -175,7 +222,10 @@ pub struct ModelSample {
     pub model_vptr: u32,
     pub model_data: u32,
     pub model_data_vptr: u32,
+    pub joint_tree: u32,
+    pub joint_tree_vptr: u32,
     pub matrix_buffer: u32,
+    pub matrix_buffer_joint_tree: u32,
     pub matrix_buffer_vptr: u32,
     pub scene_heap_napa: Option<u32>,
     pub scene_heap_gddr3: Option<u32>,
@@ -330,12 +380,47 @@ fn read_model_pointers(memory: &mut impl GuestMemory, actor: u32) -> Result<Mode
             "J3DModelData vptr mismatch at 0x{model_data:08x}: 0x{model_data_vptr:08x}"
         ));
     }
+    let joint_tree = checked_field(
+        model_data,
+        MODEL_DATA_JOINT_TREE,
+        "J3DModelData::mJointTree",
+    )?;
+    let joint_tree_vptr = read_word(memory, joint_tree)?;
+    if joint_tree_vptr != J3D_JOINT_TREE_VPTR {
+        return Err(format!(
+            "J3DJointTree vptr mismatch at 0x{joint_tree:08x}: 0x{joint_tree_vptr:08x}"
+        ));
+    }
     let matrix_buffer = required_pointer(
         memory,
         checked_field(model, MODEL_MTX_BUFFER, "J3DModel::mMtxBuffer")?,
         "J3DMtxBuffer",
     )?;
-    let matrix_buffer_vptr = read_word(memory, matrix_buffer)?;
+    mem::plan_read(matrix_buffer, MATRIX_BUFFER_SIZE).map_err(|error| {
+        format!("J3DMtxBuffer object at 0x{matrix_buffer:08x} is out of bounds: {error}")
+    })?;
+    let matrix_buffer_joint_tree = required_pointer(
+        memory,
+        checked_field(
+            matrix_buffer,
+            MATRIX_BUFFER_JOINT_TREE,
+            "J3DMtxBuffer::mJointTree",
+        )?,
+        "J3DMtxBuffer::mJointTree",
+    )?;
+    if matrix_buffer_joint_tree != joint_tree {
+        return Err(format!(
+            "J3DMtxBuffer joint-tree identity mismatch: buffer has 0x{matrix_buffer_joint_tree:08x}, model data has 0x{joint_tree:08x}"
+        ));
+    }
+    let matrix_buffer_vptr = read_word(
+        memory,
+        checked_field(
+            matrix_buffer,
+            MATRIX_BUFFER_VPTR_OFFSET,
+            "J3DMtxBuffer vptr",
+        )?,
+    )?;
     if matrix_buffer_vptr != J3D_MTX_BUFFER_VPTR {
         return Err(format!(
             "J3DMtxBuffer vptr mismatch at 0x{matrix_buffer:08x}: 0x{matrix_buffer_vptr:08x}"
@@ -350,7 +435,10 @@ fn read_model_pointers(memory: &mut impl GuestMemory, actor: u32) -> Result<Mode
         model_vptr,
         model_data,
         model_data_vptr,
+        joint_tree,
+        joint_tree_vptr,
         matrix_buffer,
+        matrix_buffer_joint_tree,
         matrix_buffer_vptr,
     })
 }
@@ -401,7 +489,10 @@ fn sample_once(memory: &mut impl GuestMemory) -> Result<ModelSample, String> {
         model_vptr: model_before.model_vptr,
         model_data: model_before.model_data,
         model_data_vptr: model_before.model_data_vptr,
+        joint_tree: model_before.joint_tree,
+        joint_tree_vptr: model_before.joint_tree_vptr,
         matrix_buffer: model_before.matrix_buffer,
+        matrix_buffer_joint_tree: model_before.matrix_buffer_joint_tree,
         matrix_buffer_vptr: model_before.matrix_buffer_vptr,
         scene_heap_napa: heap_before.scene_heap_napa,
         scene_heap_gddr3: heap_before.scene_heap_gddr3,
@@ -427,6 +518,26 @@ pub fn verify_pal_layout(dol: &[u8], symbols: &[u8]) -> Result<(), String> {
                 "PAL model-chain DOL signature mismatch at 0x{address:08x}"
             ));
         }
+    }
+    let joint_tree_ctor_word = u32::from_be_bytes(
+        MODEL_DATA_JOINT_TREE_INIT_SIG[4..8]
+            .try_into()
+            .expect("four-byte branch signature"),
+    );
+    if branch_target(joint_tree_ctor_word, MODEL_DATA_JOINT_TREE_INIT + 4)
+        != Some(MODEL_DATA_JOINT_TREE_VPTR_INIT_TARGET)
+    {
+        return Err("PAL J3DModelData embedded J3DJointTree constructor target changed".into());
+    }
+    let initialize_word = u32::from_be_bytes(
+        ENTRY_MTX_BUFFER_VPTR_STORE_SIG[12..16]
+            .try_into()
+            .expect("four-byte branch signature"),
+    );
+    if branch_target(initialize_word, ENTRY_MTX_BUFFER_VPTR_STORE + 12)
+        != Some(MATRIX_BUFFER_INITIALIZE)
+    {
+        return Err("PAL entryModelData matrix-buffer initializer target changed".into());
     }
     let call_word =
         u32::from_be_bytes(NEW_XANIME_PLAYER_CALL_MODEL_FACTORY_SIG.try_into().unwrap());
@@ -469,6 +580,7 @@ pub fn ensure_patch_disjoint(writes: &[multigalaxy_patch::PatchWrite]) -> Result
             MARIO_ACTOR_VPTR,
             J3D_MODEL_X_VPTR,
             J3D_MODEL_DATA_VPTR,
+            J3D_JOINT_TREE_VPTR,
             J3D_MTX_BUFFER_VPTR,
         ]
         .into_iter()
@@ -572,8 +684,13 @@ mod tests {
                 (MODEL, J3D_MODEL_X_VPTR),
                 (MODEL + MODEL_DATA_OFFSET, MODEL_DATA),
                 (MODEL_DATA, J3D_MODEL_DATA_VPTR),
+                (MODEL_DATA + MODEL_DATA_JOINT_TREE, J3D_JOINT_TREE_VPTR),
                 (MODEL + MODEL_MTX_BUFFER, MATRIX_BUFFER),
-                (MATRIX_BUFFER, J3D_MTX_BUFFER_VPTR),
+                (MATRIX_BUFFER, MODEL_DATA + MODEL_DATA_JOINT_TREE),
+                (
+                    MATRIX_BUFFER + MATRIX_BUFFER_VPTR_OFFSET,
+                    J3D_MTX_BUFFER_VPTR,
+                ),
                 (HEAP_WATCHER_SINGLETON, WATCHER),
                 (CURRENT_HEAP, SCENE_HEAP),
                 (WATCHER + heap_observer::SCENE_HEAP_NAPA_OFFSET, SCENE_HEAP),
@@ -633,7 +750,11 @@ mod tests {
         assert_eq!(sample.xanime_player, Some(XANIME));
         assert_eq!(sample.model, MODEL);
         assert_eq!(sample.model_data, MODEL_DATA);
+        assert_eq!(sample.joint_tree, MODEL_DATA + MODEL_DATA_JOINT_TREE);
+        assert_eq!(sample.joint_tree_vptr, J3D_JOINT_TREE_VPTR);
         assert_eq!(sample.matrix_buffer, MATRIX_BUFFER);
+        assert_eq!(sample.matrix_buffer_joint_tree, sample.joint_tree);
+        assert_eq!(sample.matrix_buffer_vptr, J3D_MTX_BUFFER_VPTR);
         assert_eq!(sample.scene_heap_napa, Some(SCENE_HEAP));
         assert_eq!(sample.current_heap, Some(SCENE_HEAP));
     }
@@ -649,17 +770,39 @@ mod tests {
     }
 
     #[test]
-    fn rejects_wrong_actor_model_data_and_matrix_vptrs() {
+    fn rejects_wrong_actor_model_data_joint_tree_and_matrix_vptrs() {
         for (address, bad) in [
             (ACTOR, 0x8057_3690),
             (MODEL, J3D_MODEL_VPTR),
             (MODEL_DATA, 0x805D_4F38),
-            (MATRIX_BUFFER, 0x805D_4F18),
+            (MODEL_DATA + MODEL_DATA_JOINT_TREE, 0x805D_4F18),
+            (MATRIX_BUFFER, MODEL_DATA + 0x20),
+            (MATRIX_BUFFER + MATRIX_BUFFER_VPTR_OFFSET, 0x805D_4F18),
         ] {
             let mut memory = Memory::valid();
             memory.set(address, bad);
             assert!(observe_fixture(&mut memory).is_err());
         }
+    }
+
+    #[test]
+    fn matrix_buffer_first_word_is_joint_tree_pointer_not_its_vptr() {
+        let mut memory = Memory::valid();
+        assert_ne!(memory.words[&MATRIX_BUFFER], J3D_MTX_BUFFER_VPTR);
+        assert_eq!(
+            memory.words[&MATRIX_BUFFER],
+            MODEL_DATA + MODEL_DATA_JOINT_TREE
+        );
+        assert!(observe_fixture(&mut memory).is_ok());
+    }
+
+    #[test]
+    fn rejects_matrix_buffer_whose_full_pal_object_span_crosses_mem1_end() {
+        let mut memory = Memory::valid();
+        memory.set(MODEL + MODEL_MTX_BUFFER, 0x817F_FFE0);
+        assert!(observe_fixture(&mut memory)
+            .unwrap_err()
+            .contains("J3DMtxBuffer object"));
     }
 
     #[test]

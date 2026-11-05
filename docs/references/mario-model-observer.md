@@ -1,6 +1,6 @@
 # Read-only PAL Mario model observer
 
-This is an opt-in, one-shot observer for the existing Mario model under official stock Dolphin 2609a. It reads only the validated read-only MEM1 mapping. It does not pause Dolphin, write guest memory, invoke callbacks, destroy a model, or retain pointers between invocations. No live run has yet been recorded for this command.
+This is an opt-in, one-shot observer for the existing Mario model under official stock Dolphin 2609a. It reads only the validated read-only MEM1 mapping. It does not pause Dolphin, write guest memory, invoke callbacks, destroy a model, or retain pointers between invocations. The first attempted live run exposed an observer field-layout error; the correction below is statically verified and has synthetic regression coverage, but a live rerun is still required.
 
 ## PAL RMGP01 Rev 0 pointer path
 
@@ -24,7 +24,18 @@ All addresses below are bound to the repository's exact PAL DOL SHA-256 and exac
 | `J3DModel::mModelData` | model `+0x04` | PAL `J3DModel::entryModelData` store at `0x80431130`; `getJ3DModelData` accessor at `0x80169760` loads `+0x04` |
 | `J3DModel::mMtxBuffer` | model `+0x84` | PAL `entryModelData` stores the created matrix buffer at `0x80431168` |
 | `J3DModelData` vptr | `0x805D4F18` at model-data `+0` | Exact PAL vtable symbol |
-| `J3DMtxBuffer` vptr | `0x805D4F5C` at buffer `+0` | Exact PAL vtable symbol and `entryModelData` construction path |
+| embedded `J3DModelData::mJointTree` | model-data `+0x10` | `J3DModelData` constructor at `0x804300A4` adds `0x10` and branches to `J3DJointTree` constructor `0x8042FCF8`; destructor at `0x80430324` passes the same embedded address to `J3DJointTree` destruction |
+| `J3DJointTree` vptr | `0x805D4F04` at embedded tree `+0` | PAL symbol and constructor store at `0x8042FD1C` |
+| `J3DMtxBuffer::mJointTree` | buffer `+0x00` | `J3DMtxBuffer::create` at `0x804303B4..0x804303C4` stores `J3DModelData + 0x10` into buffer `+0`; `entryModelData` passes the model-data pointer as argument |
+| `J3DMtxBuffer` vptr | `0x805D4F5C` at buffer `+0x38` | `entryModelData` at `0x80431158..0x80431164` materializes this vtable address and stores it at `+0x38`; the object allocation is `0x3C` bytes |
+
+### Diagnosis of the first live failure
+
+The earlier reader interpreted the word at `J3DMtxBuffer + 0` as its vptr and rejected `0x80D6875C` because it did not equal `0x805D4F5C`. That check was wrong: the first word is `mJointTree`, while the vptr is at `+0x38`. The reported value is a plausible MEM1 address for the embedded joint tree; it would exactly equal `J3DModelData + 0x10` if that run's `J3DModelData` pointer was `0x80D6874C`. The failed diagnostic did not include that model-data pointer, so this exact equality is not claimed as a live observation. The corrected observer reads and verifies both independent facts: embedded tree pointer/vptr, then matrix-buffer tree identity and vptr at `+0x38`. It does not relax pointer, MEM1-bound, DOL-signature, vptr, or scene-consistency validation.
+
+The PAL code also answers the polymorphism/layout question: the symbol map has a `J3DMtxBuffer` vtable (`0x805D4F5C`) and virtual destructor entry (`+0x08`, audited in the draw-only contract), and `entryModelData` explicitly installs that address at object offset `+0x38`. The layout is nonstandard relative to a presumed first-word vptr, so the observer now follows the actual PAL stores rather than a generic C++ object assumption.
+
+`J3DMtxBuffer::initialize` at `0x8043035C` begins by storing zero at `this+0`, then initializes the remaining fields through `+0x34`. `J3DMtxBuffer::create` later stores `modelData+0x10` at `this+0`. This is why checking the first word as a vptr produced the exact false mismatch.
 
 `ModelManager::getJ3DModel` returns a `J3DModel*` at the API boundary. The live object is required to have the exact `J3DModelX` dynamic vptr because both the PAL `newXanimePlayer` route and no-Xanime `newJ3DModel` factory construct that type. Unknown model types fail closed. The exact accessor, constructor, member-store, and factory-branch bytes are checked in both the local DOL and live memory; the mandatory AllStars patch is checked for overlap with those signatures.
 
@@ -32,7 +43,7 @@ Petari source is used for names/member interpretation and corroboration: [`LiveA
 
 ## Sampling and failure rules
 
-One invocation starts from `GameSystem::sInstance`, resolves the complete Mario chain, validates the MarioActor vptr, and follows only fixed, checked fields. It then uses the existing heap observer to re-resolve the scene and actor-group metadata, checks model/data/matrix-buffer vptrs, re-resolves the Mario root chain before re-reading the model fields, and checks both roots and heap identity again afterward. Live PAL signatures are checked immediately before and after the sample. Any invalid pointer, null required object, unexpected vptr, signature mismatch, scene/group/heap change, or model-pointer change rejects the whole observation.
+One invocation starts from `GameSystem::sInstance`, resolves the complete Mario chain, validates the MarioActor vptr, and follows only fixed, checked fields. It then uses the existing heap observer to re-resolve the scene and actor-group metadata, checks the J3DModel/J3DModelData/J3DJointTree/J3DMtxBuffer identities, re-resolves the Mario root chain before re-reading the model fields, and checks both roots and heap identity again afterward. The matrix-buffer object span is checked as 0x3C bytes; its `+0` pointer must equal the model data's embedded tree at `+0x10`; the embedded tree's vptr must be `0x805D4F04`; and the matrix-buffer vptr at `+0x38` must be `0x805D4F5C`. Live PAL signatures are checked immediately before and after the sample. Any invalid pointer, null required object, unexpected vptr, signature mismatch, scene/group/heap change, or model-pointer change rejects the whole observation.
 
 The command is:
 
@@ -43,7 +54,7 @@ Set-Location C:\Users\maxim\Projects\multigalaxy1
 
 Use the PID of the already-running stock Dolphin process from the same interactive Windows session. The command verifies its executable, process session, Dolphin 2609a codehandler, PAL DOL/map, and mandatory AllStars patch input. It does not launch Dolphin or change its configuration.
 
-Successful output labels the scene, group, actor, manager, optional Xanime player, model, model data, matrix buffer, Scene Napa/GDDR3 heaps, and the sample-time `sCurrentHeap`. `model_allocation_heap=unverified` is intentional: the code does not retain allocator provenance, and the sample-time heap is not proof of the heap used to create the model.
+Successful output labels the scene, group, actor, manager, optional Xanime player, model, model data, embedded joint tree and vptr, matrix buffer's joint-tree pointer, matrix-buffer vptr at `+0x38`, Scene Napa/GDDR3 heaps, and the sample-time `sCurrentHeap`. `model_allocation_heap=unverified` is intentional: the code does not retain allocator provenance, and the sample-time heap is not proof of the heap used to create the model.
 
 For a manual transition comparison, invoke the command once in a stable playable scene, complete one ordinary in-game transition, wait until the destination scene is active, then invoke it again with the same Dolphin PID. Compare the printed identities and timestamp. Each run is a separate bounded sample; the tool does not keep watching or cache the first run's pointers. If a required model object is outside the validated MEM1 view, the command rejects it rather than opening a broader mapping.
 
@@ -55,4 +66,4 @@ Because the emulator continues concurrently, repeated identity checks cannot pro
 
 ## Synthetic coverage and live status
 
-Synthetic tests cover the Xanime and non-Xanime ModelManager branches, expected object vptrs, invalid/null pointers, model-pointer changes, scene/group changes, and current-heap interpretation. These fixtures validate the Rust reader's bounds and consistency behavior only. They do not prove live model layout or destruction. No live Mario-model transition observation has been performed yet; do not treat the observer's compilation or synthetic tests as runtime evidence.
+Synthetic tests cover the Xanime and non-Xanime ModelManager branches, expected object vptrs, the non-vptr first matrix-buffer word, embedded-tree identity, wrong joint-tree and matrix-buffer vptrs, invalid/null pointers, model-pointer changes, scene/group changes, and current-heap interpretation. These fixtures validate the Rust reader's bounds and consistency behavior only. They do not prove live model layout or destruction. The corrected observer has not yet been rerun against Dolphin; do not treat compilation or synthetic tests as live runtime evidence.

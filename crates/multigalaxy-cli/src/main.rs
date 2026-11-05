@@ -350,7 +350,7 @@ fn run_observe_mario_model(config_path: &std::path::Path, pid: u32) -> Result<()
         )
     };
     println!(
-        "mario_model_observer=validated_read_only unix_ms={} pid={pid} game=RMGP01 revision=0 GameSystem=0x{:08x} SceneController=0x{:08x} scene=0x{:08x} scene_object_holder=0x{:08x} actor_group=0x{:08x} MarioHolder=0x{:08x} MarioActor=0x{:08x} ModelManager=0x{:08x} XanimePlayer={} J3DModel=0x{:08x} dynamic_vptr=0x{:08x} J3DModelData=0x{:08x} data_vptr=0x{:08x} J3DMtxBuffer=0x{:08x} matrix_vptr=0x{:08x} SceneHeapNapa={} SceneHeapGDDR3={} sampled_current_heap={} current_matches_scene_napa={:?} model_allocation_heap=unverified scene_identity_tuple=stable_for_sample scene_serial_generation=unavailable",
+        "mario_model_observer=validated_read_only unix_ms={} pid={pid} game=RMGP01 revision=0 GameSystem=0x{:08x} SceneController=0x{:08x} scene=0x{:08x} scene_object_holder=0x{:08x} actor_group=0x{:08x} MarioHolder=0x{:08x} MarioActor=0x{:08x} ModelManager=0x{:08x} XanimePlayer={} J3DModel=0x{:08x} dynamic_vptr=0x{:08x} J3DModelData=0x{:08x} data_vptr=0x{:08x} J3DJointTree=0x{:08x} joint_tree_vptr=0x{:08x} J3DMtxBuffer=0x{:08x} matrix_buffer_joint_tree=0x{:08x} matrix_vptr_at_plus_38=0x{:08x} SceneHeapNapa={} SceneHeapGDDR3={} sampled_current_heap={} current_matches_scene_napa={:?} model_allocation_heap=unverified scene_identity_tuple=stable_for_sample scene_serial_generation=unavailable",
         timestamp_unix_ms(),
         sample.game_system,
         sample.scene_controller,
@@ -365,7 +365,10 @@ fn run_observe_mario_model(config_path: &std::path::Path, pid: u32) -> Result<()
         sample.model_vptr,
         sample.model_data,
         sample.model_data_vptr,
+        sample.joint_tree,
+        sample.joint_tree_vptr,
         sample.matrix_buffer,
+        sample.matrix_buffer_joint_tree,
         sample.matrix_buffer_vptr,
         ptr(sample.scene_heap_napa),
         ptr(sample.scene_heap_gddr3),
