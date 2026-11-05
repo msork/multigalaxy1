@@ -28,6 +28,8 @@ The user later reported a successful Penguin-vptr observation in that PAL scene:
 
 The user subsequently reported a read-only mission-transition comparison for Dolphin PID `86776`: Beach Bowl had group `0x80FA07D8`, count 1164, and 16 Penguin matches; the destination had group `0x80FA074C`, count 166, and 0 Penguin matches. The reported scene address remained `0x80F8EF70`, and the Scene Napa/current-heap address remained `0x80F8EEF0`. This is user-supplied evidence, not independently recaptured in this pass. It shows changed group identity/count/candidates between samples. It does not prove heap destruction or that the same scene instance remained active; equal numeric addresses may be reused. The heap value was observed during gameplay, not during actor construction/allocation. No constructor-time heap identity is claimed.
 
+The user also reported PAL execute-holder samples from Dolphin PID `114728`: Beach Bowl holder `0x80F945C4`, execute array `0x80F945F4`, count 1702 of 4096; destination holder `0x80F94538`, array `0x80F94568`, count 359 of 4096. All five pending-operation flags were zero. The AllLiveActorGroup changed `0x80FA07D8` to `0x80FA074C`, while the Scene numeric address was reported reused. These are user-reported metadata observations, not independent captures by this tool. They show available execute-info records arithmetically but do not establish callback-list capacity or safe actor registration. No heap destruction or scene-instance continuity is inferred.
+
 ### Static PAL/source evidence
 
 The exact PAL DOL and Petari symbol file pass `validate-mario-map`. The existing `player_probe.rs` validates the PAL Mario-root chain's instruction signatures and uses these fields:

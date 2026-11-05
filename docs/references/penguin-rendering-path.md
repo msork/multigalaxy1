@@ -77,6 +77,62 @@ The opt-in read-only `observe-heaps` implementation and its exact PAL global/fie
 
 ## Scheduler and model-resource ownership assessment
 
+### User-reported execute-holder transition sample (PID 114728)
+
+The user reports these read-only observations on Dolphin with PAL RMGP01 Rev 0:
+
+| Sample | Scene address | AllLiveActorGroup | Execute holder | Execute array | Live count / capacity | Remaining | Pending flags |
+|---|---:|---:|---:|---:|---:|---:|---|
+| Beach Bowl | `0x80F8EF70` (reported reused) | `0x80FA07D8` | `0x80F945C4` | `0x80F945F4` | 1702 / 4096 | 2394 | all five zero |
+| Destination | `0x80F8EF70` (reported reused) | `0x80FA074C` | `0x80F94538` | `0x80F94568` | 359 / 4096 | 3737 | all five zero |
+
+These values are user-reported, not independently captured by the current CLI. The Scene numeric address was reused, so it is not evidence that the same Scene instance continued. Both group and execute-holder addresses changed; counts differ by 1343. Zero pending movement/draw connect/disconnect flags describe only those five sampled holder bytes. They do not prove callback-list consistency, heap destruction, or safe registration. The 2394/3737 values are free slots in the execute-info holder according to the reported count; they are not a reservation for other callback storage and do not authorize `registerActor`.
+
+### Callback-list and draw-buffer capacity trace
+
+The scene owns a separate `SceneNameObjListExecutor` (base `NameObjListExecutor`) that owns movement, calcAnim, and draw category lists plus a `DrawBufferHolder`. This is distinct from the `NameObjExecuteHolder` records observed above. PAL function bytes, exact symbol-map entries, Petari source, and the static initialization tables show this registration order:
+
+1. `SceneNameObjListExecutor::initMovementList` (`0x80345A30`, file `0x340F70`), `initCalcAnimList` (`0x80345AA4`, `0x340FE4`) and `initDrawList` (`0x80345B68`, `0x3410A8`) initialize category-list metadata from the PAL tables. The static tables are `cMovementListInitTable` at `0x80538848` / file `0x534948` (size `0x178`), `cCalcAnimListInitTable` at `0x805389C0` / `0x534AC0` (size `0xB8`), `cDrawBufferListInitTable` at `0x80538A78` / `0x534B78` (size `0x2A0`), and `cDrawListInitTable` at `0x80538D18` / `0x534E18` (size `0x2A0`). In the exact PAL data, the movement table row for category `0x28` contains `(0x28, 96)`, and the calcAnim row for category `0x06` contains `(0x06, 96)`; the auxiliary value's role is not used here as a live count or an overflow guarantee. The draw category is `-1`, so that NPC helper does not request a draw-list callback. These initialization tables are static setup data, not live occupancy measurements.
+2. `NameObjExecuteHolder::registerActor` calls `NameObjExecuteInfo::setConnectInfo`. The latter registers a requested draw-buffer type first, then calls `incrementCheckMovement`, `incrementCheckCalcAnim`, and `incrementCheckDraw` for non-`-1` categories. The increments are intended to establish per-category storage requirements before list buffers are allocated. Existing NPC uses movement `0x28`, calcAnim `0x06`, draw-buffer `0x10`, draw `-1`.
+3. `SceneFunction::allocateDrawBufferActorList` (`0x80344820`) calls `NameObjListExecutor::allocateDrawBufferActorList` (`0x8026C00C`). That allocates the three category-list buffers and then `DrawBufferHolder` actor-list buffers. Ordinary placement registers actors during scene placement. This pass has verified both paths and their required accounting, but has not pinned a caller instruction proving their relative order in every scene. A remote object registered after these buffers are allocated would be a late append unless a separate resizing path is proven.
+4. When an actor is connected, `NameObjExecuteInfo::connectToScene` adds movement and calcAnim entries; `connectToDraw` adds draw and draw-buffer entries. Connect/disconnect is deferred through the five flags in `NameObjExecuteHolder` and its record state machine. This is distinct from capacity reservation.
+
+Relevant exact PAL functions and evidence:
+
+| Operation | PAL address / file offset | Static behavior relevant to bounds |
+|---|---|---|
+| `NameObjCategoryList::incrementCheck` | `0x80261870` / `0x25CDB0` | Selects one category record and increments its preallocation/check count; no maximum comparison. |
+| `NameObjCategoryList::allocateBuffer` | `0x8026188C` / `0x25CDCC` | Allocates the category arrays from their prepared counts. It is called by the executor buffer-allocation phase. |
+| `NameObjCategoryList::add` | `0x80261914` / `0x25CE54` | Indexes the selected category and appends/increments its used count; the PAL body has no capacity check before the store. |
+| `DrawBufferGroup::init` | `0x803965B8` / `0x391AF8` | Initializes its draw-executor and active-executor arrays using table-provided capacity. |
+| `DrawBufferGroup::registerDrawBuffer` | `0x80396610` / `0x391B50` | Reuses an executor with the same model-resource name or constructs and pushes a new one. |
+| `Vector<AssignableArray<DrawBufferExecuter>>::push_back` | `0x80396BA4` / `0x3920E4` | Directly appends to its pointer array and increments count; the PAL body has no capacity comparison. |
+| `DrawBufferExecuter::allocateActorListBuffer` | `0x80396360` / `0x3918A0` | Allocates the actor pointer array at the precomputed `mDrawBufferCount` and stores that as max. |
+| `DrawBufferExecuter::add` | `0x803963B8` / `0x3918F8` | Increments `mNumActors` then writes `mActors[old_count]`; no capacity comparison in the path. |
+| `DrawBufferGroup::active` | `0x80396748` / `0x391C88` | Adds actor to its executor, then appends that executor to the active list when previously empty. |
+| `DrawBufferHolder::active` | Petari `DrawBufferHolder.cpp` | When a buffer group first becomes active, appends it via `mArray[mCount++]`; source shows no capacity check. |
+
+`DrawBufferInitialTable` in Petari defines a `mCapacity` field. The PAL draw-buffer table entry for type `0x10` supplies 80 executor slots for that draw-buffer group; this is not the per-model actor-array capacity. Per-model actor capacity is separately set from `mDrawBufferCount` during `allocateActorListBuffer`. Likewise, static category table values and the execute-holder free count are not proof of live available callback slots. Exact live category-list and per-model draw-executor occupancy was not sampled. Petari sources: [`NameObjListExecutor.hpp`](https://github.com/SMGCommunity/Petari/blob/master/include/Game/NameObj/NameObjListExecutor.hpp), [`NameObjListExecutor.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/NameObj/NameObjListExecutor.cpp), [`NameObjCategoryList.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/NameObj/NameObjCategoryList.cpp), [`SceneNameObjListExecutor.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/Scene/SceneNameObjListExecutor.cpp), [`DrawBufferHolder.hpp`](https://github.com/SMGCommunity/Petari/blob/master/include/Game/System/DrawBufferHolder.hpp), [`DrawBufferHolder.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/System/DrawBufferHolder.cpp), [`DrawBufferGroup.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/System/DrawBufferGroup.cpp), and [`DrawBufferExecuter.cpp`](https://github.com/SMGCommunity/Petari/blob/master/src/Game/System/DrawBufferExecuter.cpp). The live count conclusions remain separately user-reported.
+
+The source and PAL call path therefore reject a simple "count is below 4096, so add one" argument. The observed Beach Bowl count leaves 2394 execute-info records, but movement/calcAnim category arrays and draw-buffer actor arrays are sized during the earlier scene setup phase. Their later append paths do not check or grow those arrays. Even a remote actor reusing an existing model executor can exceed its preallocated actor count if registered after buffer allocation. A new model name may also exceed the draw-buffer group's preallocated executor slots. The actor cannot be safely registered through the normal path without proving an earlier reservation point or a verified bounded resize/rebuild path.
+
+### Whether another remote actor can be registered safely
+
+**Not established; do not register one.** A single execute-info slot fits arithmetically in each reported sample, but the category and draw-buffer arrays are independent and may already have been allocated. PAL `incrementCheck`, `add`, draw-executor `push_back`, active-list append, and actor-list append logic do not provide a runtime overflow guard in the traced paths. The live pending flags being zero says nothing about these capacities. Scene-address reuse also makes address equality inadequate as an ownership/generation token.
+
+An eventual safe route would need a verified scene-init reservation that accounts for every remote visual before `allocateDrawBufferActorList`, including its execute record, movement/animation/draw categories, draw-buffer model executor, and actor slot. Otherwise, a separately verified operation must rebuild/extend every affected list atomically on the emulation thread while preserving active indices and callbacks. Neither route has been proven. At four players, budget for up to three remote visuals before any list allocation; late joins should activate reserved scene-owned slots rather than allocate/register new objects.
+
+### Smallest read-only callback-capacity observation if pursuing reservation
+
+The two reported samples suffice to conclude that observed execute-holder headroom alone is not enough. A further live observation is optional, but would help size a future pre-registration design. The smallest bounded observer should:
+
+1. Re-resolve the validated PAL scene and its separately owned `SceneNameObjListExecutor` each sample; statically verify the exact Scene field/accessor, executor vptr, and `NameObjListExecutor` fields (`DrawBufferHolder`, movement list, calcAnim list, draw list) before following pointers.
+2. Read only the verified category metadata for movement `0x28`, calcAnim `0x06`, and any selected remote draw category, returning each prepared capacity/count/check-count and array span. It must not enumerate actor pointers or invoke callbacks.
+3. Read the draw-buffer group metadata for type `0x10`: group capacity/used executors, active-list capacity/count, and�only after the remote placeholder model name and string layout are statically pinned�the matching DrawBufferExecuter capacity/count. Do not scan or print model strings or actor arrays by default.
+4. Validate every pointer, table index, multiplication, count/capacity relation, full array span, and scene identity twice. Bound counts to values derived from the PAL static tables; fail closed on unknown categories, changed scene/group, or unverified model identity.
+
+Before implementing that observer, exact live field offsets and validation signatures for `NameObjCategoryList`, `DrawBufferHolder`, `DrawBufferGroup`, and `DrawBufferExecuter` must be independently reviewed against PAL DOL and Petari. The existing `observe-scheduler` intentionally does not dereference those systems. A live capacity report would still not authorize registration where append code has no bounds check; it would only inform a separately reviewed scene-init reservation.
+
 ### User-reported mission-transition sample
 
 PID `86776` was sampled by the user on PAL RMGP01 Rev 0. In Beach Bowl, the live group was `0x80FA07D8` with 1164 registered actors and 16 Penguin-vptr matches. After entering the destination, the group was `0x80FA074C` with 166 registered actors and no Penguin matches. The scene address remained `0x80F8EF70`; the Scene Napa/current-heap value remained `0x80F8EEF0`.
@@ -85,7 +141,7 @@ This is evidence that the observed group contents and group address differed bet
 
 ### Execute-info creation and scheduler registration (static PAL trace)
 
-The ordinary registration route is scene-owned and record-based. It is not a general-purpose “add actor” API:
+The ordinary registration route is scene-owned and record-based. It is not a general-purpose "add actor" API:
 
 | Step | PAL symbol/address | DOL file offset | Verified behavior |
 |---|---:|---:|---|
@@ -115,8 +171,8 @@ Still unresolved: an archive known to be mounted in a selected test scene; compl
 Before any runtime write or spawn, a separately authorized phase must perform read-only checks that:
 
 1. Re-resolve the active scene and SceneObjHolder chain and validate the execute-holder vptr, array pointer, record stride, count, and capacity for that exact scene. `registerActor` itself does not check `count < 4096`; stop if capacity cannot be proven with headroom. Never call it based only on the advertised maximum.
-2. Confirm a candidate category tuple from exact PAL callbacks and prove each list’s capacity/registration behavior. Require a custom update path that only consumes a bounded snapshot and sets a transform; it must not invoke NPC AI, gameplay gravity, sensors, collision, camera, sound, or progression.
-3. Confirm an already mounted model/archive and its ownership/cleanup path. Do not copy another actor’s model-manager pointer.
+2. Confirm a candidate category tuple from exact PAL callbacks and prove each list's capacity/registration behavior. Require a custom update path that only consumes a bounded snapshot and sets a transform; it must not invoke NPC AI, gameplay gravity, sensors, collision, camera, sound, or progression.
+3. Confirm an already mounted model/archive and its ownership/cleanup path. Do not copy another actor's model-manager pointer.
 4. Prove the registration phase, deferred connect/disconnect processing, draw-buffer setup, and teardown ordering for a scene-scoped object. On disconnect, hide only after its side effects are known; retain storage until proven scene cleanup. Invalidate all host handles on scene transition.
 5. Use one local synthetic bounded pose in one fixed mission first. Stop on scene/group/holder identity change, stale record index, pending scheduler state, count near capacity, missing archive, invalid heap context, callback after teardown, or any change to an existing actor/Mario/camera/input/gameplay state.
 
@@ -129,7 +185,7 @@ $DolphinPid = 12345 # replace with the isolated Dolphin.exe PID
 cargo run -p multigalaxy -- observe-scheduler .\development.local.toml $DolphinPid
 ```
 
-Expected prefix: `scheduler_observer=validated_read_only`, followed by scene, SceneObjHolder, AllLiveActorGroup, execute-holder and array addresses, `capacity=4096`, live `count`, `remaining`, five pending-operation flags, and `callback_lists=not_read`. A null SceneObj slot means the holder is not initialized in that scene; invalid vptrs, capacity/count, pointers, MEM1 span, or inconsistent double samples fail closed. This is a new command; no live result is claimed until the user runs it.
+Expected prefix: `scheduler_observer=validated_read_only`, followed by scene, SceneObjHolder, AllLiveActorGroup, execute-holder and array addresses, `capacity=4096`, live `count`, `remaining`, five pending-operation flags, and `callback_lists=not_read`. A null SceneObj slot means the holder is not initialized in that scene; invalid vptrs, capacity/count, pointers, MEM1 span, or inconsistent double samples fail closed. The user reports that this observer produced the PID 114728 holder values documented above; this pass did not independently recapture them.
 
 ### Exact holder and registration evidence
 
