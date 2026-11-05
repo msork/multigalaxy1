@@ -15,6 +15,12 @@ const FILE_MAP_READ: u32 = 0x0004;
 const VIEW_BYTES: usize = 0x1_0000;
 const GUEST_BASE: u32 = 0x8000_0000;
 
+#[derive(Debug)]
+pub enum MappingOpenError {
+    NotReady(String),
+    Invalid(String),
+}
+
 #[link(name = "kernel32")]
 extern "system" {
     fn OpenFileMappingW(access: u32, inherit: i32, name: *const u16) -> *mut c_void;
@@ -35,11 +41,11 @@ pub struct StockMem1 {
 }
 
 impl StockMem1 {
-    pub fn open_dolphin(pid: u32) -> Result<Self, String> {
+    pub fn open_dolphin(pid: u32) -> Result<Self, MappingOpenError> {
         Self::open_name(&format!("dolphin-emu.{pid}"))
     }
 
-    fn open_name(name: &str) -> Result<Self, String> {
+    fn open_name(name: &str) -> Result<Self, MappingOpenError> {
         let wide: Vec<u16> = OsStr::new(name).encode_wide().chain(Some(0)).collect();
         // SAFETY: `wide` is a nul-terminated UTF-16 name and remains alive for
         // the duration of the call. The requested access is limited to the
@@ -47,10 +53,13 @@ impl StockMem1 {
         let raw_handle =
             unsafe { OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE, 0, wide.as_ptr()) };
         let handle = NonNull::new(raw_handle).ok_or_else(|| {
-            format!(
-                "cannot open stock Dolphin shared memory {name:?}: {}",
-                std::io::Error::last_os_error()
-            )
+            let error = std::io::Error::last_os_error();
+            let diagnostic = format!("cannot open stock Dolphin shared memory {name:?}: {error}");
+            if error.raw_os_error() == Some(2) {
+                MappingOpenError::NotReady(diagnostic)
+            } else {
+                MappingOpenError::Invalid(diagnostic)
+            }
         })?;
         // A 64 KiB view covers the ID and Gecko handler region while remaining
         // far smaller than Dolphin's full shared memory mapping.
@@ -72,10 +81,16 @@ impl StockMem1 {
                 let error = std::io::Error::last_os_error();
                 // SAFETY: `handle` is an owned mapping handle returned above.
                 unsafe { CloseHandle(handle.as_ptr() as isize) };
-                return Err(format!("cannot map Dolphin MEM1 view: {error}"));
+                return Err(MappingOpenError::Invalid(format!(
+                    "cannot map Dolphin MEM1 view: {error}"
+                )));
             }
         };
         Ok(Self { handle, view })
+    }
+
+    pub fn mapped_view_bytes(&self) -> usize {
+        VIEW_BYTES
     }
 
     fn guest_offset(address: u32, length: usize) -> Result<usize, String> {

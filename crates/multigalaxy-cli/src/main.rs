@@ -1,3 +1,4 @@
+mod bridge_identity;
 mod controller_patch;
 mod dev_config;
 mod gdb;
@@ -583,6 +584,7 @@ fn run_interactive_sampler(
 fn run_interactive_gecko_bridge_probe(
     child: &mut process::Child,
     dolphin: &std::path::Path,
+    identity_timeout: Duration,
 ) -> Result<(), String> {
     const EXPECTED_HANDLER_SHA256: &str =
         "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
@@ -621,7 +623,9 @@ fn run_interactive_gecko_bridge_probe(
         }
     });
 
-    let discovery_deadline = Instant::now() + Duration::from_secs(60);
+    let probe_started = Instant::now();
+    let mapping_deadline = probe_started + identity_timeout;
+    let mut gecko_deadline = None;
     let mut memory = None;
     let mut mailbox = None;
     let mut next_discovery = Instant::now();
@@ -664,26 +668,53 @@ fn run_interactive_gecko_bridge_probe(
         if memory.is_none() && Instant::now() >= next_discovery {
             match stock_memory::StockMem1::open_dolphin(pid) {
                 Ok(view) => {
-                    let disc_id = view.read_guest(0x8000_0000, 6)?;
-                    if disc_id != b"RMGP01" {
-                        return Err(format!(
-                            "shared mapping belongs to game ID {:?}, expected PAL RMGP01",
-                            String::from_utf8_lossy(&disc_id)
-                        ));
+                    let view_bytes = view.mapped_view_bytes();
+                    let remaining_identity_timeout =
+                        mapping_deadline.saturating_duration_since(Instant::now());
+                    if remaining_identity_timeout.is_zero() {
+                        return Err(format!("timed out waiting {:?} for the Dolphin MEM1 mapping and PAL identity; pid={pid} mapping_view_bytes={view_bytes} validation=timeout elapsed_ms={}", identity_timeout, probe_started.elapsed().as_millis()));
                     }
-                    println!("state=mem1_attached game_id=RMGP01 pid={pid}");
+                    println!("elapsed_ms={} pid={pid} mapping_status=valid mapping_view_bytes={view_bytes} validation=game_identity_pending", probe_started.elapsed().as_millis());
+                    let mut last_identity_log = None;
+                    if let Err(error) = bridge_identity::wait_for_pal_identity(
+                        remaining_identity_timeout,
+                        Duration::from_millis(250),
+                        || {
+                            let bytes = view.read_guest(0x8000_0000, 6)?;
+                            bytes.try_into().map_err(|_| {
+                                "MEM1 returned an unexpected game ID length".to_owned()
+                            })
+                        },
+                        |elapsed, observed, status| {
+                            if status == bridge_identity::IdentityStatus::Ready
+                                || last_identity_log.map_or(true, |last: Instant| {
+                                    last.elapsed() >= Duration::from_secs(2)
+                                })
+                            {
+                                println!("elapsed_ms={} identity_poll_elapsed_ms={} pid={pid} mapping_status=valid mapping_view_bytes={view_bytes} validation={status:?} observed_game_id={}", probe_started.elapsed().as_millis(), elapsed.as_millis(), bridge_identity::describe_game_id(observed));
+                                last_identity_log = Some(Instant::now());
+                            }
+                        },
+                    ) {
+                        return Err(format!("pid={pid} mapping_status=valid mapping_view_bytes={view_bytes} validation=identity_failed: {error}"));
+                    }
+                    println!("elapsed_ms={} pid={pid} mapping_status=valid mapping_view_bytes={view_bytes} validation=PAL_RMGP01_verified", probe_started.elapsed().as_millis());
                     memory = Some(view);
+                    gecko_deadline = Some(Instant::now() + Duration::from_secs(60));
                     next_discovery = Instant::now();
                 }
-                Err(error) => {
-                    if Instant::now() >= discovery_deadline {
-                        return Err(format!("Dolphin 2609a named MEM1 mapping did not become available within 60 seconds: {error}"));
+                Err(stock_memory::MappingOpenError::NotReady(error)) => {
+                    if Instant::now() >= mapping_deadline {
+                        return Err(format!("timed out waiting {:?} for Dolphin's named MEM1 mapping; pid={pid} mapping_view_bytes=0 validation=mapping_not_created elapsed_ms={} detail={error}", identity_timeout, probe_started.elapsed().as_millis()));
                     }
                     if discovery_notice.elapsed() >= Duration::from_secs(2) {
-                        println!("state=waiting_for_mem1; {error}");
+                        println!("elapsed_ms={} pid={pid} mapping_status=waiting mapping_view_bytes=0 validation=mapping_not_created detail={error}", probe_started.elapsed().as_millis());
                         discovery_notice = Instant::now();
                     }
                     next_discovery = Instant::now() + Duration::from_millis(250);
+                }
+                Err(stock_memory::MappingOpenError::Invalid(error)) => {
+                    return Err(format!("invalid Dolphin MEM1 mapping; pid={pid} mapping_view_bytes=0 elapsed_ms={} detail={error}; refusing all writes", probe_started.elapsed().as_millis()));
                 }
             }
         }
@@ -706,11 +737,11 @@ fn run_interactive_gecko_bridge_probe(
                     report_started = Instant::now();
                 }
                 Ok(None) => {
-                    if Instant::now() >= discovery_deadline {
-                        return Err("the Gecko mailbox did not appear in Dolphin RAM within 60 seconds; confirm the isolated Gecko code is enabled and the game has booted".into());
+                    if gecko_deadline.is_some_and(|deadline| Instant::now() >= deadline) {
+                        return Err(format!("timed out waiting 60 seconds for the Gecko mailbox; pid={pid} mapping_view_bytes={} validation=PAL_RMGP01_verified gecko_signature=not_found elapsed_ms={}", memory.as_ref().map_or(0, stock_memory::StockMem1::mapped_view_bytes), probe_started.elapsed().as_millis()));
                     }
                     if discovery_notice.elapsed() >= Duration::from_secs(2) {
-                        println!("state=waiting_for_gecko; Dolphin is running; enter a playable scene if still at boot");
+                        println!("elapsed_ms={} pid={pid} mapping_status=valid mapping_view_bytes={} validation=PAL_RMGP01_verified gecko_signature=waiting", probe_started.elapsed().as_millis(), memory.as_ref().map_or(0, stock_memory::StockMem1::mapped_view_bytes));
                         discovery_notice = Instant::now();
                     }
                 }
@@ -970,8 +1001,21 @@ fn run() -> Result<(), String> {
         let mut gdb_unattached = false;
         let mut mute = true;
         let mut gecko_bridge_probe = false;
+        let mut bridge_startup_timeout = Duration::from_secs(60);
+        let mut custom_bridge_timeout = false;
         for option in &args[4..] {
-            match option.to_str() {
+            let option_text = option
+                .to_str()
+                .ok_or("dev-launch option must be valid UTF-8")?;
+            if let Some(timeout) = bridge_identity::parse_timeout_option(option_text)? {
+                if custom_bridge_timeout {
+                    return Err("bridge startup timeout may be specified only once".into());
+                }
+                bridge_startup_timeout = timeout;
+                custom_bridge_timeout = true;
+                continue;
+            }
+            match Some(option_text) {
                 Some("--debug") if !debug && !gdb_unattached => debug = true,
                 Some("--debug-unattached") if !debug && !gdb_unattached => gdb_unattached = true,
                 Some("--unmute") if mute => mute = false,
@@ -980,13 +1024,18 @@ fn run() -> Result<(), String> {
                 }
                 _ => {
                     return Err(
-                        "dev-launch options: [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe]".into(),
+                        "dev-launch options: [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--bridge-startup-timeout-secs=5..300]".into(),
                     )
                 }
             }
         }
         if gecko_bridge_probe && (debug || gdb_unattached) {
             return Err("--gecko-bridge-probe uses stock Dolphin's named MEM1 mapping and must run without --debug or --debug-unattached".into());
+        }
+        if custom_bridge_timeout && !gecko_bridge_probe {
+            return Err(
+                "--bridge-startup-timeout-secs is only valid with --gecko-bridge-probe".into(),
+            );
         }
         let gdb_enabled = debug || gdb_unattached;
         if gdb_enabled && (port == 0 || !port_is_available(port)) {
@@ -1033,7 +1082,11 @@ fn run() -> Result<(), String> {
             println!("bridge stage=stock-mem1; Dolphin is running without GDB; opening a bounded read/write view of its 2609a MEM1 mapping");
             log_process_windows(child.id());
             #[cfg(windows)]
-            run_interactive_gecko_bridge_probe(&mut child, &config.dolphin)?;
+            run_interactive_gecko_bridge_probe(
+                &mut child,
+                &config.dolphin,
+                bridge_startup_timeout,
+            )?;
             #[cfg(not(windows))]
             return Err("the stock Dolphin named-MEM1 bridge prototype currently supports Windows Dolphin 2609a only".into());
         } else if debug {
@@ -1414,7 +1467,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;

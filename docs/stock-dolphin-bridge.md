@@ -9,6 +9,7 @@ Implemented locally:
 - The launcher adds a reversible Gecko C0 test routine only to the selected isolated profile's `GameSettings/RMGP01.ini`; it does not alter the RVZ, DOL, Dolphin installation, or regular profile. Mandatory PAL AllStars and both requested shoulder swaps stay enabled.
 - The routine increments an inline 32-bit counter on each Gecko OnFrame execution and copies a host-written acknowledgement into a game-observed echo word.
 - Rust opens only `dolphin-emu.<PID>`, maps the first 64 KiB, verifies live game ID `RMGP01`, checks the Dolphin 2609a handler size (2880 bytes) and SHA-256 (`2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b`), searches the exact handler range for the unique PPC signature, and restricts writes to the validated acknowledgement word before the first observed AllStars code-cave write at `0x80002790`.
+- Game ID reads now tolerate all-zero and partially copied IDs until a bounded deadline (60 seconds by default; `--bridge-startup-timeout-secs=5..300` overrides it). Logs include elapsed time, PID, the 64 KiB mapped-view size, observed ID bytes, and validation status. A complete printable non-PAL ID fails immediately as `wrong_game`; nonprintable unexpected bytes or read failures report `invalid_mapping`; persistent zero/partial IDs report `timeout`. The full Dolphin section size is not queried: only the intentionally bounded view size is reported.
 - The Rust probe reports update rate, read/write cost, acknowledgement rate and round-trip latency; `Q` unmaps the view. It enables no GDB server.
 - Windows synthetic tests create a separate named mapping and verify counter-read / acknowledgement-write visibility across two mapped views. This proves the Rust mapping mechanics only, **not Dolphin behavior**.
 
@@ -20,6 +21,7 @@ These findings were checked against the local 2609a source tree; direct source l
 
 - `MemArenaWin.cpp` creates a page-file mapping named `dolphin-emu.<current PID>` with `PAGE_READWRITE`.
 - `Memmap.cpp` assigns the first shared-memory segment to MEM1 at offset 0, then maps that segment as Dolphin's RAM backing. Guest `0x80000000` maps to MEM1 offset 0 in the normal Wii MEM1 address mapping.
+- `HW::Init` calls `MemoryManager::Init` before CPU/guest execution. The mapping may therefore exist before boot code populates guest RAM. `MEM1_BASE_ADDR` is `0x80000000`; `GetSpanForAddress` clears the top address bits, mapping it to physical offset 0. The same source's boot setup labels `0x80000000` the GameID address. Previously recorded live GDB reads at this address returned `RMGP01` after boot. The current all-zero ID is consistent with a startup race, but alone does not prove a race rather than failed boot or a mapping problem.
 - This permits an external process in the same user/session to open an existing mapping without `ReadProcessMemory`, scanning host pointers, or changing Dolphin. It still bypasses a documented API, can race CPU execution, and may change across releases. The launcher therefore exposes a narrow fixed view, volatile aligned reads, and one acknowledgement write; this is not yet accepted as production transport. The handler SHA-256 is pinned, but Dolphin exposes no stable source-version API here, so the handler fingerprint does not prove that the Dolphin executable is official or unmodified; the local development path is expected to be the user's verified stock 2609a installation.
 - Dolphin 2609a GDB processes requests from a periodic CPU-thread callback (100,000 emulated cycles). Its `M` write path uses the guarded memory range but also unconditionally resets PPC instruction cache state and refreshes disassembly UI. GDB remains a development tool and is excluded from this bridge benchmark.
 - MemoryWatcher is compiled only for UNIX in this release. Its AF_UNIX datagram implementation sends changed values outward and does not provide Windows bidirectional IPC.
@@ -77,6 +79,8 @@ If direct shared mapping fails validation, is incoherent during live emulation, 
 
 - [Dolphin 2609a Windows MemArena](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Common/MemArenaWin.cpp)
 - [Dolphin 2609a memory map](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/HW/Memmap.cpp)
+- [Dolphin 2609a hardware initialization](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/HW/HW.cpp)
+- [Dolphin 2609a boot setup](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/Boot/Boot_BS2Emu.cpp)
 - [Dolphin 2609a GDB stub](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/PowerPC/GDBStub.cpp)
 - [Dolphin 2609a Gecko code support](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/GeckoCode.cpp)
 - [Dolphin 2609a Gecko patch engine](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/PatchEngine.cpp)

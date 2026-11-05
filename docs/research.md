@@ -10,6 +10,8 @@ Dolphin's GDB stub is configured through `Main.General.GDBPort`; its implementat
 
 For the stock-only bridge, local Dolphin 2609a source inspection found that `MemArenaWin.cpp` names its page-file memory mapping `dolphin-emu.<PID>`, while `Memmap.cpp` assigns the first mapping segment to MEM1 at offset zero. The Rust probe now opens only that process-specific mapping, verifies the live `RMGP01` ID and Gecko-handler code signature, and limits its write to the validated mailbox acknowledgment. This is an internal Windows implementation detail rather than an official API. No live bridge handshake or performance evidence exists yet; see [stock bridge experiment](stock-dolphin-bridge.md).
 
+The first live probe attempt observed six zero bytes at `0x80000000` immediately after opening the named mapping and failed before any write. Dolphin 2609a source shows `HW::Init` initializes the memory manager and creates the mapping before CPU/guest execution; `MEM1_BASE_ADDR` is `0x80000000`, which maps to shared offset zero, and the boot setup labels that address for the GameID. This makes a startup race plausible, while the zero sample alone cannot rule out failed boot or another runtime issue. The probe now waits (default 60 seconds, configurable 5–300 seconds), logs mapping-view size/PID/elapsed/ID/status, and distinguishes an absent map, uninitialized identity, wrong title, invalid view, and timeout. It does not write until PAL identity and Gecko signature/range validation succeed.
+
 Research references:
 
 - [Dolphin GDB stub](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/Core/PowerPC/GDBStub.cpp)
