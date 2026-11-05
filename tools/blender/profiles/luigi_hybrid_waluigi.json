@@ -1,0 +1,98 @@
+{
+  "schema": "mg1.galaxy-waluigi-hybrid-profile.v1",
+  "profile_id": "luigi_galaxy_controls_waluigi_deform_rig",
+  "source_rig": "luigi.001_armature",
+  "target_rig": "123475520_waluigi.gpl",
+  "target_meshes": [
+    "LiteralWalk_ARMTEST_29_0x75c1640_submesh0",
+    "LiteralWalk_ARMTEST_29_0x75c1640_submesh1"
+  ],
+  "reference_rig": "LiteralWalk_Waluigi_Target",
+  "reference_meshes": [
+    "LiteralWalk_ARMTEST_29_0x75c1640_submesh0",
+    "LiteralWalk_ARMTEST_29_0x75c1640_submesh1"
+  ],
+  "landmarks": [
+    ["JointRoot", "bone_6"],
+    ["Hip", "bone_19"],
+    ["Spine1", "bone_20"],
+    ["Spine2", "bone_21"],
+    ["ShoulderL", "bone_22"],
+    ["ArmL1", "bone_23"],
+    ["ArmL2", "bone_26"],
+    ["HandL", "bone_30"],
+    ["ShoulderR", "bone_57"],
+    ["ArmR1", "bone_58"],
+    ["ArmR2", "bone_61"],
+    ["HandR", "bone_65"],
+    ["LegL1", "bone_7"],
+    ["LegL2", "bone_8"],
+    ["FootL", "bone_9"],
+    ["LegR1", "bone_13"],
+    ["LegR2", "bone_14"],
+    ["FootR", "bone_15"],
+    ["Head", "bone_53"]
+  ],
+  "deform_controls": [
+    {"source": "JointRoot", "target": "bone_6", "translation": true, "rotation": false},
+    {"source": "Hip", "target": "bone_19"},
+    {"source": "Spine1", "target": "bone_20"},
+    {"source": "Spine2", "target": "bone_21"},
+    {"source": "ShoulderL", "target": "bone_22"},
+    {"source": "ArmL1", "target": "bone_23"},
+    {"source": "ArmL1", "target": "bone_25"},
+    {"source": "ArmL2", "target": "bone_27"},
+    {"source": "ArmL2", "target": "bone_29"},
+    {"source": "HandL", "target": "bone_30"},
+    {"source": "ShoulderR", "target": "bone_57"},
+    {"source": "ArmR1", "target": "bone_58"},
+    {"source": "ArmR1", "target": "bone_60"},
+    {"source": "ArmR2", "target": "bone_62"},
+    {"source": "ArmR2", "target": "bone_64"},
+    {"source": "HandR", "target": "bone_65"},
+    {"source": "LegL1", "target": "bone_7"},
+    {"source": "LegL2", "target": "bone_8"},
+    {"source": "FootL", "target": "bone_9"},
+    {"source": "LegR1", "target": "bone_13"},
+    {"source": "LegR2", "target": "bone_14"},
+    {"source": "FootR", "target": "bone_15"},
+    {"source": "Head", "target": "bone_53"}
+  ],
+  "arm_control_targets": [
+    "bone_22", "bone_23", "bone_25", "bone_27", "bone_29", "bone_30",
+    "bone_57", "bone_58", "bone_60", "bone_62", "bone_64", "bone_65"
+  ],
+  "fist_bones": [
+    "bone_31", "bone_32", "bone_33", "bone_34", "bone_35", "bone_36", "bone_37",
+    "bone_38", "bone_39", "bone_40", "bone_41", "bone_42", "bone_43", "bone_44",
+    "bone_45", "bone_46", "bone_47", "bone_48", "bone_49", "bone_50", "bone_51",
+    "bone_66", "bone_67", "bone_68", "bone_69", "bone_70", "bone_71", "bone_72",
+    "bone_73", "bone_74", "bone_75", "bone_76", "bone_77", "bone_78", "bone_79",
+    "bone_80", "bone_81", "bone_82", "bone_83", "bone_84", "bone_85", "bone_86"
+  ],
+  "regions": {
+    "left_shoulder_upper": ["bone_22", "bone_23", "bone_24", "bone_25"],
+    "left_forearm_wrist": ["bone_26", "bone_27", "bone_29"],
+    "left_glove_fingers": ["bone_30", "bone_31", "bone_32", "bone_33", "bone_34", "bone_35", "bone_36", "bone_37", "bone_38", "bone_39", "bone_40", "bone_41", "bone_42", "bone_43", "bone_44", "bone_45", "bone_46", "bone_47", "bone_48", "bone_49", "bone_50", "bone_51"],
+    "right_shoulder_upper": ["bone_57", "bone_58", "bone_59", "bone_60"],
+    "right_forearm_wrist": ["bone_61", "bone_62", "bone_64"],
+    "right_glove_fingers": ["bone_65", "bone_66", "bone_67", "bone_68", "bone_69", "bone_70", "bone_71", "bone_72", "bone_73", "bone_74", "bone_75", "bone_76", "bone_77", "bone_78", "bone_79", "bone_80", "bone_81", "bone_82", "bone_83", "bone_84", "bone_85", "bone_86"]
+  },
+  "seams": {
+    "left_branch_shoulder": ["bone_23", "bone_25"],
+    "left_elbow": ["bone_25", "bone_29"],
+    "left_forearm_wrist": ["bone_29", "bone_27"],
+    "left_wrist_glove": ["bone_27", "bone_30"],
+    "right_branch_shoulder": ["bone_58", "bone_60"],
+    "right_elbow": ["bone_60", "bone_64"],
+    "right_forearm_wrist": ["bone_64", "bone_62"],
+    "right_wrist_glove": ["bone_62", "bone_65"]
+  },
+  "notes": [
+    "Target weights are not edited: every Waluigi deform bone and original group remain in the duplicated armature/mesh.",
+    "The two upper-arm branches receive the same ArmL1/ArmR1 anatomical delta in their own rest-calibrated local axes.",
+    "The two forearm/wrist branches receive ArmL2/ArmR2 independently in their own rest-calibrated local axes.",
+    "Finger bones hold the first-frame V2 closed-fist basis and receive no source finger motion.",
+    "This is a test mapping; per-branch native animation offsets and per-clip manual corrections are not learned or implied."
+  ]
+}
