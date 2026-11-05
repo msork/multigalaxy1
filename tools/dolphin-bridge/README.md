@@ -41,15 +41,15 @@ The script refuses other tags, dirty source trees, preexisting bridge files, or 
 - an include, singleton, initialization, per-frame call, and shutdown in `Source/Core/Core/Core.cpp`
 - the two new sources to `Source/Core/Core/CMakeLists.txt`
 
-The Windows 2609a source has a hard compiler-version guard requiring Visual Studio 2026. The initial VS 2022/MSVC 19.44 build failed at `Source/PCH/pch.h` with Dolphin's explicit Visual Studio 2026 requirement. Official Build Tools 2026 18.11.3 (MSVC 14.51.36231) has since been installed. Using its x64 developer environment, Dolphin configured and built successfully with a local preset. `CMakeUserPresets.json` and its build directory exist only in the ignored Dolphin checkout to keep the earlier VS 2022 configure separate:
+The Windows 2609a source has a hard compiler-version guard requiring Visual Studio 2026. The initial VS 2022/MSVC 19.44 build failed at `Source/PCH/pch.h` with Dolphin's explicit Visual Studio 2026 requirement. Official Build Tools 2026 18.11.3 (MSVC 14.51.36231) has since been installed. Run the checked-in build script from a VS 2026 x64 developer shell; it verifies tag/integration, configures `ENABLE_CLI_TOOL=ON`, builds both required CMake targets, and refuses success unless both executables are beside each other:
 
-```cmd
-call "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-cmake --preset mg1-vs26 -DUSE_SYSTEM_LIBS=OFF
-cmake --build --preset mg1-build-vs26 --target dolphin-emu --parallel 6
+```powershell
+$source = (Resolve-Path .\target\dolphin-2609a-build\git-source).Path
+$build = Join-Path $source 'build\release\x64-vs26'
+.\tools\dolphin-bridge\build-2609a.ps1 -SourceRoot $source -BuildDirectory $build -Jobs 6
 ```
 
-This compiled and linked `build/release/x64-vs26/Binaries/Dolphin.exe` from the patched `core` target. For a fresh source checkout without a previous build cache, upstream's `cmake --workflow ninja-release-x64` preset is the standard alternative.
+The script configures with Ninja, the source tree's `CMake/DolphinToolchain.cmake`, and `USE_SYSTEM_LIBS=OFF`; it builds `dolphin-emu` and `dolphin-tool` from the same checkout and toolchain. Both executables must exist under `<build-dir>/Binaries/`. This was run successfully here and produced `Dolphin.exe` (22,742,528 bytes) and `DolphinTool.exe` beside it. The CMake cache confirms `ENABLE_CLI_TOOL:BOOL=ON`.
 
 The C++ code requires C++20 (`std::atomic_ref`). Launch a successful build through MultiGalaxy1 with the isolated profile and mandatory AllStars patch, then in another PowerShell run:
 
@@ -66,6 +66,7 @@ The bridge files written for MultiGalaxy1 carry WTFPL v2. When incorporated into
 - Rust payload decoder, stale heartbeat, and mapping layout tests pass in the workspace.
 - Unified patch applies cleanly to exact Dolphin tag `2609a`; the helper enforces the exact tag and clean source tree.
 - CMake configure completed with bundled dependencies.
-- VS 2022/MSVC 19.44 was rejected by Dolphin's explicit compiler guard. VS Build Tools 2026 18.11.3/MSVC 14.51.36231 then compiled `SharedMemoryBridge.cpp` and patched `Core.cpp` and linked the release `Dolphin.exe` successfully.
+- VS 2022/MSVC 19.44 was rejected by Dolphin's explicit compiler guard. VS Build Tools 2026 18.11.3/MSVC 14.51.36231 then compiled `SharedMemoryBridge.cpp` and patched `Core.cpp`, and linked both `Dolphin.exe` and matching `DolphinTool.exe` from the same tree.
+- `ENABLE_CLI_TOOL=ON` was confirmed in the build cache. MultiGalaxy1's `validate-pal-game` ran the adjacent DolphinTool against the configured PAL RVZ and verified `RMGP01`, PAL, revision 0 without modifying the RVZ.
 - The GUI was not started from this automation desktop: it is `CodexSandboxDesktop-*`, not the interactive `WinSta0\Default` desktop. The launcher refused before starting Dolphin.
 - Dolphin boot, AllStars runtime activation, live identity/heartbeat/MEM1 sample, callback cadence, and bridge-on/bridge-off performance remain unverified acceptance criteria.
