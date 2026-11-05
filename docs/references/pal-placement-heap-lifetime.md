@@ -9,6 +9,23 @@ Status: **research only**, PAL RMGP01 Rev 0. No game-memory writes, hooks, injec
 - The DOL text section mapping used here is file offset `0x25E0` → guest address `0x800070A0`. File offsets below are derived from the PAL DOL section table and checked against that file.
 - **PAL DOL verified** means the symbol-addressed instructions/call edges were inspected in this exact DOL. **Petari source** supplies matching-build source semantics. **Deduction** is an interpretation of those facts. No new live heap pointer or actor was inspected during this research pass.
 
+## Heap observer address/layout verification
+
+The opt-in `observe-heaps` command uses only exact PAL Rev 0 symbols and instruction signatures. Static addresses below are in the PAL DOL/BSS; they are not host pointers.
+
+| Field/access | PAL address | DOL offset or BSS | Evidence and interpretation |
+|---|---:|---:|---|
+| `SingletonHolder<HeapMemoryWatcher>::sInstance` pointer slot | `0x806A245C` | BSS | Exact symbol-map entry, size 4/alignment 4; validated to lie inside the exact PAL DOL BSS. This slot contains the emulated address of the watcher object. |
+| `JKRHeap::sCurrentHeap` pointer slot | `0x806A26DC` | BSS | Exact symbol-map entry, size 4/alignment 4; validated inside PAL DOL BSS. The `JKRHeap::alloc` null-heap path loads this SDA-backed global at function `0x80409698` (file offset `0x404BB8 + 0x20`, bytes `80 6D DA 3C`). |
+| `HeapMemoryWatcher::mSceneHeapNapa` handle | watcher `+0x14` | `createSceneHeapOnGameHeap` `0x8039EBFC`, file `0x39A13C`; exact 0x48-byte routine signature checked | PAL stores the first created scene heap at `+0x14`; `getSceneHeapNapa` (`0x803E7460`, file `0x3E29A0`) loads the singleton then `lwz r3,0x14(r3)`. `setCurrentHeapToSceneHeap` (`0x8039EC94`, file `0x39A1D4`) also loads `+0x14` before calling `MR::becomeCurrentHeap`. |
+| `HeapMemoryWatcher::mSceneHeapGDDR3` handle | watcher `+0x18` | `createSceneHeapOnGameHeap` `0x8039EBFC`, file `0x39A13C`; `getHeapGDDR3` `0x8039EB7C`, file `0x39A0BC` | PAL stores the second created scene heap at `+0x18`; `getHeapGDDR3` compares the queried heap with `+0x18`, identifying this field. |
+| Watcher constructor initialization | `0x8039EF00` | file `0x39A440` | Constructor clears fields through `+0x24`, including both scene heap slots. |
+| Scene heap destruction | `0x8039EC9C` | file `0x39A1DC` | Exact 0x38-byte signature checked; passes `+0x14` and `+0x18` to heap-destroy-and-null helpers. |
+
+The Rust verifier checks the two exact BSS symbol records, relevant function symbol records, DOL BSS containment, and exact PAL instruction signatures for the heap getter, scene heap create/set/destroy paths, and JKRHeap allocation path. It does not accept an address from user input or a runtime-discovered code location. The game-memory observer reads the watcher pointer, current heap pointer, and the two watcher fields as four-byte big-endian values from the existing bounded MEM1 mapping. It accepts aligned opaque handles only inside retail Wii MEM1 (`0x80000000..0x81800000`) or MEM2/GDDR3 (`0x90000000..0x94000000`) ranges, based on Dolphin 2609a `Source/Core/Core/HW/Memmap.h`; it **never dereferences a heap pointer**. MEM2 support here validates pointer values only; no MEM2 memory view is opened.
+
+The current heap may legitimately differ from the Scene Napa heap when sampled outside scene-placement setup. The report exposes `current_heap_matches_scene_napa` as true, false, or unavailable; false is a valid observation, not a validation failure. A sample during ordinary gameplay establishes only which pointer was in `sCurrentHeap` at that read, not which heap was active when a Penguin constructor ran.
+
 ## Normal scene and placement path
 
 The PAL code selects the Scene heap before the normal placement calls:
@@ -83,8 +100,17 @@ The future experiment must be isolated to a reversible patch/profile. On failure
 
 ## Smallest further experiment
 
-Before a spawn prototype, perform a **read-only live correlation** in a single playable scene: sample `JKRHeap::sCurrentHeap` at `0x806A26DC`, the active `HeapMemoryWatcher` instance identified from its verified singleton accessor, and its `+0x14/+0x18` heap handles during placement completion, pause/resume, and transition. Separately observe one known placed actor's pointer, group count, and scene epoch, then confirm the heap handles cease to be valid only after scene teardown. Do not follow a heap pointer as an object or infer object allocation ownership from numerical range alone. If this confirms only the current heap but not actor/resource allocation ownership, the next experiment remains source/disassembly tracing of allocator return ownership; do not spawn.
+The read-only `observe-heaps` command now performs a bounded, double-sampled correlation of `sCurrentHeap`, both Scene heap handles, active scene address, and AllLiveActorGroup address. Run it at separate user-controlled checkpoints: after entering a playable scene, while paused/resumed, and after a scene transition. Each invocation re-resolves the entire GameSystem → controller → scene → holder → group chain and discards the result if scene/group/heap pointers change during the sample. It does not observe the constructor call itself.
+
+PowerShell from the repository root, with the user's isolated PAL Dolphin session already running:
+
+```powershell
+$DolphinPid = 12345 # replace with the PID of the isolated Dolphin instance
+cargo run -p multigalaxy -- observe-heaps .\development.local.toml $DolphinPid
+```
+
+Expected output begins `heap_observer=validated_read_only` and includes `scene`, `group`, `watcher`, `sampled_gameplay_current_heap`, `scene_heap_napa`, `scene_heap_gddr3`, and `current_matches_scene_napa`. `constructor_time_heap=not_observed` is deliberate. Any invalid pointer, wrong game, incompatible Dolphin mapping, unstable scene/group, or live PAL signature mismatch fails closed. Do not supply a heap address to `inspect-memory` based only on a prior sample, and do not interpret pointer-range membership as allocation ownership. To establish constructor-time identity, a future authorized experiment would need a verified breakpoint/read-only trace at the placement creator or allocator call; this observer cannot establish it.
 
 ## Status
 
-The ordinary placement allocation and bulk scene-heap cleanup path is now statically traced. This resolves the earlier question of whether the stock scene path relies on individually destructing every placed LiveActor: the traced path does not show those destructor calls. It does **not** clear the runtime actor-spawn safety blockers. A remote Penguin is not approved, actor creation/rendering is not implemented, and M4 remains unchanged.
+The ordinary placement allocation and bulk scene-heap cleanup path is statically traced. The heap observer is implemented and has synthetic coverage only; no live heap snapshot has yet been captured by this turn. It does **not** clear the runtime actor-spawn safety blockers. A remote Penguin is not approved, actor creation/rendering is not implemented, and M4 remains unchanged.

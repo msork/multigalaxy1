@@ -69,6 +69,8 @@ The research points toward a **new, separately owned cosmetic actor type**, not 
 
 The smallest safe prototype, once the listed gates are cleared, is one local-only, noninteractive, scene-scoped visual actor at a synthetic fixed position in a single PAL test scene. It should be a custom cosmetic type, never a full Penguin or an existing actor. Disconnect hides it but does not free it mid-scene; a scene transition invalidates all host handles and relies on normal scene teardown only after allocation/resource ownership is proven. The next research-only experiment is a read-only correlation of `sCurrentHeap` and the active Scene heap handles during gameplay and transitions, alongside one placed actor/group count. No runtime write is needed.
 
+The opt-in read-only `observe-heaps` implementation and its exact PAL global/field evidence are documented in [PAL placement heap and lifetime](pal-placement-heap-lifetime.md). It reports a gameplay-time sample and compares current heap with Scene Napa; it makes no constructor-time claim.
+
 ## Remaining blockers
 
 - Normal placement's selected current heap and bulk scene-heap teardown are statically traced. Live heap correlation and ownership for every transitive model/archive allocation remain unverified; scene teardown does not show per-actor destructor calls.

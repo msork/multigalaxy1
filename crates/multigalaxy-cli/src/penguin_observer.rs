@@ -75,6 +75,17 @@ struct Metadata {
     array: u32,
 }
 
+/// Resolve and independently recheck the known PAL scene/group chain without
+/// reading actor entries. Consumers still re-resolve it around their own reads.
+pub fn validated_scene_group(memory: &mut impl GuestMemory) -> Result<(u32, u32), String> {
+    let before = metadata(memory)?;
+    let after = metadata(memory)?;
+    if before != after {
+        return Err("scene/group changed during identity check".into());
+    }
+    Ok((before.chain.scene, before.chain.group))
+}
+
 pub fn verify_penguin_pal(dol: &[u8], symbols: &[u8]) -> Result<(), String> {
     let symbols =
         std::str::from_utf8(symbols).map_err(|e| format!("symbols file is not UTF-8: {e}"))?;
