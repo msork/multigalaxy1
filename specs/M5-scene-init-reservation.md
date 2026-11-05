@@ -1,6 +1,6 @@
 # M5 scene-initialization reservation architecture
 
-Status: research-only design for up to three separate remote cosmetic actors per local Dolphin client. No actor, reservation, memory write, hook, injection, or Dolphin change is implemented or authorized here. Target is PAL RMGP01 Rev 0 and stock Dolphin.
+Status: research-only design for up to three separate remote cosmetic actors per local Dolphin client. No actor, reservation, memory write, hook, injection, or Dolphin change is implemented or authorized here. Target is PAL RMGP01 Rev 0 and stock Dolphin. The [SMGNetworkMultiplayer rendering review](../docs/references/smgnetworkmultiplayer-analysis.md) identifies a lower-footprint first experiment: render one remote Mario pose from the existing local Mario model's animation/draw callbacks. That can avoid per-remote actor/scheduler storage, but still needs PAL-specific hook validation and has borrowed model/resource lifetime risks. Scene-owned actor reservation remains a fallback for a later distinct-model renderer; its gates below remain binding.
 
 ## 1. Objective
 

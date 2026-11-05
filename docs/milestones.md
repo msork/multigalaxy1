@@ -7,7 +7,7 @@
 | M2 | Stock Dolphin bridge feasibility | In progress; user-reported live mailbox and paired bridge-off/on benchmark are recorded; title/menu, pause/resume, and transition lifecycle checks remain pending |
 | M3 | Verified PAL Mario coordinate extraction | User reports the mailbox yielded real X/Y/Z at ~60 Hz; source/DOL checks and synthetic snapshot tests are recorded, while this turn did not independently repeat gameplay |
 | M4 | Two-player online position relay | In progress; Rust localhost binary server/client and synthetic two-client reconnect/removal tests pass; separate live Dolphin clients remain unverified |
-| M5 | Remote-player rendering on stock Dolphin | Phase 1.15: PAL GameScene reservation ordering and three-slot design documented; inert preallocation is a static deduction. User-reported callback counts remain aggregate. Actor/clipping bounds, per-model slots/resources, runtime activation, and teardown remain unverified; no actor spawning/rendering |
+| M5 | Remote-player rendering on stock Dolphin | Phase 1.16: SMGNetworkMultiplayer shared-Mario-model renderer analyzed; four upstream hook callsites resolve to expected callees in PAL DOL, but no PAL hook/runtime proof. Prefer one remote Mario through existing render callbacks before actor reservation. Upstream code license unclear; Wario/Waluigi resources and model ownership unverified. No actor spawning/rendering |
 | M6 | Independent per-client camera/render integration | Not started; each client keeps its own full-screen camera, remote render actor must not affect it |
 | M7 | Wario/Waluigi models and abilities | Not started |
 | M8 | Online authority, progression, and synchronization | Not started; M4 relays positions only and does not synchronize shared progression |
