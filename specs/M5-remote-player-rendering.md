@@ -2,6 +2,8 @@
 
 Status: research plus opt-in read-only actor-class and scheduler-metadata observers. No game-memory writes, executable patches, hooks, actor creation, or runtime rendering changes are authorized by this phase.
 
+M5 Phase 1.13: added the opt-in callback-list metadata observer specified in [M5 callback-list observer](M5-callback-list-observer.md). It targets movement `0x28`, calcAnim `0x06`, and Penguin draw-buffer group `0x10`; it reads metadata only and has no live Dolphin result yet.
+
 M5 Phase 1.12 update: user-reported read-only samples (PID 114728) show Beach Bowl execute holder `0x80F945C4`, array `0x80F945F4`, count 1702/4096, and destination holder `0x80F94538`, array `0x80F94568`, count 359/4096. All five pending flags were zero. AllLiveActorGroup changed `0x80FA07D8` → `0x80FA074C`; the Scene numeric address was reused and does not identify a persistent scene instance. PAL `NameObjListExecutor` and draw-buffer analysis finds callback and actor arrays pre-sized during scene setup from per-category/model counts; the append paths do not prove safe late growth. Holder headroom therefore does not make remote actor registration safe. No callback lists were enumerated. Model/archive residency, transitive resource ownership, list reservation/resizing, and teardown remain blockers. See [Penguin live investigation](../docs/references/penguin-live-investigation.md), [Penguin actor/render path](../docs/references/penguin-rendering-path.md), and [PAL placement heap/lifetime trace](../docs/references/pal-placement-heap-lifetime.md).
 
 ## 1. Objective
@@ -120,15 +122,18 @@ Phase 1.5/1.7/1.8: `observe-penguins` is opt-in and uses stock Dolphin's read-on
 
 Research-only actor path: the references above record exact-hash PAL evidence and Petari semantics for placement, heap selection, execute-info scheduling, callback list allocation, resource ownership, and teardown. User reports live group/holder transitions, including Scene address reuse; no heap destruction or constructor-time identity is inferred. `observe-scheduler` validated the holder before the latest user sample, which reports 1702/4096 and 359/4096 entries with zero pending flags. It does not inspect category or draw-buffer arrays. Static PAL analysis finds unchecked appends after capacity preparation, so no safe dynamic registration route is established. Model/archive residency and complete scene teardown/resource ownership remain unverified. No actor was spawned.
 
-Read-only scheduler validation workflow (manual live check; do not launch a Dolphin instance from the sandbox):
+Read-only scheduler validation workflows (manual live check; do not launch a Dolphin instance from the sandbox):
 
 ```powershell
 Set-Location C:\Users\maxim\Projects\multigalaxy1
 $DolphinPid = 12345 # set the PID of the already-running isolated Dolphin.exe
 cargo run -p multigalaxy -- observe-scheduler .\development.local.toml $DolphinPid
+cargo run -p multigalaxy -- observe-callback-lists .\development.local.toml $DolphinPid
 ```
 
 Run once in a playable PAL scene and again after a settled mission transition. Expected output includes `capacity=4096`, the live `count`, `remaining`, holder/array pointers, the five pending-operation flags, and `callback_lists=not_read`. A null slot is expected if the execute holder has not been lazily created in that scene. Results are live observations only after the command succeeds; static validation and synthetic tests are not live proof. Do not interpret remaining slots as authorization to call `registerActor`.
+
+The callback-list command reports movement/calcAnim list identities, callback-array pointers, count/capacity/headroom/check counts, draw-buffer group executor/active-list metadata, and pending flags. Run it only in a settled playable scene and after a settled scene transition. It rejects nonzero pending flags and changing metadata. It never reads callback or actor entries. Treat output as live evidence only after it succeeds against the visible user-side stock Dolphin process.
 
 Before actor implementation: produce a PAL instruction-signature manifest and resolve prototypes for constructor, model initialization, scheduler connect/disconnect, scene creation/destruction, and draw submission. Run `observe-heaps` before and after a normal mission transition with the same Dolphin PID; changed scene/group/heap addresses support an identity change, while reused addresses are inconclusive. These gameplay-time samples do not prove heap identity at constructor execution. Confirm execute-info setup/capacity, actor-system-info/clipping behavior, a scene-mounted model/archive, complete model-resource ownership, and teardown callback order from matching Petari source/disassembly. See the prerequisites and stop conditions in `docs/references/pal-placement-heap-lifetime.md`.
 
