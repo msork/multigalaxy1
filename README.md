@@ -1,6 +1,6 @@
 # MultiGalaxy1
 
-Rust-first, online-only multiplayer modification research for PAL Super Mario Galaxy 1, with Dolphin as the local emulation backend. Each participant runs a separate Dolphin instance and sees a full-screen local camera. MultiGalaxy1 supplies the launcher, game-side bridge, and online session layer; it does not use Dolphin NetPlay.
+Rust-first, online-only multiplayer modification research for PAL Super Mario Galaxy 1, with Dolphin as the local emulation backend. Each participant runs a separate Dolphin instance and sees a full-screen local camera. MultiGalaxy1 is developing a launcher, a game-side bridge prototype, and an online session layer; it does not use Dolphin NetPlay.
 
 ## Current status
 
@@ -27,4 +27,4 @@ Original MultiGalaxy1 code is released under the [WTFPL Version 2](LICENSE). Thi
 
 ## Stock Dolphin bridge status
 
-MultiGalaxy1 uses an unmodified official Dolphin installation. The previously explored Dolphin source fork/shared-memory publisher is retired; its implementation notes are retained in [bridge feasibility research](docs/stock-dolphin-bridge.md). Stock Dolphin 2609a's GDB supports development memory inspection but may impose runtime cost and pauses at startup. MemoryWatcher is not built into the Windows release and is one-way. Gecko/DOL injection can run guest code but does not itself provide a host IPC channel. No low-overhead, bidirectional stock-Dolphin bridge has yet passed a runtime benchmark, so online actor synchronization remains blocked on that proof. AllStars remains mandatory on launcher paths.
+MultiGalaxy1 uses an unmodified official Dolphin installation. The retired Dolphin fork is not part of the project. An experimental Windows Dolphin 2609a bridge proof combines a Gecko frame counter with Dolphin's existing named MEM1 mapping; it is version-specific and undocumented. Synthetic mapping tests pass, but live exchange and gameplay performance remain unverified. Online actor synchronization remains blocked on those tests. AllStars stays mandatory on launcher paths. See [bridge feasibility and interactive test instructions](docs/stock-dolphin-bridge.md).

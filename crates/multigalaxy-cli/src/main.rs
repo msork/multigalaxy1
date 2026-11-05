@@ -1,9 +1,12 @@
 mod controller_patch;
 mod dev_config;
 mod gdb;
+mod gecko_bridge;
 mod perf_bench;
 mod player_probe;
 mod startup;
+#[cfg(windows)]
+mod stock_memory;
 
 use multigalaxy_patch::{
     branch_target, changed_ranges, parse_dol, sha256, DiscIdentity, RevisionCatalog, SectionKind,
@@ -171,6 +174,7 @@ fn configure_isolated_profile(
     development: bool,
     gdb_port: Option<u16>,
     mute: bool,
+    gecko_bridge_probe: bool,
 ) -> Result<(), String> {
     let config_dir = user_dir.join("Config");
     fs::create_dir_all(&config_dir)
@@ -191,6 +195,9 @@ fn configure_isolated_profile(
     fs::create_dir_all(&settings_dir)
         .map_err(|e| format!("cannot create isolated GameSettings directory: {e}"))?;
     let mut settings = controller_patch::allstars_game_settings(patch).to_owned();
+    if gecko_bridge_probe {
+        gecko_bridge::append_code(&mut settings);
+    }
     if let Some(profile_path) = controller_profile {
         let profile_name = "Pro Con to Classic Con";
         let profile_dir = config_dir.join("Profiles").join("Wiimote");
@@ -572,6 +579,234 @@ fn run_interactive_sampler(
     Ok(())
 }
 
+#[cfg(windows)]
+fn run_interactive_gecko_bridge_probe(
+    child: &mut process::Child,
+    dolphin: &std::path::Path,
+) -> Result<(), String> {
+    const EXPECTED_HANDLER_SHA256: &str =
+        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
+    let pid = child.id();
+    let sys_handler = dolphin
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join("Sys")
+        .join("codehandler.bin");
+    let handler_bytes = fs::read(&sys_handler).map_err(|error| {
+        format!(
+            "cannot inspect stock Dolphin Gecko codehandler {}: {error}",
+            sys_handler.display()
+        )
+    })?;
+    let handler_size = handler_bytes.len();
+    let handler_sha256 = sha256(&handler_bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    if handler_size != 2880 || handler_sha256 != EXPECTED_HANDLER_SHA256 {
+        return Err(format!(
+            "Dolphin codehandler.bin did not match the verified 2609a input (size={handler_size}, sha256={handler_sha256}); refusing to guess a Gecko RAM layout"
+        ));
+    }
+    println!("Stock Dolphin 2609a named-MEM1 mailbox probe; PID={pid}; handler_bytes={handler_size}; handler_sha256={handler_sha256}. No GDB server is enabled. Type Q to stop.");
+    println!("Waiting for Dolphin's named MEM1 mapping and the isolated-profile Gecko probe...");
+    let (tx, rx) = std::sync::mpsc::channel::<String>();
+    std::thread::spawn(move || {
+        let stdin = std::io::stdin();
+        loop {
+            let mut line = String::new();
+            if stdin.read_line(&mut line).is_err() || tx.send(line.trim().to_owned()).is_err() {
+                break;
+            }
+        }
+    });
+
+    let discovery_deadline = Instant::now() + Duration::from_secs(60);
+    let mut memory = None;
+    let mut mailbox = None;
+    let mut next_discovery = Instant::now();
+    let mut last_counter = None;
+    let mut last_counter_change = Instant::now();
+    let mut last_ack_counter = None;
+    let mut pending_ack: Option<(u32, Instant)> = None;
+    let mut report_started = Instant::now();
+    let mut report_frames = 0u64;
+    let mut report_acks = 0u64;
+    let mut report_rtt_total = Duration::ZERO;
+    let mut report_rtt_max = Duration::ZERO;
+    let mut report_read_total = Duration::ZERO;
+    let mut report_write_total = Duration::ZERO;
+    let mut report_reads = 0u64;
+    let mut report_writes = 0u64;
+    let mut discovery_notice = Instant::now();
+
+    loop {
+        if let Some(status) = child.try_wait().map_err(|error| {
+            format!("cannot inspect Dolphin while bridge probe is running: {error}")
+        })? {
+            return Err(format!(
+                "Dolphin exited while bridge probe was active ({status})"
+            ));
+        }
+        match rx.recv_timeout(Duration::from_millis(1)) {
+            Ok(command)
+                if command.eq_ignore_ascii_case("q") || command.eq_ignore_ascii_case("quit") =>
+            {
+                break
+            }
+            Ok(command) if !command.is_empty() => {
+                println!("unknown command {command:?}; type Q to stop")
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            _ => {}
+        }
+
+        if memory.is_none() && Instant::now() >= next_discovery {
+            match stock_memory::StockMem1::open_dolphin(pid) {
+                Ok(view) => {
+                    let disc_id = view.read_guest(0x8000_0000, 6)?;
+                    if disc_id != b"RMGP01" {
+                        return Err(format!(
+                            "shared mapping belongs to game ID {:?}, expected PAL RMGP01",
+                            String::from_utf8_lossy(&disc_id)
+                        ));
+                    }
+                    println!("state=mem1_attached game_id=RMGP01 pid={pid}");
+                    memory = Some(view);
+                    next_discovery = Instant::now();
+                }
+                Err(error) => {
+                    if Instant::now() >= discovery_deadline {
+                        return Err(format!("Dolphin 2609a named MEM1 mapping did not become available within 60 seconds: {error}"));
+                    }
+                    if discovery_notice.elapsed() >= Duration::from_secs(2) {
+                        println!("state=waiting_for_mem1; {error}");
+                        discovery_notice = Instant::now();
+                    }
+                    next_discovery = Instant::now() + Duration::from_millis(250);
+                }
+            }
+        }
+
+        if mailbox.is_none() && memory.is_some() && Instant::now() >= next_discovery {
+            let view = memory.as_ref().expect("mapping checked above");
+            let length = (gecko_bridge::HANDLER_END - gecko_bridge::HANDLER_BASE) as usize;
+            let bytes = view.read_guest(gecko_bridge::HANDLER_BASE, length)?;
+            match gecko_bridge::locate_mailbox(gecko_bridge::HANDLER_BASE, handler_size, &bytes) {
+                Ok(Some(found)) => {
+                    println!(
+                        "state=mailbox_ready counter=0x{:08x} ack=0x{:08x} echo=0x{:08x}",
+                        found.counter_address(),
+                        found.acknowledgement_address(),
+                        found.echo_address()
+                    );
+                    mailbox = Some(found);
+                    last_counter = None;
+                    last_counter_change = Instant::now();
+                    report_started = Instant::now();
+                }
+                Ok(None) => {
+                    if Instant::now() >= discovery_deadline {
+                        return Err("the Gecko mailbox did not appear in Dolphin RAM within 60 seconds; confirm the isolated Gecko code is enabled and the game has booted".into());
+                    }
+                    if discovery_notice.elapsed() >= Duration::from_secs(2) {
+                        println!("state=waiting_for_gecko; Dolphin is running; enter a playable scene if still at boot");
+                        discovery_notice = Instant::now();
+                    }
+                }
+                Err(error) => {
+                    return Err(format!(
+                        "could not validate Gecko mailbox in stock Dolphin RAM: {error}"
+                    ))
+                }
+            }
+            next_discovery = Instant::now() + Duration::from_millis(500);
+        }
+
+        if let Some(mailbox) = mailbox {
+            let view = memory.as_ref().expect("mailbox requires a mapped view");
+            let read_started = Instant::now();
+            let counter = view.read_guest_word(mailbox.counter_address())?;
+            let echo = view.read_guest_word(mailbox.echo_address())?;
+            let read_time = read_started.elapsed();
+            report_read_total += read_time;
+            report_reads += 1;
+            let counter_changed = last_counter != Some(counter);
+            if counter_changed {
+                if let Some(previous) = last_counter {
+                    let delta = counter.wrapping_sub(previous);
+                    if delta < 0x8000_0000 {
+                        report_frames = report_frames.saturating_add(delta as u64);
+                    }
+                }
+                last_counter = Some(counter);
+                last_counter_change = Instant::now();
+            } else if last_counter_change.elapsed() > Duration::from_secs(3) {
+                return Err("Gecko heartbeat/counter stopped changing for 3 seconds while Dolphin remained alive; the game may be paused or the handler has stopped executing".into());
+            }
+
+            if let Some((expected, sent_at)) = pending_ack {
+                if echo == expected {
+                    let rtt = sent_at.elapsed();
+                    report_acks += 1;
+                    report_rtt_total += rtt;
+                    report_rtt_max = report_rtt_max.max(rtt);
+                    pending_ack = None;
+                }
+            }
+            if pending_ack.is_none() && counter_changed && last_ack_counter != Some(counter) {
+                let acknowledgement = counter.rotate_left(7) ^ 0x4d47_3141;
+                let write_started = Instant::now();
+                view.acknowledge(mailbox, acknowledgement)?;
+                report_write_total += write_started.elapsed();
+                report_writes += 1;
+                pending_ack = Some((acknowledgement, write_started));
+                last_ack_counter = Some(counter);
+            }
+
+            if report_started.elapsed() >= Duration::from_secs(1) {
+                let elapsed = report_started.elapsed().as_secs_f64();
+                let avg_rtt_ms = if report_acks == 0 {
+                    0.0
+                } else {
+                    report_rtt_total.as_secs_f64() * 1000.0 / report_acks as f64
+                };
+                let avg_read_ms = if report_reads == 0 {
+                    0.0
+                } else {
+                    report_read_total.as_secs_f64() * 1000.0 / report_reads as f64
+                };
+                let avg_write_ms = if report_writes == 0 {
+                    0.0
+                } else {
+                    report_write_total.as_secs_f64() * 1000.0 / report_writes as f64
+                };
+                println!(
+                    "unix_ms={} state=live counter={} game_update_hz={:.1} ack_hz={:.1} read_hz={:.1} ack_rtt_avg_ms={:.3} ack_rtt_max_ms={:.3} shared_read_avg_ms={:.6} shared_write_avg_ms={:.6}",
+                    timestamp_unix_ms(), counter, report_frames as f64 / elapsed,
+                    report_acks as f64 / elapsed, report_reads as f64 / elapsed, avg_rtt_ms, report_rtt_max.as_secs_f64() * 1000.0,
+                    avg_read_ms, avg_write_ms
+                );
+                report_started = Instant::now();
+                report_frames = 0;
+                report_acks = 0;
+                report_rtt_total = Duration::ZERO;
+                report_rtt_max = Duration::ZERO;
+                report_read_total = Duration::ZERO;
+                report_write_total = Duration::ZERO;
+                report_reads = 0;
+                report_writes = 0;
+            }
+            let _ = std::io::stdout().flush();
+            std::thread::sleep(Duration::from_millis(1));
+        } else {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+    println!("bridge_probe=stopped; named MEM1 view unmapped");
+    Ok(())
+}
+
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
     if args.len() == 4 && args[0] == "bench-dolphin" {
@@ -588,7 +823,7 @@ fn run() -> Result<(), String> {
         let condition = args[3].to_str().ok_or("condition must be valid UTF-8")?;
         if !perf_bench::valid_condition(condition) {
             return Err(
-                "condition must be normal, gdb-unattached, gdb-idle, or gdb-sampling".into(),
+                "condition must be normal, gdb-unattached, gdb-idle, gdb-sampling, stock-bridge-off, or stock-bridge-on".into(),
             );
         }
         println!("benchmark condition={condition} pid={pid} duration_s={seconds}; read-only process CPU sampling starts now");
@@ -679,6 +914,7 @@ fn run() -> Result<(), String> {
             true,
             None,
             false,
+            false,
         )?;
         fs::write(
             user_dir.join(".mg1-development-profile"),
@@ -733,17 +969,24 @@ fn run() -> Result<(), String> {
         let mut debug = false;
         let mut gdb_unattached = false;
         let mut mute = true;
+        let mut gecko_bridge_probe = false;
         for option in &args[4..] {
             match option.to_str() {
                 Some("--debug") if !debug && !gdb_unattached => debug = true,
                 Some("--debug-unattached") if !debug && !gdb_unattached => gdb_unattached = true,
                 Some("--unmute") if mute => mute = false,
+                Some("--gecko-bridge-probe") if !gecko_bridge_probe => {
+                    gecko_bridge_probe = true
+                }
                 _ => {
                     return Err(
-                        "dev-launch options: [--debug | --debug-unattached] [--unmute]".into(),
+                        "dev-launch options: [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe]".into(),
                     )
                 }
             }
+        }
+        if gecko_bridge_probe && (debug || gdb_unattached) {
+            return Err("--gecko-bridge-probe uses stock Dolphin's named MEM1 mapping and must run without --debug or --debug-unattached".into());
         }
         let gdb_enabled = debug || gdb_unattached;
         if gdb_enabled && (port == 0 || !port_is_available(port)) {
@@ -775,6 +1018,7 @@ fn run() -> Result<(), String> {
             true,
             if gdb_enabled { Some(port) } else { None },
             mute,
+            gecko_bridge_probe,
         )?;
         let mut child = spawn_game(
             &config.dolphin,
@@ -785,7 +1029,14 @@ fn run() -> Result<(), String> {
             mute,
             &patch,
         )?;
-        if debug {
+        if gecko_bridge_probe {
+            println!("bridge stage=stock-mem1; Dolphin is running without GDB; opening a bounded read/write view of its 2609a MEM1 mapping");
+            log_process_windows(child.id());
+            #[cfg(windows)]
+            run_interactive_gecko_bridge_probe(&mut child, &config.dolphin)?;
+            #[cfg(not(windows))]
+            return Err("the stock Dolphin named-MEM1 bridge prototype currently supports Windows Dolphin 2609a only".into());
+        } else if debug {
             println!("debug stage=gdb-attach; opening the persistent Rust GDB session");
             let mut client =
                 match connect_gdb_until_ready(&mut child, port, Duration::from_secs(15)) {
@@ -955,6 +1206,7 @@ fn run() -> Result<(), String> {
             false,
             if gdb_enabled { Some(port) } else { None },
             mute,
+            false,
         )?;
         spawn_game(
             &dolphin,
@@ -1162,7 +1414,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port> [--debug | --debug-unattached] [--unmute] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
@@ -1303,6 +1555,7 @@ mod tests {
             true,
             Some(55221),
             true,
+            false,
         )
         .unwrap();
         let dolphin_ini = fs::read_to_string(user.join("Config/Dolphin.ini")).unwrap();
@@ -1319,6 +1572,22 @@ mod tests {
         assert!(game_ini.contains("WiimoteSource0 = 1"));
         assert!(game_ini.contains("WiimoteProfile1 = Pro Con to Classic Con"));
         assert_eq!(copied_profile, profile_bytes);
+        assert_eq!(fs::read(&source_profile).unwrap(), profile_bytes);
+        configure_isolated_profile(
+            &user,
+            &patch,
+            Some(&source_profile),
+            true,
+            Some(55221),
+            true,
+            true,
+        )
+        .unwrap();
+        let probe_ini = fs::read_to_string(user.join("GameSettings/RMGP01.ini")).unwrap();
+        assert!(probe_ini.contains("[OnFrame_Enabled]"));
+        assert!(probe_ini.contains("AllStars"));
+        assert!(probe_ini.contains("[Gecko_Enabled]"));
+        assert!(probe_ini.contains("MultiGalaxy1 Stock Dolphin Mailbox Probe"));
         assert_eq!(fs::read(source_profile).unwrap(), profile_bytes);
         fs::remove_dir_all(root).unwrap();
     }

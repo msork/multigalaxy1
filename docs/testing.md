@@ -54,6 +54,8 @@ Dolphin 2609a accepts one GDB client per process. If a read times out or the con
 
 The four-condition benchmark procedure and source-level GDB overhead investigation are in [performance.md](performance.md). The Rust `bench-dolphin` command measures CPU utilization for an existing Dolphin PID and records operator-read Speed/FPS/VPS OSD averages. No valid gameplay performance numbers have been captured yet: this automation uses a sandbox desktop, and Dolphin must be launched by the user's interactive PowerShell. The GDB-unattached condition is paused on Dolphin 2609a and must not be reported as a running-game FPS comparison.
 
-## Dolphin integrated bridge
+## Stock Dolphin mailbox proof
 
-The retired Dolphin source patch/shared-memory design is not part of the supported build. Stock-Dolphin options, verified limitations, and the required interactive feasibility benchmark are documented in [stock-dolphin-bridge.md](stock-dolphin-bridge.md). No live bridge publication, 60 Hz game-state exchange, or stock-Dolphin performance result is verified.
+Rust tests now cover the generated Gecko counter/echo code, code-handler signature and bounds, AllStars cave overlap rejection, and a synthetic Windows named-mapping round trip. These are static/synthetic results only. They do not verify Dolphin's live Gecko execution, external-memory coherency, handshake, or performance.
+
+The opt-in `dev-launch ... 0 --gecko-bridge-probe` path enables the probe only in an isolated profile and uses no GDB. It requires official Dolphin 2609a on Windows, a visible interactive desktop, PAL RMGP01 Rev 0, and mandatory externally supplied AllStars files. The exact baseline/probe commands and paired 30-second FPS/VPS/speed/CPU procedure are in [stock-dolphin-bridge.md](stock-dolphin-bridge.md). No live counter, acknowledgement, 60 Hz result, or gameplay performance comparison is verified yet.

@@ -1,27 +1,27 @@
-﻿# Stock Dolphin performance and bridge benchmark
+# Performance verification
 
-## Purpose
+The stock bridge prototype is a PAL Gecko frame counter/echo plus a bounded Rust view of Dolphin 2609a's named MEM1 mapping. GDB is not used for this bridge because it pauses startup and its `M` command has source-verified instruction-cache/disassembly side effects. No Dolphin performance numbers are currently recorded.
 
-Test whether an unmodified official Dolphin can support the online mod's live state bridge. The retired shared-memory source patch and its benchmark modes are not part of the product.
+## Paired interactive benchmark
 
-## Known evidence
+Run only from the user's visible interactive PowerShell, with Dolphin closed between trials. Keep the same isolated profile, D3D12 backend, AllStars patch, controller, game scene, resolution, and 30-second idle interval. The only changed variable is enabling the test Gecko routine.
 
-Dolphin 2609a's GDB stub schedules command processing every 100,000 emulated cycles while active and pauses at startup until a client continues execution. This is a source-level mechanism, not a measured performance cost. The user reported severe slowdown even after sampler STOP; no numeric FPS/CPU samples are recorded, so quantify with a controlled interactive test before making a performance claim.
+Baseline:
 
-MemoryWatcher is UNIX-only in the official 2609a CMake configuration and uses a one-way AF_UNIX datagram stream. External process-memory polling has no supported guest-RAM mapping and can race the emulation thread. Gecko injection can execute PPC code but needs a separate host communication path. Details and source links: [stock Dolphin bridge feasibility](stock-dolphin-bridge.md).
+```powershell
+cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0
+cargo run -p multigalaxy -- bench-dolphin <PID> 30 stock-bridge-off
+```
 
-## Interactive benchmark
+Bridge enabled:
 
-Use the same PAL scene, Dolphin backend, profile, controller, and input sequence. Run three 30-second samples after warm-up for each playable condition:
+```powershell
+cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0 --gecko-bridge-probe
+cargo run -p multigalaxy -- bench-dolphin <PID> 30 stock-bridge-on
+```
 
-1. Official Dolphin, GDB off.
-2. Official Dolphin, GDB attached and idle (`STOP`).
-3. Official Dolphin, GDB actively sampling.
+The operator records the Dolphin OSD's Speed%, FPS, and VPS for each run. `bench-dolphin` samples process CPU once per second. The bridge console additionally reports game counter update Hz, acknowledgement Hz, polling read Hz, mean/max echo latency, and host read/write duration. Repeat each condition at least three times; compare medians and note scene-specific variance. `gdb-unattached` is paused and never a running-game comparator.
 
-Record Dolphin Speed/FPS/VPS OSD and `bench-dolphin` CPU output. GDB unattached remains paused, so it is not a gameplay comparison. Perform this from interactive `WinSta0\Default`; the automation desktop is not user-visible and must not be used to claim runtime performance.
+## Evidence status
 
-## Current test status
-
-A synthetic Windows named-mapping experiment previously demonstrated about 61 publications/s between two Rust processes. This is only an IPC transport micro-test; it does not involve Dolphin, guest RAM, or emulation overhead. The former fork bridge comparison is retired. No matched stock-Dolphin benchmark has been performed. The stock proof presently verified is read-only PAL RMGP01 Rev 0 validation through official DolphinTool.
-
-Do not implement a production bridge until a stock-only prototype demonstrates reliable bidirectional state exchange near 60 Hz and no noticeable slowdown. If that cannot be done through a supported stock interface, document the blocker and alternatives without restoring a fork.
+Synthetic named-mapping unit tests pass. They do not test Dolphin or establish runtime cost. Live frame cadence, game-observed acknowledgement, rendered gameplay, FPS/VPS/speed, CPU, and latency await user-side execution. Do not state “60 Hz” or “no noticeable slowdown” until paired results are recorded.

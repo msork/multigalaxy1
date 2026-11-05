@@ -11,7 +11,12 @@ pub struct CpuSample {
 pub fn valid_condition(value: &str) -> bool {
     matches!(
         value,
-        "normal" | "gdb-unattached" | "gdb-idle" | "gdb-sampling"
+        "normal"
+            | "gdb-unattached"
+            | "gdb-idle"
+            | "gdb-sampling"
+            | "stock-bridge-off"
+            | "stock-bridge-on"
     )
 }
 
@@ -207,6 +212,8 @@ mod tests {
     fn accepts_stock_dolphin_benchmark_conditions_and_rejects_retired_modes() {
         assert!(valid_condition("normal"));
         assert!(valid_condition("gdb-idle"));
+        assert!(valid_condition("stock-bridge-off"));
+        assert!(valid_condition("stock-bridge-on"));
         assert!(!valid_condition("bridge-enabled"));
         assert!(!valid_condition("bridge-disabled"));
         assert!(!valid_condition("production"));

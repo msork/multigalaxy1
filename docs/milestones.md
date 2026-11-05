@@ -4,7 +4,7 @@
 |---|---|---|
 | M0 | Research, reverse engineering, PAL feasibility, architecture | In progress; official DolphinTool validates RMGP01 Rev 0; stock bridge remains unproven |
 | M1 | Reproducible Rust patch tooling and verified PAL maps | Partial; DOL parser/differ and safe patch composition tests exist; no runtime hook is accepted |
-| M2 | Stock Dolphin bridge feasibility | In progress; fork/shared-memory implementation retired; GDB/MemoryWatcher/Gecko/external-memory tradeoffs documented; interactive performance test pending |
+| M2 | Stock Dolphin bridge feasibility | In progress; Windows 2609a named-MEM1 + Gecko counter/echo proof and synthetic mapped-view tests implemented; interactive handshake/performance pending |
 | M3 | Two-client state exchange and visible remote character | Not started; blocked on M2 and verified game-side hooks |
 | M4 | Generalized four-player engine | Not started |
 | M5 | Independent per-client camera/render integration | Not started |

@@ -8,6 +8,8 @@ The current user-supplied `reference/original/main.dol` is 6,283,264 bytes (SHA-
 
 Dolphin's GDB stub is configured through `Main.General.GDBPort`; its implementation supports memory reads and writes at the protocol level. The MultiGalaxy Rust client intentionally implements reads only. On this Dolphin 2609a test, the listener appeared on `0.0.0.0`, not just loopback, even though the client connects to `127.0.0.1`. Dolphin must be stopped after debugging. Dolphin's MemoryWatcher implementation was not validated for this Windows build; it is not used by the bridge.
 
+For the stock-only bridge, local Dolphin 2609a source inspection found that `MemArenaWin.cpp` names its page-file memory mapping `dolphin-emu.<PID>`, while `Memmap.cpp` assigns the first mapping segment to MEM1 at offset zero. The Rust probe now opens only that process-specific mapping, verifies the live `RMGP01` ID and Gecko-handler code signature, and limits its write to the validated mailbox acknowledgment. This is an internal Windows implementation detail rather than an official API. No live bridge handshake or performance evidence exists yet; see [stock bridge experiment](stock-dolphin-bridge.md).
+
 Research references:
 
 - [Dolphin GDB stub](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/Core/PowerPC/GDBStub.cpp)

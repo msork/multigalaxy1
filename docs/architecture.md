@@ -9,7 +9,7 @@ Rust launcher/client
   ├─ lobby, identity, game/revision/localization validation
   ├─ Rust transport, prediction, reconciliation, authority
   ├─ official Dolphin process lifecycle and isolated profiles
-  └─ candidate stock-compatible guest/host bridge (not yet proven)
+  └─ experimental PAL Gecko + 2609a named-MEM1 bridge proof (live status unverified)
        └─ verified PAL PPC hooks and remote actor presentation, if feasible
 
 Authoritative session server
@@ -29,7 +29,7 @@ Player slots are stable identities with transform, velocity, facing, animation, 
 
 ## Stock Dolphin boundary
 
-A launcher alone cannot expose or render game actors. Stock Dolphin exposes GDB diagnostics, but GDB's runtime cost is not quantified and it pauses on startup. MemoryWatcher is not compiled into Windows 2609a and is one-way. Gecko/DOL patches can execute guest code, but do not inherently provide host IPC. External process memory is unsupported and may race the emulation thread. A low-overhead bidirectional bridge must pass a stock-only feasibility test before implementation. See [stock bridge research](stock-dolphin-bridge.md).
+A launcher alone cannot expose or render game actors. A reversible probe now tests a Gecko mailbox against Dolphin 2609a's existing named Windows MEM1 mapping. This mapping is an undocumented internal detail, not a Dolphin API; identity, bounds, handler signature, and AllStars overlap are checked, but live cache/synchronization behavior and overhead are not verified. GDB remains development-only; MemoryWatcher is not compiled into Windows 2609a. Actor synchronization cannot begin until the live bidirectional and paired-performance tests pass. See [stock bridge research](stock-dolphin-bridge.md).
 
 ## PAL and localization
 

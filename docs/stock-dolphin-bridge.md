@@ -1,51 +1,77 @@
-﻿# Stock Dolphin bridge feasibility
+# Stock Dolphin runtime bridge feasibility
 
-## Decision
+## Decision and current evidence
 
-MultiGalaxy1 will use official, unmodified Dolphin only. The former Dolphin 2609a fork/shared-memory source patch and custom build pipeline are retired. Their code and build scripts are removed from the active repository; these notes preserve the investigation. The ignored local build/source trees are outside the project and were not touched. No stock-Dolphin transport is currently verified as a low-overhead, bidirectional game-state bridge.
+MultiGalaxy1 uses official, unmodified Dolphin only. No Dolphin fork or custom Dolphin binary is built or distributed. The preferred proof is a small PAL Gecko PPC routine plus a Rust host reader for Dolphin 2609a's existing Windows named memory mapping. This is an **experimental, undocumented Dolphin implementation detail**, not a supported Dolphin API. It is version-gated by mapping name/layout, live `RMGP01` identity, handler size, exact PPC signature, address bounds, and AllStars overlap checks. Do not use this path with other Dolphin versions until revalidated.
 
-## Verified stock interfaces
+Implemented locally:
 
-### Gecko and DOL hooks
+- The launcher adds a reversible Gecko C0 test routine only to the selected isolated profile's `GameSettings/RMGP01.ini`; it does not alter the RVZ, DOL, Dolphin installation, or regular profile. Mandatory PAL AllStars and both requested shoulder swaps stay enabled.
+- The routine increments an inline 32-bit counter on each Gecko OnFrame execution and copies a host-written acknowledgement into a game-observed echo word.
+- Rust opens only `dolphin-emu.<PID>`, maps the first 64 KiB, verifies live game ID `RMGP01`, checks the Dolphin 2609a handler size (2880 bytes) and SHA-256 (`2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b`), searches the exact handler range for the unique PPC signature, and restricts writes to the validated acknowledgement word before the first observed AllStars code-cave write at `0x80002790`.
+- The Rust probe reports update rate, read/write cost, acknowledgement rate and round-trip latency; `Q` unmaps the view. It enables no GDB server.
+- Windows synthetic tests create a separate named mapping and verify counter-read / acknowledgement-write visibility across two mapped views. This proves the Rust mapping mechanics only, **not Dolphin behavior**.
 
-Dolphin supports Action Replay/Gecko patches, and its patch engine can alter guest memory/code. A verified PAL hook could run game-side PPC code without modifying Dolphin. That solves execution inside the guest only. It does not provide a host IPC endpoint: the guest still needs an available game/IOS networking path, a supported Dolphin IPC, or another reviewed channel. The mandatory AllStars Gecko patch is a separate controller patch and remains required. No MultiGalaxy hook is enabled until exact PAL signatures, overlap checks, and runtime behavior are verified.
+No live Dolphin exchange, 60 Hz cadence, visible gameplay, or performance comparison has yet been verified. The C0 code's runtime execution, Dolphin's synchronization/cache visibility for external shared-memory writes, and Gecko ordering relative to AllStars still require the interactive test below. The prototype fails closed if validation does not match.
 
-### GDB Remote Serial Protocol
+## Dolphin 2609a source findings
 
-Dolphin 2609a has a GDB server with guest memory read/write protocol operations and periodic command processing. MultiGalaxy's Rust client deliberately implements read-only sampling. The server accepts one persistent client and GDB startup pauses the game until the client continues execution. This remains useful for development diagnostics, but GDB is not selected for production transport: user testing reported slowdown even after sampler STOP, and this workspace has no numerical controlled gameplay benchmark to quantify it. Do not convert that report into an invented FPS result.
+These findings were checked against the local 2609a source tree; direct source links are provided below.
 
-### MemoryWatcher
+- `MemArenaWin.cpp` creates a page-file mapping named `dolphin-emu.<current PID>` with `PAGE_READWRITE`.
+- `Memmap.cpp` assigns the first shared-memory segment to MEM1 at offset 0, then maps that segment as Dolphin's RAM backing. Guest `0x80000000` maps to MEM1 offset 0 in the normal Wii MEM1 address mapping.
+- This permits an external process in the same user/session to open an existing mapping without `ReadProcessMemory`, scanning host pointers, or changing Dolphin. It still bypasses a documented API, can race CPU execution, and may change across releases. The launcher therefore exposes a narrow fixed view, volatile aligned reads, and one acknowledgement write; this is not yet accepted as production transport. The handler SHA-256 is pinned, but Dolphin exposes no stable source-version API here, so the handler fingerprint does not prove that the Dolphin executable is official or unmodified; the local development path is expected to be the user's verified stock 2609a installation.
+- Dolphin 2609a GDB processes requests from a periodic CPU-thread callback (100,000 emulated cycles). Its `M` write path uses the guarded memory range but also unconditionally resets PPC instruction cache state and refreshes disassembly UI. GDB remains a development tool and is excluded from this bridge benchmark.
+- MemoryWatcher is compiled only for UNIX in this release. Its AF_UNIX datagram implementation sends changed values outward and does not provide Windows bidirectional IPC.
+- Gecko C0 executes guest PPC code per frame. It provides the guest half of this test but no host channel by itself.
 
-Dolphin 2609a's MemoryWatcher is conditionally compiled only under UNIX in its top-level CMake configuration. Its implementation observes configured addresses at frame end and sends changed values through an AF_UNIX datagram socket. Therefore the official Windows 2609a build does not include this facility, and even on supported builds it is an outbound changed-value watcher, not a general bidirectional state API.
+## Safe interactive proof
 
-### External process memory
+Use an interactive PowerShell on the user's normal desktop (`WinSta0\Default`), not an automation desktop. Ensure Dolphin is closed before each launch. Use the same fresh isolated profile and playable scene for both runs; AllStars is enabled in both. Development config remains local and git-ignored.
 
-ReadProcessMemory/WriteProcessMemory are Windows OS mechanisms, not a Dolphin-supported guest-memory API. Guest RAM backing pointers are internal and relocatable; external sampling can race emulation and requires a verified mapping from guest addresses to host memory. No such mapping is accepted or tested here. Do not scan for host pointers or write through guessed addresses.
+```powershell
+cd C:\Users\maxim\Projects\multigalaxy1
+cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0
+```
 
-## Feasibility test matrix
+Start the game, enter the same playable scene, and leave Mario idle for 30 seconds. Record Dolphin OSD Speed/FPS/VPS and PID. In a second PowerShell, sample CPU for the same interval:
 
-| Method | Stock Dolphin | Direction | Windows 2609a status | Current disposition |
-|---|---|---|---|---|
-| Gecko/DOL guest hook | Yes | Guest execution only | Supported patch mechanism | Candidate for verified game logic; IPC unresolved |
-| GDB RSP | Yes | Read and protocol-level write | Available, pauses on startup; overhead unmeasured | Development-only, read-only in this project |
-| MemoryWatcher | Yes, conditional build | Dolphin to client | Not compiled by Windows 2609a; Unix socket, changed values | Not suitable for current Windows target |
-| External process memory | OS-level | Potentially both | Unsupported mapping/race problem | No implementation until mapping and safety proven |
-| Stock Dolphin IPC | No general game-state API identified | — | No supported API identified | Research only |
+```powershell
+cargo run -p multigalaxy -- bench-dolphin <PID> 30 stock-bridge-off
+```
 
-## Minimal stock proof and benchmark
+Close Dolphin, then launch with the probe:
 
-Verified locally with the official installed DolphinTool: `validate-pal-game <stock Dolphin.exe> <PAL RVZ>` reported PAL `RMGP01` revision 0. This reads the image and does not modify it. The official Dolphin binary itself was not modified.
+```powershell
+cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0 --gecko-bridge-probe
+```
 
-No matched gameplay benchmark could be run from the automation desktop: Dolphin GUI processes created there are on a noninteractive desktop and are not visible to the user. The launcher preserves its guard and will not pretend such a run is a valid visual/runtime test. The needed interactive benchmark is normal stock Dolphin versus GDB-attached-idle versus active sampling, on the same scene and profile; capture Dolphin Speed/FPS/VPS and process CPU for repeated 30-second samples. GDB unattached is paused and is not a gameplay comparison. No numerical results are claimed.
+Enter the same scene and record the console's `state=live` lines plus matching OSD and CPU measurements:
 
-## Next gate
+```powershell
+cargo run -p multigalaxy -- bench-dolphin <PID> 30 stock-bridge-on
+```
 
-Before writing a transport implementation, produce a stock-only prototype that demonstrates (a) guest hook activation on exact PAL Rev 0, (b) safe bidirectional exchange at approximately 60 Hz, and (c) no noticeable gameplay slowdown. If no supported stock channel can satisfy these constraints, document that online actor synchronization cannot be delivered under the stock-only requirement and present alternatives for user decision; do not silently restore a Dolphin fork.
+Use `Q` in the launcher console to unmap/stop. A live proof requires a changing counter, matching acknowledgements/echoes, approximately 60 game updates per second, stable gameplay, and paired FPS/VPS/speed/CPU data. Keep logs and report both the synthetic and live evidence separately. If no mailbox appears within 60 seconds, the launcher reports the failure; check the isolated Gecko enable section and whether the game reached its title/menu. Do not disable AllStars or GDB silently to work around failure.
+
+## Interface comparison
+
+| Method | Stock Windows 2609a | Direction | Assessment |
+|---|---|---|---|
+| Named Dolphin MEM1 mapping + Gecko mailbox | Yes, internal implementation detail | Bidirectional | Preferred proof; undocumented, race/cache semantics and overhead unverified |
+| GDB RSP | Yes | Bidirectional protocol | Development-only; startup pause and per-write cache/UI costs make it poor for 60 Hz |
+| MemoryWatcher | Not compiled in Windows build | Dolphin to client | Unix-only changed-value datagrams; not bidirectional |
+| `ReadProcessMemory` / `WriteProcessMemory` | Windows OS APIs | Potentially bidirectional | No separate benefit over mapping, easy to race; not selected |
+| Gecko/DOL hook alone | Yes | Guest only | Can execute code, cannot reach host IPC by itself |
+| Dolphin fork/source patch | Explicitly prohibited | Bidirectional | Retired; not an option under current project decision |
+
+If direct shared mapping fails validation, is incoherent during live emulation, or imposes measurable overhead, stop and report. Remaining stock options are a Gecko guest routine that uses a game/IOS-supported network channel (requires separate feasibility research) or accepting that official Dolphin provides no adequate general-purpose bridge. Do not revive the fork without a new explicit project decision.
 
 ## References
 
-- [Dolphin 2609a GDBStub.cpp](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/PowerPC/GDBStub.cpp)
-- [Dolphin 2609a top-level CMakeLists.txt](https://github.com/dolphin-emu/dolphin/blob/2609a/CMakeLists.txt)
-- [Dolphin 2609a MemoryWatcher header](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/MemoryWatcher.h)
-- [Dolphin patch engine](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/PatchEngine.cpp)
-- [Dolphin progress report on Gecko patch behavior](https://dolphin-emu.org/blog/2018/11/01/dolphin-progress-report-sept-and-oct-2018/)
+- [Dolphin 2609a Windows MemArena](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Common/MemArenaWin.cpp)
+- [Dolphin 2609a memory map](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/HW/Memmap.cpp)
+- [Dolphin 2609a GDB stub](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/PowerPC/GDBStub.cpp)
+- [Dolphin 2609a Gecko code support](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/GeckoCode.cpp)
+- [Dolphin 2609a Gecko patch engine](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Core/PatchEngine.cpp)
+- [Dolphin 2609a MemoryWatcher build condition](https://github.com/dolphin-emu/dolphin/blob/2609a/CMakeLists.txt)

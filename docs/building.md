@@ -28,6 +28,13 @@ Debug mode connects to one persistent GDB session, validates the live `RMGP01` i
 
 The benchmark command accepts `normal`, `gdb-unattached`, `gdb-idle`, and `gdb-sampling`. The `gdb-unattached` case is paused and not comparable to gameplay. Follow [performance.md](performance.md) for interactive paired runs. No numeric stock-GDB performance result is currently claimed.
 
-## Stock bridge status
+## Stock bridge experiment
 
-The Dolphin source patch and build scripts are retired. Do not apply or build them. Gecko/DOL guest hooks, GDB, MemoryWatcher, and external memory limitations are described in [stock-dolphin-bridge.md](stock-dolphin-bridge.md). PAL image validation with official DolphinTool is the minimal stock-Dolphin proof currently available; visible game boot and live bridge exchange require a user-visible interactive test.
+The launcher includes an opt-in, reversible mailbox experiment for official Dolphin 2609a. It enables a Gecko counter routine only in the selected isolated profile and reads Dolphin's version-specific named MEM1 mapping; it does not enable GDB. First use a fresh isolated profile already prepared by `dev-setup`, with external mandatory AllStars patch inputs configured. From interactive PowerShell on the visible Windows desktop, launch the baseline and then the probe (close Dolphin between runs):
+
+```powershell
+cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0
+cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0 --gecko-bridge-probe
+```
+
+The bridge command prints changing counters, update frequency, acknowledged frequency, and measured shared-memory read/write and round-trip timing. Type `Q` to stop. Compare paired OSD FPS/VPS/speed and CPU via `bench-dolphin <PID> 30 stock-bridge-off` and `bench-dolphin <PID> 30 stock-bridge-on`, in the same scene. This is a proof candidate, not a supported Dolphin API. Synthetic tests pass; no live exchange or performance result is claimed until this interactive run succeeds. See [stock-dolphin-bridge.md](stock-dolphin-bridge.md) for safeguards and detailed procedure.
