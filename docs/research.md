@@ -56,3 +56,9 @@ Sources:
 - [Petari PAL source split ranges](https://github.com/SMGCommunity/Petari/blob/master/config/RMGP01/splits.txt)
 - [Petari PAL version selection and build configuration](https://github.com/SMGCommunity/Petari/blob/master/configure.py)
 - [Dolphin GDB memory-read implementation](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/Core/PowerPC/GDBStub.cpp)
+
+## M5 remote actor lifecycle
+
+Petari source confirms a `NameObj` lifecycle and a `LiveActor` drawable-actor layer. The PAL symbol file includes candidate addresses for LiveActor construction/model setup, NameObj scheduler connect/disconnect, draw-buffer registration, and the local Mario movement/animation/draw functions. The list and evidence limits are in [Petari actor lifecycle research](references/petari-actor-lifecycle.md); the host mailbox and remote-actor design are specified in [M5](../specs/M5-remote-player-rendering.md).
+
+These symbols do not identify an approved hook, allocator, placeholder model, or safe runtime constructor call. `MarioActor` constructs a Mario movement object and is coupled to local player state, so a second MarioActor is not the proposed remote visual. The next step is read-only observation of a non-player actor's allocation, scheduler registration, and teardown in a PAL playable scene. No actor spawn, guest-memory write, or executable modification was performed for this research.

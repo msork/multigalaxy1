@@ -7,8 +7,8 @@
 | M2 | Stock Dolphin bridge feasibility | In progress; user-reported live mailbox and paired bridge-off/on benchmark are recorded; title/menu, pause/resume, and transition lifecycle checks remain pending |
 | M3 | Verified PAL Mario coordinate extraction | User reports the mailbox yielded real X/Y/Z at ~60 Hz; source/DOL checks and synthetic snapshot tests are recorded, while this turn did not independently repeat gameplay |
 | M4 | Two-player online position relay | In progress; Rust localhost binary server/client and synthetic two-client reconnect/removal tests pass; separate live Dolphin clients remain unverified |
-| M5 | Generalized four-player engine | Not started |
-| M6 | Independent per-client camera/render integration | Not started |
+| M5 | Remote-player rendering on stock Dolphin | Phase 1 research/spec complete; candidate PAL actor/scheduler symbols documented, no hook or actor runtime verified |
+| M6 | Independent per-client camera/render integration | Not started; each client keeps its own full-screen camera, remote render actor must not affect it |
 | M7 | Wario/Waluigi models and abilities | Not started |
 | M8 | Online authority, progression, and synchronization | Not started; M4 relays positions only and does not synchronize shared progression |
 | M9 | AllStars Classic Controller and conventional gamepads | Static AllStars + shoulder-swap validation and isolated profile support exist; runtime input validation pending |
