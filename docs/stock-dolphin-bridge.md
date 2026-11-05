@@ -31,6 +31,12 @@ Use an interactive PowerShell on the user's normal desktop (`WinSta0\Default`), 
 
 ```powershell
 cd C:\Users\maxim\Projects\multigalaxy1
+cargo run -p multigalaxy -- dev-setup development.local.toml 'target\mg1-stock-bridge-test'
+```
+
+If Dolphin asks for save import, import using Dolphin's UI, then close setup Dolphin. Use the same isolated profile for both baseline and probe:
+
+```powershell
 cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0
 ```
 
