@@ -176,6 +176,10 @@ layered action stays at frame-zero pose in background mode, the probe evaluates
 the original FCurves directly at integer samples; arbitrary subframe fidelity
 and visual anatomy still need review.
 
+RUN/JUMP/SWIM clip-local amplitude corrections and their saved/reopened
+quarter-frame validation are documented in
+[`literal-clip-specific-corrections.md`](../../docs/animation-retargeting/literal-clip-specific-corrections.md).
+
 ## Profile-driven Galaxy action conversion
 
 The V2 literal Luigi walk is the golden regression. The reusable converter

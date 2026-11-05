@@ -1,0 +1,32 @@
+{
+  "schema": "mg1.literal-retarget-clip-corrections.v1",
+  "description": "Clip-local rest-relative rotation attenuation for proportion/deformation hot spots. The shared converter and approved walk are not modified.",
+  "clips": {
+    "luigi_armature_luigirun": {
+      "reason": "The source run has large but correct excursions. Waluigi's longer limbs and overlapping branches visually amplify them; reduce limb angular amplitude while retaining timing and direction.",
+      "bone_factors": {
+        "bone_7": 0.82, "bone_8": 0.82, "bone_9": 0.88,
+        "bone_13": 0.82, "bone_14": 0.82, "bone_15": 0.88,
+        "bone_22": 0.90, "bone_23": 0.84, "bone_24": 0.84, "bone_25": 0.84,
+        "bone_26": 0.80, "bone_27": 0.80, "bone_29": 0.80, "bone_30": 0.90,
+        "bone_57": 0.90, "bone_58": 0.84, "bone_59": 0.84, "bone_60": 0.84,
+        "bone_61": 0.80, "bone_62": 0.80, "bone_64": 0.80, "bone_65": 0.90
+      }
+    },
+    "luigi_armature_luigijump": {
+      "reason": "Only slightly reduce the mapped body curl and Waluigi-right arm reach responsible for the frame-0 glove/leg crowding. Keep the source's airborne frame-24 ending; it is not a landing pose.",
+      "bone_factors": {
+        "bone_19": 0.90, "bone_20": 0.90, "bone_21": 0.90,
+        "bone_57": 0.90, "bone_58": 0.90, "bone_59": 0.90, "bone_60": 0.90,
+        "bone_61": 0.90, "bone_62": 0.90, "bone_64": 0.90, "bone_65": 0.90
+      }
+    },
+    "luigi_armature_swimbreast": {
+      "reason": "Reduce only the left forearm/elbow branch excursion that overextends or reverses visually on Waluigi's proportions. Apply one positive scale across all overlapping lower-arm branches to preserve bend direction and branch coherence.",
+      "bone_factors": {
+        "bone_22": 0.75, "bone_23": 0.75, "bone_24": 0.75, "bone_25": 0.75,
+        "bone_26": 0.65, "bone_27": 0.65, "bone_29": 0.65
+      }
+    }
+  }
+}

@@ -40,7 +40,7 @@ def parse_args():
     p.add_argument("--baseline-rig", default="Waluigi_Arm_Test")
     p.add_argument("--candidate-prefix", default="DirectWalk_ARMTEST_")
     p.add_argument("--baseline-prefix", default="ARMTEST_")
-    p.add_argument("--frames", nargs="+", type=int, default=[0, 15, 30, 45, 60])
+    p.add_argument("--frames", nargs="+", type=float, default=[0, 15, 30, 45, 60])
     p.add_argument("--output", required=True)
     return p.parse_args(argv)
 
@@ -229,7 +229,8 @@ def main():
             }
 
         for frame in args.frames:
-            bpy.context.scene.frame_set(frame)
+            whole = math.floor(frame)
+            bpy.context.scene.frame_set(whole, subframe=frame-whole)
             bpy.context.view_layer.update()
             candidate_vertices_for_frame = []
             for (cand_temp, base_temp), (cand, base) in zip(temp_pairs,
