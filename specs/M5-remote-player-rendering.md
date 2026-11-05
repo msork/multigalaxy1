@@ -2,6 +2,8 @@
 
 Status: research/specification only. No game-memory writes, executable patches, hooks, actor creation, or runtime rendering changes are authorized by this phase.
 
+M5 Phase 1.5 status: blocked before live actor-pointer inspection. See [PAL actor lifecycle investigation](../docs/references/pal-actor-lifecycle-investigation.md). A Penguin in Beach Bowl Galaxy's Sunken Treasure mission is the selected observation candidate; its constructor/init/vtable symbols are present in the PAL map, but its live pointer and lifecycle have not been established.
+
 ## 1. Objective
 
 Define a safe path to display one remote participant in the local full-screen SMG1 scene, driven by the existing M4 Rust position relay. A remote visual must be a separate scene object: it must not replace Mario, register as the local player, own the camera, read local controls, or participate in gameplay collisions/progression.
@@ -113,6 +115,8 @@ Future runtime proof requires all of the following on PAL Rev 0, stock Dolphin 2
 ## 8. Testing strategy
 
 Phase 1: validate symbol-map names/addresses against the local pinned PAL map and source links; review all proposed state rejection cases; `git diff --check`. No game runtime changes.
+
+Phase 1.5: do not add actor-pointer traversal until the AllLiveActorGroup layout and vtable address point are confirmed against the exact PAL build, and an arbitrary-range read-only backend is bounded and PID/game validated. Current 64 KiB stock mapping and M4 mailbox are insufficient for actor objects. The safe stop condition and manual workflow are documented in the Phase 1.5 investigation note.
 
 Before actor implementation: produce a PAL instruction-signature manifest and resolve prototypes for constructor, model initialization, scheduler connect/disconnect, scene creation/destruction, and draw submission. Read-only Dolphin inspection must observe a known non-player actor's scene/scheduler lifetime in a playable scene. Confirm allocator ownership and archive lifetime from matching Petari source/disassembly.
 
