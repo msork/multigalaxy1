@@ -1,16 +1,19 @@
 //! Synthetic host-side ownership model for a possible shared-resource J3D clone.
 //!
-//! This module is not connected to Dolphin or game memory. Its allocator and
-//! model descriptor are deliberately host abstractions, not Wii/JRK ABI claims.
+//! This module is not connected to Dolphin or game memory. Its scene arena,
+//! allocator, and descriptors are host abstractions, not Wii/JRK ABI claims.
 
 #![allow(dead_code)] // Deliberately exercised offline, not wired into runtime code.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
 
 const MAX_MODEL_ITEMS: usize = 8192;
 const MAX_SYNTHETIC_BYTES: usize = 64 * 1024 * 1024;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HeapId(u64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AllocationKind {
@@ -32,6 +35,7 @@ enum AllocationKind {
 struct ModelDescriptor {
     resource_id: u64,
     scene_generation: u64,
+    heap_id: HeapId,
     joint_count: usize,
     weight_matrix_count: usize,
     draw_matrix_count: usize,
@@ -42,7 +46,7 @@ struct ModelDescriptor {
 
 impl ModelDescriptor {
     fn validate(self) -> Result<(), OwnershipError> {
-        if self.resource_id == 0 || self.scene_generation == 0 {
+        if self.resource_id == 0 || self.scene_generation == 0 || self.heap_id.0 == 0 {
             return Err(OwnershipError::InvalidDescriptor("missing identity"));
         }
         for (name, count) in [
@@ -68,7 +72,7 @@ impl ModelDescriptor {
 
     fn allocation_plan(self) -> Result<Vec<(AllocationKind, usize)>, OwnershipError> {
         self.validate()?;
-        // Byte totals are synthetic host-test accounting only. In particular,
+        // These byte totals are synthetic host accounting only. Values such as
         // 0x300/0x40/32 are not PAL object sizes or Dolphin allocation requests.
         let matrix_bytes = |count: usize, bytes_each: usize, views: usize| {
             count
@@ -77,8 +81,6 @@ impl ModelDescriptor {
                 .ok_or(OwnershipError::SizeOverflow)
         };
         let packet_bytes = |count: usize| count.checked_mul(32).ok_or(OwnershipError::SizeOverflow);
-        let draw_bytes = matrix_bytes(self.draw_matrix_count, 48, 2)?;
-        let normal_bytes = matrix_bytes(self.draw_matrix_count, 36, 2)?;
         let mut plan = vec![
             (AllocationKind::ModelInstance, 0x300),
             (AllocationKind::MatrixBuffer, 0x40),
@@ -92,8 +94,14 @@ impl ModelDescriptor {
                     .checked_mul(2 * std::mem::size_of::<usize>() * 2)
                     .ok_or(OwnershipError::SizeOverflow)?,
             ),
-            (AllocationKind::DrawMatrices, draw_bytes),
-            (AllocationKind::NormalMatrices, normal_bytes),
+            (
+                AllocationKind::DrawMatrices,
+                matrix_bytes(self.draw_matrix_count, 48, 2)?,
+            ),
+            (
+                AllocationKind::NormalMatrices,
+                matrix_bytes(self.draw_matrix_count, 36, 2)?,
+            ),
             (
                 AllocationKind::ExtraViewMatrices,
                 matrix_bytes(self.draw_matrix_count, 48, 1)?,
@@ -130,7 +138,7 @@ impl ModelDescriptor {
     }
 }
 
-/// Immutable resource identity and model counts shared by synthetic instances.
+/// Resource identity is immutable in this model and kept alive by each instance.
 #[derive(Debug)]
 struct SharedModelData {
     descriptor: ModelDescriptor,
@@ -159,8 +167,9 @@ impl AllocationLedger {
         &self,
         kind: AllocationKind,
         bytes: usize,
+        heap_id: HeapId,
     ) -> Result<AllocationLease, OwnershipError> {
-        if bytes == 0 {
+        if bytes == 0 || heap_id.0 == 0 {
             return Err(OwnershipError::InvalidAllocation(kind));
         }
         let next_bytes = self
@@ -180,6 +189,7 @@ impl AllocationLedger {
             ledger: self.clone(),
             kind,
             bytes,
+            heap_id,
         })
     }
 
@@ -193,11 +203,12 @@ struct AllocationLease {
     ledger: AllocationLedger,
     kind: AllocationKind,
     bytes: usize,
+    heap_id: HeapId,
 }
 
 impl Drop for AllocationLease {
     fn drop(&mut self) {
-        let _allocation_kind = self.kind;
+        let _allocation_owner = (self.kind, self.heap_id);
         self.ledger
             .0
             .live_allocations
@@ -206,6 +217,80 @@ impl Drop for AllocationLease {
             .0
             .live_bytes
             .set(self.ledger.0.live_bytes.get() - self.bytes);
+    }
+}
+
+#[derive(Debug)]
+struct SceneHeapState {
+    heap_id: HeapId,
+    generation: u64,
+    alive: bool,
+    attached_instances: usize,
+    allocations: Vec<AllocationLease>,
+    ledger: AllocationLedger,
+}
+
+#[derive(Debug, Clone)]
+struct SceneHeapArena(Rc<RefCell<SceneHeapState>>);
+
+impl SceneHeapArena {
+    fn new(heap_id: HeapId, generation: u64, ledger: AllocationLedger) -> Self {
+        Self(Rc::new(RefCell::new(SceneHeapState {
+            heap_id,
+            generation,
+            alive: true,
+            attached_instances: 0,
+            allocations: Vec::new(),
+            ledger,
+        })))
+    }
+
+    fn checkpoint(&self) -> usize {
+        self.0.borrow().allocations.len()
+    }
+
+    fn allocate(&self, kind: AllocationKind, bytes: usize) -> Result<(), OwnershipError> {
+        let mut state = self.0.borrow_mut();
+        if !state.alive {
+            return Err(OwnershipError::SceneHeapDestroyed);
+        }
+        let lease = state.ledger.allocate(kind, bytes, state.heap_id)?;
+        state
+            .allocations
+            .try_reserve(1)
+            .map_err(|_| OwnershipError::HostAllocation)?;
+        state.allocations.push(lease);
+        Ok(())
+    }
+
+    fn rollback(&self, checkpoint: usize) {
+        self.0.borrow_mut().allocations.truncate(checkpoint);
+    }
+
+    fn attach_instance(&self) {
+        self.0.borrow_mut().attached_instances += 1;
+    }
+
+    fn detach_instance(&self) {
+        let mut state = self.0.borrow_mut();
+        state.attached_instances -= 1;
+    }
+
+    fn is_live(&self, heap_id: HeapId, generation: u64) -> bool {
+        let state = self.0.borrow();
+        state.alive && state.heap_id == heap_id && state.generation == generation
+    }
+
+    fn destroy(&self) -> Result<(), OwnershipError> {
+        let mut state = self.0.borrow_mut();
+        if state.attached_instances != 0 {
+            return Err(OwnershipError::OutstandingInstances(
+                state.attached_instances,
+            ));
+        }
+        state.alive = false;
+        state.allocations.clear();
+        Ok(())
     }
 }
 
@@ -224,13 +309,17 @@ enum OwnershipError {
     AllocationLimit(usize),
     HostAllocation,
     Injected(InjectedFailure),
+    SceneHeapDestroyed,
+    OutstandingInstances(usize),
+    WrongCurrentHeap { owner: HeapId, current: HeapId },
 }
 
 #[derive(Debug)]
 struct RenderInstance {
     shared: Arc<SharedModelData>,
+    arena: SceneHeapArena,
     scene_generation: u64,
-    leases: Vec<AllocationLease>,
+    heap_id: HeapId,
     animation_matrices: Vec<Matrix>,
     weight_matrices: Vec<Matrix>,
     draw_views: [Vec<Matrix>; 2],
@@ -240,6 +329,12 @@ struct RenderInstance {
     shape_packets: Vec<PacketState>,
     material_packets: Vec<PacketState>,
     initialized: bool,
+}
+
+impl Drop for RenderInstance {
+    fn drop(&mut self) {
+        self.arena.detach_instance();
+    }
 }
 
 fn zeroed<T: Clone + Default>(count: usize) -> Result<Vec<T>, OwnershipError> {
@@ -254,22 +349,42 @@ fn zeroed<T: Clone + Default>(count: usize) -> Result<Vec<T>, OwnershipError> {
 impl RenderInstance {
     fn build(
         shared: Arc<SharedModelData>,
-        ledger: &AllocationLedger,
+        arena: SceneHeapArena,
+        fail: Option<InjectedFailure>,
+    ) -> Result<Self, OwnershipError> {
+        let checkpoint = arena.checkpoint();
+        let result = Self::build_inner(shared, arena.clone(), fail);
+        if result.is_err() {
+            arena.rollback(checkpoint);
+        }
+        result
+    }
+
+    fn build_inner(
+        shared: Arc<SharedModelData>,
+        arena: SceneHeapArena,
         fail: Option<InjectedFailure>,
     ) -> Result<Self, OwnershipError> {
         let descriptor = shared.descriptor;
         let plan = descriptor.allocation_plan()?;
-        let mut leases = Vec::new();
-        leases
-            .try_reserve_exact(plan.len())
-            .map_err(|_| OwnershipError::HostAllocation)?;
+        let state = arena.0.borrow();
+        if !state.alive {
+            return Err(OwnershipError::SceneHeapDestroyed);
+        }
+        if state.heap_id != descriptor.heap_id || state.generation != descriptor.scene_generation {
+            return Err(OwnershipError::InvalidDescriptor(
+                "resource, scene, and heap identities do not match",
+            ));
+        }
+        drop(state);
+
         for (index, (kind, bytes)) in plan.iter().copied().enumerate() {
             if fail == Some(InjectedFailure::BeforeAllocation(index)) {
                 return Err(OwnershipError::Injected(InjectedFailure::BeforeAllocation(
                     index,
                 )));
             }
-            leases.push(ledger.allocate(kind, bytes)?);
+            arena.allocate(kind, bytes)?;
         }
         if fail == Some(InjectedFailure::DuringInitialization) {
             return Err(OwnershipError::Injected(
@@ -279,8 +394,9 @@ impl RenderInstance {
 
         let instance = Self {
             shared,
+            arena: arena.clone(),
             scene_generation: descriptor.scene_generation,
-            leases,
+            heap_id: descriptor.heap_id,
             animation_matrices: zeroed(descriptor.joint_count)?,
             weight_matrices: zeroed(descriptor.weight_matrix_count)?,
             draw_views: [
@@ -301,8 +417,22 @@ impl RenderInstance {
             instance.scene_generation,
             instance.shared.descriptor.scene_generation
         );
-        debug_assert_eq!(instance.leases.len(), plan.len());
+        debug_assert_eq!(instance.heap_id, instance.shared.descriptor.heap_id);
+        instance.arena.attach_instance();
         Ok(instance)
+    }
+
+    fn validate_explicit_delete_heap(&self, current_heap: HeapId) -> Result<(), OwnershipError> {
+        if !self.arena.is_live(self.heap_id, self.scene_generation) {
+            return Err(OwnershipError::SceneHeapDestroyed);
+        }
+        if current_heap != self.heap_id {
+            return Err(OwnershipError::WrongCurrentHeap {
+                owner: self.heap_id,
+                current: current_heap,
+            });
+        }
+        Ok(())
     }
 
     fn set_draw_component(
@@ -314,7 +444,7 @@ impl RenderInstance {
         value: f32,
     ) -> Result<(), OwnershipError> {
         if !self.initialized
-            || self.scene_generation != self.shared.descriptor.scene_generation
+            || !self.arena.is_live(self.heap_id, self.scene_generation)
             || !value.is_finite()
         {
             return Err(OwnershipError::InvalidDescriptor("instance not live"));
@@ -337,10 +467,13 @@ impl RenderInstance {
 mod tests {
     use super::*;
 
+    const SCENE_HEAP: HeapId = HeapId(0x51);
+
     fn descriptor() -> ModelDescriptor {
         ModelDescriptor {
             resource_id: 0x4d4152494f,
             scene_generation: 7,
+            heap_id: SCENE_HEAP,
             joint_count: 32,
             weight_matrix_count: 8,
             draw_matrix_count: 48,
@@ -356,12 +489,17 @@ mod tests {
         })
     }
 
+    fn arena(ledger: AllocationLedger) -> SceneHeapArena {
+        SceneHeapArena::new(SCENE_HEAP, 7, ledger)
+    }
+
     #[test]
-    fn instances_share_only_immutable_asset_and_isolate_mutable_state() {
+    fn shared_resources_and_all_mutable_instance_fields_are_isolated() {
         let ledger = AllocationLedger::default();
+        let arena = arena(ledger.clone());
         let asset = shared();
-        let original = RenderInstance::build(asset.clone(), &ledger, None).unwrap();
-        let mut remote = RenderInstance::build(asset.clone(), &ledger, None).unwrap();
+        let original = RenderInstance::build(asset.clone(), arena.clone(), None).unwrap();
+        let mut remote = RenderInstance::build(asset.clone(), arena.clone(), None).unwrap();
         assert!(Arc::ptr_eq(&original.shared, &remote.shared));
         assert!(!std::ptr::eq(
             original.draw_views[0].as_ptr(),
@@ -371,8 +509,10 @@ mod tests {
             original.shape_packets.as_ptr(),
             remote.shape_packets.as_ptr()
         ));
-        assert_eq!(remote.draw_views[0][0], Matrix::default());
-        assert_eq!(remote.shape_packets[0], PacketState::default());
+        assert!(!std::ptr::eq(
+            original.material_packets.as_ptr(),
+            remote.material_packets.as_ptr()
+        ));
 
         remote.set_draw_component(0, 0, 0, 3, 125.0).unwrap();
         remote.animation_matrices[0].0[0][0] = 42.0;
@@ -391,75 +531,155 @@ mod tests {
         assert_eq!(original.shape_packets[0], PacketState::default());
         assert_eq!(original.material_packets[0], PacketState::default());
         assert_eq!(original.shared.descriptor, descriptor());
-    }
-
-    #[test]
-    fn successful_cleanup_releases_every_synthetic_allocation() {
-        let ledger = AllocationLedger::default();
-        let instance = RenderInstance::build(shared(), &ledger, None).unwrap();
-        assert!(ledger.live().0 > 0);
-        assert!(ledger.live().1 > 0);
-        drop(instance);
+        drop((original, remote));
+        arena.destroy().unwrap();
         assert_eq!(ledger.live(), (0, 0));
     }
 
     #[test]
-    fn every_allocation_failure_rolls_back_prior_allocations() {
+    fn model_instance_drop_does_not_free_scene_heap_arrays() {
         let ledger = AllocationLedger::default();
+        let arena = arena(ledger.clone());
+        let instance = RenderInstance::build(shared(), arena.clone(), None).unwrap();
+        let allocated = ledger.live();
+        assert!(allocated.0 > 0);
+        drop(instance);
+        assert_eq!(ledger.live(), allocated);
+        arena.destroy().unwrap();
+        assert_eq!(ledger.live(), (0, 0));
+    }
+
+    #[test]
+    fn scene_heap_cannot_be_destroyed_while_instances_are_attached() {
+        let ledger = AllocationLedger::default();
+        let arena = arena(ledger.clone());
+        let instance = RenderInstance::build(shared(), arena.clone(), None).unwrap();
+        assert_eq!(
+            arena.destroy(),
+            Err(OwnershipError::OutstandingInstances(1))
+        );
+        assert!(instance.validate_explicit_delete_heap(SCENE_HEAP).is_ok());
+        drop(instance);
+        arena.destroy().unwrap();
+        assert_eq!(ledger.live(), (0, 0));
+    }
+
+    #[test]
+    fn explicit_delete_rejects_a_different_current_heap() {
+        let ledger = AllocationLedger::default();
+        let arena = arena(ledger.clone());
+        let instance = RenderInstance::build(shared(), arena.clone(), None).unwrap();
+        assert_eq!(
+            instance.validate_explicit_delete_heap(HeapId(0x52)),
+            Err(OwnershipError::WrongCurrentHeap {
+                owner: SCENE_HEAP,
+                current: HeapId(0x52),
+            })
+        );
+        assert!(instance.validate_explicit_delete_heap(SCENE_HEAP).is_ok());
+        drop(instance);
+        arena.destroy().unwrap();
+        assert_eq!(ledger.live(), (0, 0));
+    }
+
+    #[test]
+    fn shared_model_data_borrow_remains_live_until_instance_is_detached() {
+        let ledger = AllocationLedger::default();
+        let arena = arena(ledger.clone());
+        let asset = shared();
+        let weak = Arc::downgrade(&asset);
+        let instance = RenderInstance::build(asset.clone(), arena.clone(), None).unwrap();
+        drop(asset);
+        assert!(weak.upgrade().is_some());
+        drop(instance);
+        assert!(weak.upgrade().is_none());
+        arena.destroy().unwrap();
+        assert_eq!(ledger.live(), (0, 0));
+    }
+
+    #[test]
+    fn every_allocation_failure_rolls_back_to_the_heap_checkpoint() {
+        let ledger = AllocationLedger::default();
+        let arena = arena(ledger.clone());
+        arena.allocate(AllocationKind::ModelInstance, 16).unwrap();
+        let baseline = ledger.live();
         let count = descriptor().allocation_plan().unwrap().len();
         for index in 0..count {
             let result = RenderInstance::build(
                 shared(),
-                &ledger,
+                arena.clone(),
                 Some(InjectedFailure::BeforeAllocation(index)),
             );
             assert!(matches!(result, Err(OwnershipError::Injected(_))));
-            assert_eq!(ledger.live(), (0, 0), "leaked after allocation {index}");
+            assert_eq!(ledger.live(), baseline, "leaked after allocation {index}");
         }
+        arena.destroy().unwrap();
     }
 
     #[test]
-    fn initialization_failure_rolls_back_the_complete_allocation_plan() {
+    fn initialization_failure_rolls_back_the_complete_heap_transaction() {
         let ledger = AllocationLedger::default();
+        let arena = arena(ledger.clone());
+        arena.allocate(AllocationKind::ModelInstance, 16).unwrap();
         let result = RenderInstance::build(
             shared(),
-            &ledger,
+            arena.clone(),
             Some(InjectedFailure::DuringInitialization),
         );
         assert_eq!(
             result.unwrap_err(),
             OwnershipError::Injected(InjectedFailure::DuringInitialization)
         );
-        assert_eq!(ledger.live(), (0, 0));
+        assert_eq!(ledger.live(), (1, 16));
+        arena.destroy().unwrap();
     }
 
     #[test]
-    fn malformed_descriptor_fails_before_any_allocation() {
+    fn invalid_or_wrong_scene_heap_identity_fails_before_allocation() {
         let ledger = AllocationLedger::default();
+        let arena = arena(ledger.clone());
         let mut invalid = descriptor();
         invalid.draw_matrix_count = usize::MAX;
-        let asset = Arc::new(SharedModelData {
-            descriptor: invalid,
-        });
-        assert!(RenderInstance::build(asset, &ledger, None).is_err());
+        assert!(RenderInstance::build(
+            Arc::new(SharedModelData {
+                descriptor: invalid
+            }),
+            arena.clone(),
+            None
+        )
+        .is_err());
+
+        let mut wrong_generation = descriptor();
+        wrong_generation.scene_generation += 1;
+        assert!(RenderInstance::build(
+            Arc::new(SharedModelData {
+                descriptor: wrong_generation
+            }),
+            arena.clone(),
+            None
+        )
+        .is_err());
         assert_eq!(ledger.live(), (0, 0));
+        arena.destroy().unwrap();
     }
 
     #[test]
     fn optional_weight_and_bump_buffers_can_be_absent() {
         let ledger = AllocationLedger::default();
+        let arena = arena(ledger.clone());
         let mut model = descriptor();
         model.weight_matrix_count = 0;
         model.bump_matrix_count = 0;
         let instance = RenderInstance::build(
             Arc::new(SharedModelData { descriptor: model }),
-            &ledger,
+            arena.clone(),
             None,
         )
         .unwrap();
         assert!(instance.weight_matrices.is_empty());
         assert!(instance.bump_matrices.is_empty());
         drop(instance);
+        arena.destroy().unwrap();
         assert_eq!(ledger.live(), (0, 0));
     }
 }
