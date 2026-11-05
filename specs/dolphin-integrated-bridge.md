@@ -36,7 +36,7 @@ The Rust `bridge_protocol` module decodes fixed payload fields and checks stalen
 
 ## Risks
 
-- Dolphin source is unavailable in this workspace, so patch application, C++ compilation, and runtime callback rate have not been verified.
+- The official Dolphin 2609a source tree and pinned submodules are present only under ignored `target/dolphin-2609a-build/`. The patch applies cleanly, CMake configure completes, and the full release `Dolphin.exe` builds successfully with VS Build Tools 2026 18.11.3/MSVC 14.51.36231. VS 2022/MSVC 19.44 is explicitly rejected by Dolphin's `Source/PCH/pch.h` guard. GUI runtime/callback cadence remain unverified because this session is on `CodexSandboxDesktop-*`; the launcher refused to create a Dolphin process outside the interactive desktop.
 - The emulated field callback may run at PAL cadence below 60 Hz. No independent timer may safely fabricate extra current game state snapshots; actual cadence must be measured.
 - `std::atomic_ref` and Rust atomics share the documented fixed layout only on supported lock-free targets; layout assertions must fail the build elsewhere.
 - The snapshot's sample word is a smoke-test field, not a meaningful gameplay value.

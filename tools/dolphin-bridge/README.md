@@ -29,10 +29,10 @@ The Rust `bridge-watch rmgp01 60` command opens the mapping read-only, validates
 
 ## Applying to Dolphin 2609a
 
-The repository has no Dolphin source checkout, so the patch is supplied but not applied or compiled here. It targets exactly tag `2609a`. With an unmodified source checkout, run:
+The ignored development area contains the official Dolphin `2609a` Git checkout at commit `409881c34357d0f105fd473167d15ab0bd9c1628`, with pinned submodules. The integration helper applied the patch and copied both source files into this exact checkout; `git diff --check` passed. No Dolphin sources or build artifacts are tracked by MultiGalaxy1.
 
 ```powershell
-.	ools\dolphin-bridge\integrate-2609a.ps1 -SourceRoot C:\path\to\dolphin
+.\tools\dolphin-bridge\integrate-2609a.ps1 -SourceRoot C:\path\to\dolphin
 ```
 
 The script refuses other tags, dirty source trees, preexisting bridge files, or a patch context mismatch. It adds:
@@ -41,10 +41,20 @@ The script refuses other tags, dirty source trees, preexisting bridge files, or 
 - an include, singleton, initialization, per-frame call, and shutdown in `Source/Core/Core/Core.cpp`
 - the two new sources to `Source/Core/Core/CMakeLists.txt`
 
-Then configure/build Dolphin using the official 2609a Windows instructions. The code requires C++20 (`std::atomic_ref`). The root project does not vendor Dolphin or its build dependencies. Launch the built Dolphin through MultiGalaxy1, then in another PowerShell run:
+The Windows 2609a source has a hard compiler-version guard requiring Visual Studio 2026. The initial VS 2022/MSVC 19.44 build failed at `Source/PCH/pch.h` with Dolphin's explicit Visual Studio 2026 requirement. Official Build Tools 2026 18.11.3 (MSVC 14.51.36231) has since been installed. Using its x64 developer environment, Dolphin configured and built successfully with a local preset. `CMakeUserPresets.json` and its build directory exist only in the ignored Dolphin checkout to keep the earlier VS 2022 configure separate:
+
+```cmd
+call "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+cmake --preset mg1-vs26 -DUSE_SYSTEM_LIBS=OFF
+cmake --build --preset mg1-build-vs26 --target dolphin-emu --parallel 6
+```
+
+This compiled and linked `build/release/x64-vs26/Binaries/Dolphin.exe` from the patched `core` target. For a fresh source checkout without a previous build cache, upstream's `cmake --workflow ninja-release-x64` preset is the standard alternative.
+
+The C++ code requires C++20 (`std::atomic_ref`). Launch a successful build through MultiGalaxy1 with the isolated profile and mandatory AllStars patch, then in another PowerShell run:
 
 ```powershell
-.	arget\debug\multigalaxy.exe bridge-watch rmgp01 60
+.\target\debug\multigalaxy.exe bridge-watch rmgp01 60
 ```
 
 ## License and distribution
@@ -53,7 +63,9 @@ The bridge files written for MultiGalaxy1 carry WTFPL v2. When incorporated into
 
 ## Verification status
 
-- Rust payload decoder tests cover schema, PAL identity, revision, RAM address bounds, counters, and stale timeout.
-- Rust mapping layout tests assert the 192-byte, 64-byte-aligned outer ABI, and existing synthetic cross-process mapping tests exercise the same mapping name/layout.
-- Unified patch syntax parses with `git apply --stat`.
-- No Dolphin source checkout/compiler is present in this workspace. The C++ patch has not been applied, compiled, run in Dolphin, or benchmarked. Therefore 60 Hz publication and full-speed gameplay remain unverified acceptance criteria.
+- Rust payload decoder, stale heartbeat, and mapping layout tests pass in the workspace.
+- Unified patch applies cleanly to exact Dolphin tag `2609a`; the helper enforces the exact tag and clean source tree.
+- CMake configure completed with bundled dependencies.
+- VS 2022/MSVC 19.44 was rejected by Dolphin's explicit compiler guard. VS Build Tools 2026 18.11.3/MSVC 14.51.36231 then compiled `SharedMemoryBridge.cpp` and patched `Core.cpp` and linked the release `Dolphin.exe` successfully.
+- The GUI was not started from this automation desktop: it is `CodexSandboxDesktop-*`, not the interactive `WinSta0\Default` desktop. The launcher refused before starting Dolphin.
+- Dolphin boot, AllStars runtime activation, live identity/heartbeat/MEM1 sample, callback cadence, and bridge-on/bridge-off performance remain unverified acceptance criteria.

@@ -11,14 +11,13 @@ diff --git a/Source/Core/Core/CMakeLists.txt b/Source/Core/Core/CMakeLists.txt
 diff --git a/Source/Core/Core/Core.cpp b/Source/Core/Core/Core.cpp
 --- a/Source/Core/Core/Core.cpp
 +++ b/Source/Core/Core/Core.cpp
-@@ -68,6 +68,7 @@
+@@ -68,5 +68,6 @@
  #include "Core/PowerPC/JitInterface.h"
  #include "Core/PowerPC/PowerPC.h"
  #include "Core/State.h"
 +#include "Core/SharedMemoryBridge.h"
  #include "Core/System.h"
  #include "Core/WiiRoot.h"
- #ifdef USE_MEMORYWATCHER
 @@ -89,6 +90,7 @@
  namespace Core
  {
@@ -46,10 +45,9 @@ diff --git a/Source/Core/Core/Core.cpp b/Source/Core/Core/Core.cpp
 +                                   SConfig::GetInstance().GetRevision());
  
    INFO_LOG_FMT(BOOT, "Starting core = {} mode", system.IsWii() ? "Wii" : "GameCube");
-@@ -858,5 +858,6 @@ void Shutdown(Core::System& system)
+@@ -858,2 +858,3 @@ void Shutdown(Core::System& system)
    if (s_emu_thread.joinable())
      s_emu_thread.join();
 +  s_multi_galaxy_bridge.Shutdown();
-   // Make sure there's nothing left over in case we're about to exit.
    HostDispatchJobs(system);
  }

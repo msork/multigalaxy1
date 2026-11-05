@@ -4,7 +4,7 @@
 |---|---|---|
 | M0 | Research, reverse engineering, PAL feasibility, architecture | In progress; DOL analysis verified; exact PAL build and game bridge unresolved |
 | M1 | Rust launcher foundation, reproducible patching, verified PAL injection | Not started |
-| M2 | Dolphin lifecycle and versioned game-side IPC bridge | Source-level 2609a Windows publisher + Rust reader prototyped; source application/build/runtime and cadence unverified |
+| M2 | Dolphin lifecycle and versioned game-side IPC bridge | Exact Dolphin 2609a source acquired; bridge patch applies cleanly; VS 2026 release Dolphin builds successfully. Live GUI boot, snapshot cadence, and performance verification remain blocked on interactive desktop launch |
 | M3 | Two-Dolphin state exchange and visible remote character | Not started; first runtime online proof |
 | M4 | Four-player sessions, lobby, identity, character assignment | Not started |
 | M5 | Server authority, prediction/reconciliation, progression and recovery | Not started |
