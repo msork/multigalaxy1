@@ -212,29 +212,11 @@ mod tests {
             )
         };
         let initial = NonNull::new(initial.cast::<u8>()).expect("test view mapping failed");
+        let body = crate::gecko_bridge::payload_words();
+        let mailbox_offset = crate::gecko_bridge::mailbox_data_word() * 4;
         unsafe {
             ptr::copy_nonoverlapping(b"RMGP01".as_ptr(), initial.as_ptr(), 6);
             let offset = (HANDLER_BASE - GUEST_BASE) as usize + 2880 + 16;
-            let body = [
-                0x7c08_02a6u32,
-                0x4800_0005,
-                0x7d88_02a6,
-                0x398c_0028,
-                0x816c_0000,
-                0x396b_0001,
-                0x916c_0000,
-                0x814c_0004,
-                0x914c_0008,
-                0x7c08_03a6,
-                0x4800_0018,
-                0x6000_0000,
-                0,
-                0,
-                0,
-                0x4d47_3142,
-                0x4e80_0020,
-                0x6000_0000,
-            ];
             for (index, word) in body.iter().enumerate() {
                 ptr::write_volatile(
                     initial.as_ptr().add(offset + index * 4).cast::<u32>(),
@@ -242,7 +224,7 @@ mod tests {
                 );
             }
             ptr::write_volatile(
-                initial.as_ptr().add(offset + 48).cast::<u32>(),
+                initial.as_ptr().add(offset + mailbox_offset).cast::<u32>(),
                 7u32.to_be(),
             );
         }

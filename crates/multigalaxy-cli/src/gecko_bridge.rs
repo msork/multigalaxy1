@@ -1,50 +1,288 @@
-//! Reversible Gecko-code mailbox experiment for stock Dolphin.
+//! Reversible Gecko mailbox experiment for stock Dolphin.
 //!
-//! The code handler already reserves 0x80001800..0x80003000. The probe embeds
-//! its mailbox in its own C0 execute block, so it does not borrow game globals
-//! or write to the DOL/RVZ. The host locates the marker inside that bounded
-//! handler region before it is allowed to write the acknowledgement word.
+//! The C0 routine owns only its inline code/data mailbox. It walks the exact
+//! PAL RMGP01 Rev 0 Mario pointer chain after checking every pointer and never
+//! writes to game objects. The host's only write remains the ACK word.
 
 pub const HANDLER_BASE: u32 = 0x8000_1800;
 pub const HANDLER_END: u32 = 0x8000_3000;
-// The externally supplied PAL AllStars patch places its code cave here. Keep
-// the probe's entire Gecko block below this first observed overlapping write.
 const ALLSTARS_CAVE_START: u32 = 0x8000_2790;
-const MARKER: u32 = 0x4d47_3142; // "MG1B"
-const BODY_BYTES: u32 = 72;
-const MARKER_OFFSET: usize = 60;
+const MAILBOX_MAGIC: u32 = 0x4d47_3150; // "MG1P"
+pub const MAILBOX_VERSION: u32 = 1;
+const MAILBOX_WORDS: usize = 14;
+const MAILBOX_BYTES: u32 = (MAILBOX_WORDS * 4) as u32;
+const SNAPSHOT_BYTES: usize = 12 * 4;
 
-const BODY_WORDS: [u32; 18] = [
-    0x7c08_02a6, // mflr r0 (preserve caller link register in volatile r0)
-    0x4800_0005, // bl +4 (capture a PC-relative pointer)
-    0x7d88_02a6, // mflr r12
-    0x398c_0028, // addi r12,r12,40 (mailbox begins at body+48)
-    0x816c_0000, // lwz r11,0(r12) -- frame counter
-    0x396b_0001, // addi r11,r11,1
-    0x916c_0000, // stw r11,0(r12)
-    0x814c_0004, // lwz r10,4(r12) -- host acknowledgement
-    0x914c_0008, // stw r10,8(r12) -- game-observed echo
-    0x7c08_03a6, // mtlr r0 (restore Gecko caller's return address)
-    0x4800_0018, // b +24 (skip mutable mailbox data)
-    0x6000_0000, // nop
-    0,           // mailbox counter
-    0,           // mailbox acknowledgement
-    0,           // mailbox acknowledgement echo
-    MARKER,      // validated marker, never modified
-    0x4e80_0020, // blr
-    0x6000_0000, // nop
-];
+// Mailbox words: counter, host ACK, game echo, marker, version, sequence,
+// valid, actor address, and X/Y/Z IEEE-754 bits. Mutable fields are masked
+// when matching a live handler snapshot.
+const COUNTER: usize = 0;
+const ACK: usize = 1;
+const ECHO: usize = 2;
+const MARKER: usize = 3;
+const VERSION: usize = 4;
+const SEQUENCE: usize = 5;
+const VALID: usize = 6;
+const ACTOR: usize = 7;
+const X: usize = 8;
+const Y: usize = 9;
+const Z: usize = 10;
+const SAVED_LR: usize = 12;
+
+const GAME_SYSTEM_SINGLETON: u32 = 0x806a_1228;
+
+#[derive(Clone, Copy)]
+enum FixupKind {
+    Branch,
+    Conditional { bo: u8, bi: u8 },
+}
+
+#[derive(Clone, Copy)]
+struct Fixup {
+    at: usize,
+    label: usize,
+    kind: FixupKind,
+}
+
+#[derive(Default)]
+struct Program {
+    words: Vec<u32>,
+    labels: Vec<Option<usize>>,
+    fixups: Vec<Fixup>,
+}
+
+impl Program {
+    fn label(&mut self) -> usize {
+        let id = self.labels.len();
+        self.labels.push(None);
+        id
+    }
+    fn bind(&mut self, label: usize) {
+        self.labels[label] = Some(self.words.len());
+    }
+    fn emit(&mut self, word: u32) {
+        self.words.push(word);
+    }
+    fn b(&mut self, label: usize) {
+        let at = self.words.len();
+        self.emit(0);
+        self.fixups.push(Fixup {
+            at,
+            label,
+            kind: FixupKind::Branch,
+        });
+    }
+    fn bc(&mut self, bo: u8, bi: u8, label: usize) {
+        let at = self.words.len();
+        self.emit(0);
+        self.fixups.push(Fixup {
+            at,
+            label,
+            kind: FixupKind::Conditional { bo, bi },
+        });
+    }
+    fn resolve(mut self) -> Result<Vec<u32>, String> {
+        for f in self.fixups {
+            let target = self.labels[f.label].ok_or("unbound PPC code label")?;
+            let delta = (target as i64 - f.at as i64) * 4;
+            if delta & 3 != 0 || !(-0x0200_0000..0x0200_0000).contains(&delta) {
+                return Err("PPC branch displacement is invalid".into());
+            }
+            self.words[f.at] = match f.kind {
+                FixupKind::Branch => 0x4800_0000 | ((delta as u32) & 0x03ff_fffc),
+                FixupKind::Conditional { bo, bi } => {
+                    if !(-0x8000..0x8000).contains(&delta) {
+                        return Err("PPC conditional branch displacement is out of range".into());
+                    }
+                    0x4000_0000
+                        | (u32::from(bo) << 21)
+                        | (u32::from(bi) << 16)
+                        | ((delta as u32) & 0x0000_fffc)
+                }
+            };
+        }
+        Ok(self.words)
+    }
+}
+
+fn addi(rt: u8, ra: u8, imm: u16) -> u32 {
+    0x3800_0000 | (u32::from(rt) << 21) | (u32::from(ra) << 16) | u32::from(imm)
+}
+fn lwz(rt: u8, ra: u8, offset: u16) -> u32 {
+    0x8000_0000 | (u32::from(rt) << 21) | (u32::from(ra) << 16) | u32::from(offset)
+}
+fn stw(rs: u8, ra: u8, offset: u16) -> u32 {
+    0x9000_0000 | (u32::from(rs) << 21) | (u32::from(ra) << 16) | u32::from(offset)
+}
+fn lis(rt: u8, imm: u16) -> u32 {
+    0x3c00_0000 | (u32::from(rt) << 21) | u32::from(imm)
+}
+fn ori(ra: u8, rs: u8, imm: u16) -> u32 {
+    0x6000_0000 | (u32::from(rs) << 21) | (u32::from(ra) << 16) | u32::from(imm)
+}
+fn cmpwi(ra: u8, imm: u16) -> u32 {
+    0x2c00_0000 | (u32::from(ra) << 16) | u32::from(imm)
+}
+fn andi_dot(ra: u8, rs: u8, imm: u16) -> u32 {
+    0x7000_0000 | (u32::from(rs) << 21) | (u32::from(ra) << 16) | u32::from(imm)
+}
+fn cmplw(ra: u8, rb: u8) -> u32 {
+    0x7c00_0040 | (u32::from(ra) << 16) | (u32::from(rb) << 11)
+}
+
+fn emit_pointer_check(p: &mut Program, reg: u8, field_end: u32, unavailable: usize) {
+    let check_mem2 = p.label();
+    let valid = p.label();
+    p.emit(cmpwi(reg, 0));
+    p.bc(12, 2, unavailable); // beq unavailable
+    p.emit(andi_dot(0, reg, 3));
+    p.bc(4, 2, unavailable); // bne unavailable (unaligned)
+
+    // MEM1: [0x80000000, 0x81800000); field_end keeps the full field in RAM.
+    p.emit(lis(0, 0x8000));
+    p.emit(cmplw(reg, 0));
+    p.bc(12, 0, check_mem2); // blt
+    let mem1_limit = 0x8180_0000u32 - field_end;
+    p.emit(lis(0, (mem1_limit >> 16) as u16));
+    p.emit(ori(0, 0, mem1_limit as u16));
+    p.emit(cmplw(reg, 0));
+    p.bc(12, 0, valid); // blt
+
+    p.bind(check_mem2);
+    p.emit(lis(0, 0x9000));
+    p.emit(cmplw(reg, 0));
+    p.bc(12, 0, unavailable); // blt
+    let mem2_limit = 0x9400_0000u32 - field_end;
+    p.emit(lis(0, (mem2_limit >> 16) as u16));
+    p.emit(ori(0, 0, mem2_limit as u16));
+    p.emit(cmplw(reg, 0));
+    p.bc(4, 0, unavailable); // bge
+    p.bind(valid);
+}
+
+fn payload() -> Result<(Vec<u32>, usize), String> {
+    let mut p = Program::default();
+    let unavailable = p.label();
+    let finalize = p.label();
+    let ret = p.label();
+
+    // Preserve LR and obtain a PC-relative pointer to the inline mailbox.
+    p.emit(0x7c08_02a6); // mflr r0
+    p.emit(0x4800_0005); // bl +4
+    p.emit(0x7d88_02a6); // mflr r12
+    let mailbox_addi = p.words.len();
+    p.emit(0);
+    p.emit(stw(0, 12, (SAVED_LR * 4) as u16)); // preserve LR across scratch use of r0
+
+    // Begin a seqlock write, invalidate the previous position, and preserve
+    // the existing counter/ACK/echo behavior.
+    p.emit(lwz(11, 12, (SEQUENCE * 4) as u16));
+    p.emit(addi(11, 11, 1));
+    p.emit(ori(11, 11, 1));
+    p.emit(stw(11, 12, (SEQUENCE * 4) as u16));
+    p.emit(0x7c00_04ac); // sync: expose odd sequence before mailbox mutation
+    p.emit(addi(0, 0, 0));
+    p.emit(stw(0, 12, (VALID * 4) as u16));
+    p.emit(lwz(11, 12, (COUNTER * 4) as u16));
+    p.emit(addi(11, 11, 1));
+    p.emit(stw(11, 12, (COUNTER * 4) as u16));
+    p.emit(lwz(10, 12, (ACK * 4) as u16));
+    p.emit(stw(10, 12, (ECHO * 4) as u16));
+
+    // GameSystem singleton -> scene controller -> scene -> scene object
+    // holder -> MarioHolder slot -> MarioActor. Every dereference follows a
+    // nonzero, aligned MEM1/MEM2 range check that includes its field extent.
+    p.emit(lis(10, (GAME_SYSTEM_SINGLETON >> 16) as u16));
+    p.emit(lwz(10, 10, GAME_SYSTEM_SINGLETON as u16));
+    emit_pointer_check(&mut p, 10, 0x24 + 4, unavailable);
+    p.emit(lwz(10, 10, 0x24));
+    emit_pointer_check(&mut p, 10, 0xac + 4, unavailable);
+    p.emit(lwz(10, 10, 0xac));
+    emit_pointer_check(&mut p, 10, 0x10 + 4, unavailable);
+    p.emit(lwz(10, 10, 0x10));
+    emit_pointer_check(&mut p, 10, 0x50 + 4, unavailable);
+    p.emit(lwz(10, 10, 0x50));
+    emit_pointer_check(&mut p, 10, 0x0c + 4, unavailable);
+    p.emit(lwz(10, 10, 0x0c));
+    // mPosition is inline at MarioActor+0x0c; require all 12 bytes to fit.
+    emit_pointer_check(&mut p, 10, 0x0c + 12, unavailable);
+    p.emit(stw(10, 12, (ACTOR * 4) as u16));
+    p.emit(lwz(11, 10, 0x0c));
+    p.emit(stw(11, 12, (X * 4) as u16));
+    p.emit(lwz(11, 10, 0x10));
+    p.emit(stw(11, 12, (Y * 4) as u16));
+    p.emit(lwz(11, 10, 0x14));
+    p.emit(stw(11, 12, (Z * 4) as u16));
+    p.emit(addi(0, 0, 1));
+    p.emit(stw(0, 12, (VALID * 4) as u16));
+    p.b(finalize);
+
+    p.bind(unavailable);
+    p.bind(finalize);
+    p.emit(0x7c00_04ac); // sync: publish mailbox fields before even sequence
+    p.emit(lwz(11, 12, (SEQUENCE * 4) as u16));
+    p.emit(addi(11, 11, 1));
+    p.emit(stw(11, 12, (SEQUENCE * 4) as u16));
+    p.emit(lwz(0, 12, (SAVED_LR * 4) as u16));
+    p.emit(0x7c08_03a6); // mtlr r0
+    p.b(ret);
+    if p.words.len() & 1 != 0 {
+        p.emit(0x6000_0000); // nop; keep Gecko's instruction-pair count aligned
+    }
+    let mailbox_offset = p.words.len() * 4;
+    p.words[mailbox_addi] = addi(12, 12, (mailbox_offset - 8) as u16);
+    p.emit(0); // counter
+    p.emit(0); // host ACK
+    p.emit(0); // game-observed ACK echo
+    p.emit(MAILBOX_MAGIC); // marker is data skipped by the branch above
+    p.emit(MAILBOX_VERSION);
+    p.emit(0); // sequence
+    p.emit(0); // valid
+    p.emit(0); // actor
+    p.emit(0); // x
+    p.emit(0); // y
+    p.emit(0); // z
+    p.emit(0); // reserved
+    p.emit(0); // saved LR
+    p.emit(0); // reserved/pad
+    p.bind(ret);
+    p.emit(0x4e80_0020); // blr
+    p.emit(0x6000_0000); // nop
+    let words = p.resolve()?;
+    Ok((words, mailbox_offset / 4))
+}
+
+fn mailbox_marker_index() -> Result<usize, String> {
+    let (words, _) = payload()?;
+    words
+        .iter()
+        .position(|word| *word == MAILBOX_MAGIC)
+        .ok_or_else(|| "internal PPC payload has no mailbox marker".into())
+}
 
 pub const CODE_NAME: &str = "MultiGalaxy1 Stock Dolphin Mailbox Probe";
 
-/// Add the local-only test Gecko code after the mandatory AllStars OnFrame
-/// section. The game image remains untouched; a fresh isolated Dolphin profile
-/// owns this temporary GameSettings entry.
+#[cfg(test)]
+pub(crate) fn payload_words() -> Vec<u32> {
+    payload().expect("static PPC payload must assemble").0
+}
+
+#[cfg(test)]
+pub(crate) fn mailbox_data_word() -> usize {
+    payload().expect("static PPC payload must assemble").1
+}
+
+/// Append the local-only test Gecko code after the mandatory AllStars OnFrame
+/// section. The game image remains untouched.
 pub fn append_code(settings: &mut String) {
+    let Ok((words, _)) = payload() else {
+        return;
+    };
+    let count = words.len() / 2;
     settings.push_str(&format!(
-        "\n[Gecko]\n${CODE_NAME} [MultiGalaxy1]\nC0000000 00000009\n"
+        "\n[Gecko]\n${CODE_NAME} [MultiGalaxy1]\nC0000000 {count:08X}\n"
     ));
-    for pair in BODY_WORDS.chunks_exact(2) {
+    for pair in words.chunks_exact(2) {
         settings.push_str(&format!("{:08X} {:08X}\n", pair[0], pair[1]));
     }
     settings.push_str(&format!("\n[Gecko_Enabled]\n${CODE_NAME}\n"));
@@ -52,41 +290,94 @@ pub fn append_code(settings: &mut String) {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Mailbox {
-    counter: u32,
-    acknowledgement: u32,
-    echo: u32,
+    base: u32,
 }
 
 impl Mailbox {
     pub fn counter_address(self) -> u32 {
-        self.counter
+        self.base
     }
-
     pub fn acknowledgement_address(self) -> u32 {
-        self.acknowledgement
+        self.base + (ACK as u32 * 4)
     }
-
     pub fn echo_address(self) -> u32 {
-        self.echo
+        self.base + (ECHO as u32 * 4)
+    }
+    pub fn snapshot_address(self) -> u32 {
+        self.base
     }
 
     pub(crate) fn is_inside_handler(self) -> bool {
-        [self.counter, self.acknowledgement, self.echo]
-            .into_iter()
-            .all(|address| {
-                address >= HANDLER_BASE
-                    && u64::from(address) + 4 <= u64::from(HANDLER_END)
-                    && address < ALLSTARS_CAVE_START
-                    && address & 3 == 0
-            })
-            && self.acknowledgement == self.counter + 4
-            && self.echo == self.counter + 8
+        u64::from(self.base) >= u64::from(HANDLER_BASE)
+            && u64::from(self.base) + u64::from(MAILBOX_BYTES) <= u64::from(HANDLER_END)
+            && u64::from(self.base) + u64::from(MAILBOX_BYTES) <= u64::from(ALLSTARS_CAVE_START)
+            && self.base & 3 == 0
     }
 }
 
-/// Find exactly one active probe body in Dolphin's fixed Gecko handler region.
-/// The routine bytes are checked around its marker; mutable mailbox words are
-/// intentionally excluded from the comparison.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PositionSnapshot {
+    pub counter: u32,
+    pub actor: u32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapshotState {
+    Unavailable,
+    Inconsistent,
+    Invalid,
+}
+
+/// Decode a 48-byte mailbox view only if both sequence reads are the same even
+/// value and the embedded version/marker are recognized. `after` is a second
+/// read of the sequence field after copying the whole block.
+pub fn decode_snapshot(
+    bytes: &[u8],
+    after: u32,
+) -> Result<Result<PositionSnapshot, SnapshotState>, String> {
+    if bytes.len() != SNAPSHOT_BYTES {
+        return Err("mailbox snapshot has an unexpected length".into());
+    }
+    let word = |i: usize| u32::from_be_bytes(bytes[i * 4..i * 4 + 4].try_into().unwrap());
+    if word(MARKER) != MAILBOX_MAGIC || word(VERSION) != MAILBOX_VERSION {
+        return Err("mailbox marker or version mismatch".into());
+    }
+    let before = word(SEQUENCE);
+    if before != after || before & 1 != 0 {
+        return Ok(Err(SnapshotState::Inconsistent));
+    }
+    if word(VALID) == 0 {
+        return Ok(Err(SnapshotState::Unavailable));
+    }
+    if word(VALID) != 1 {
+        return Ok(Err(SnapshotState::Invalid));
+    }
+    let actor = word(ACTOR);
+    if !crate::player_probe::is_guest_ram_range(actor, 0x18) || actor & 3 != 0 {
+        return Ok(Err(SnapshotState::Invalid));
+    }
+    let x = f32::from_bits(word(X));
+    let y = f32::from_bits(word(Y));
+    let z = f32::from_bits(word(Z));
+    if ![x, y, z]
+        .into_iter()
+        .all(|v| v.is_finite() && v.abs() < 10_000_000.0)
+    {
+        return Ok(Err(SnapshotState::Invalid));
+    }
+    Ok(Ok(PositionSnapshot {
+        counter: word(COUNTER),
+        actor,
+        x,
+        y,
+        z,
+    }))
+}
+
+/// Find exactly one versioned payload in Dolphin's fixed Gecko handler region.
 pub fn locate_mailbox(
     region_base: u32,
     handler_size: usize,
@@ -98,41 +389,54 @@ pub fn locate_mailbox(
     if handler_size % 4 != 0 || handler_size > bytes.len() {
         return Err("Dolphin codehandler.bin has an invalid size".into());
     }
-
+    let (expected, _) = payload()?;
+    let marker_index = mailbox_marker_index()?;
+    let marker_offset = marker_index * 4;
     let mut found = None;
-    for offset in (handler_size + 8..bytes.len().saturating_sub(BODY_BYTES as usize - 4)).step_by(4)
+    for marker_at in
+        (handler_size + 8..bytes.len().saturating_sub(MAILBOX_BYTES as usize - 4)).step_by(4)
     {
-        let word = u32::from_be_bytes(bytes[offset..offset + 4].try_into().unwrap());
-        if word != MARKER {
+        if u32::from_be_bytes(bytes[marker_at..marker_at + 4].try_into().unwrap()) != MAILBOX_MAGIC
+        {
             continue;
         }
-        let Some(body_start) = offset.checked_sub(MARKER_OFFSET) else {
+        let Some(start) = marker_at.checked_sub(marker_offset) else {
             continue;
         };
-        let words: Vec<u32> = bytes[body_start..body_start + BODY_BYTES as usize]
+        let end = start + expected.len() * 4;
+        if end > bytes.len() {
+            return Err("Gecko payload extends outside handler memory".into());
+        }
+        let actual: Vec<u32> = bytes[start..end]
             .chunks_exact(4)
-            .map(|chunk| u32::from_be_bytes(chunk.try_into().unwrap()))
+            .map(|c| u32::from_be_bytes(c.try_into().unwrap()))
             .collect();
-        let valid = words.len() == BODY_WORDS.len()
-            && BODY_WORDS.iter().enumerate().all(|(index, expected)| {
-                matches!(index, 12 | 13 | 14) || words[index] == *expected
-            });
-        if !valid {
+        let mailbox_word = marker_index - MARKER;
+        let mutable: Vec<usize> = [
+            COUNTER, ACK, ECHO, SEQUENCE, VALID, ACTOR, X, Y, Z, SAVED_LR,
+        ]
+        .into_iter()
+        .map(|i| mailbox_word + i)
+        .collect();
+        if actual
+            .iter()
+            .enumerate()
+            .any(|(i, w)| !mutable.contains(&i) && *w != expected[i])
+        {
             return Err(
-                "found Gecko probe marker, but the PPC routine signature is invalid".into(),
+                "found Gecko mailbox marker, but PPC routine/version signature is invalid".into(),
             );
         }
         if found.is_some() {
-            return Err("multiple Gecko probe markers found in Dolphin's handler region".into());
+            return Err("multiple Gecko mailbox markers found in Dolphin's handler region".into());
         }
-        let body_address = region_base + body_start as u32;
-        if u64::from(body_address) + u64::from(BODY_BYTES) > u64::from(ALLSTARS_CAVE_START) {
+        let mailbox_start = region_base + start as u32 + (marker_index - MARKER) as u32 * 4;
+        let cave_start = region_base + start as u32;
+        if u64::from(cave_start) + (expected.len() * 4) as u64 > u64::from(ALLSTARS_CAVE_START) {
             return Err("Gecko probe body overlaps the PAL AllStars code cave; refusing to use this code-list layout".into());
         }
         let mailbox = Mailbox {
-            counter: body_address + 48,
-            acknowledgement: body_address + 52,
-            echo: body_address + 56,
+            base: mailbox_start,
         };
         if !mailbox.is_inside_handler() {
             return Err("located mailbox is outside Dolphin's reserved Gecko region".into());
@@ -142,8 +446,6 @@ pub fn locate_mailbox(
     Ok(found)
 }
 
-/// Confirm that a fresh handler snapshot still contains the exact previously
-/// validated mailbox. This guard is run immediately before each host ACK write.
 pub fn snapshot_matches_mailbox(
     region_base: u32,
     handler_size: usize,
@@ -159,82 +461,119 @@ mod tests {
 
     fn fixture() -> Vec<u8> {
         let mut bytes = vec![0; (HANDLER_END - HANDLER_BASE) as usize];
+        let (words, _) = payload().unwrap();
         let offset = 2880 + 16;
-        for (index, word) in BODY_WORDS.iter().enumerate() {
+        for (index, word) in words.iter().enumerate() {
             bytes[offset + index * 4..offset + index * 4 + 4].copy_from_slice(&word.to_be_bytes());
         }
         bytes
     }
 
     #[test]
-    fn emits_frame_counter_and_ack_echo_as_gecko_execute_code() {
+    fn generated_gecko_payload_preserves_ack_and_walks_the_verified_pal_chain() {
+        let (words, _) = payload().unwrap();
+        assert_eq!(words.len() % 2, 0);
+        assert_eq!(words[0..3], [0x7c08_02a6, 0x4800_0005, 0x7d88_02a6]);
+        assert!(words.contains(&lwz(10, 10, 0x24)));
+        assert!(words.contains(&lwz(10, 10, 0xac)));
+        assert!(words.contains(&lwz(10, 10, 0x50)));
+        assert!(words.contains(&lwz(11, 10, 0x0c)));
+        assert!(words.contains(&stw(10, 12, 8)));
         let mut settings = "[OnFrame_Enabled]\nAllStars\n".to_owned();
         append_code(&mut settings);
-        assert!(settings.contains("C0000000 00000009"));
-        assert!(settings.contains("7C0802A6 48000005"));
-        assert!(settings.contains("914C0008 7C0803A6"));
-        assert!(settings.contains("48000018 60000000"));
-        assert!(settings.contains("4E800020 60000000"));
+        assert!(settings.contains(&format!("C0000000 {:08X}", words.len() / 2)));
         assert!(settings.ends_with("[Gecko_Enabled]\n$MultiGalaxy1 Stock Dolphin Mailbox Probe\n"));
     }
 
     #[test]
-    fn locates_mailbox_only_from_unique_verified_handler_signature() {
-        let mailbox = locate_mailbox(HANDLER_BASE, 2880, &fixture())
-            .unwrap()
-            .unwrap();
-        assert_eq!(mailbox.counter_address(), HANDLER_BASE + 2880 + 16 + 48);
-        assert_eq!(
-            mailbox.acknowledgement_address(),
-            mailbox.counter_address() + 4
-        );
-        assert_eq!(mailbox.echo_address(), mailbox.counter_address() + 8);
-        assert!(mailbox.is_inside_handler());
-    }
-
-    #[test]
-    fn rejects_wrong_bounds_corruption_and_duplicate_probe() {
+    fn locates_unique_versioned_mailbox_and_rejects_signature_or_bounds_changes() {
         let bytes = fixture();
+        let mailbox = locate_mailbox(HANDLER_BASE, 2880, &bytes).unwrap().unwrap();
+        let mailbox_word = mailbox_data_word();
+        assert_eq!(
+            mailbox.counter_address(),
+            HANDLER_BASE + 2880 + 16 + mailbox_word as u32 * 4
+        );
+        assert!(mailbox.is_inside_handler());
         assert!(locate_mailbox(HANDLER_BASE + 4, 2880, &bytes).is_err());
         assert!(locate_mailbox(HANDLER_BASE, 2881, &bytes).is_err());
         assert_eq!(
             locate_mailbox(HANDLER_BASE, 2880, &vec![0; bytes.len()]).unwrap(),
             None
         );
-        let mut corrupt = bytes.clone();
-        corrupt[2880 + 16 + 12] ^= 1;
+        let mut corrupt = bytes;
+        corrupt[2880 + 16] ^= 1;
         assert!(locate_mailbox(HANDLER_BASE, 2880, &corrupt).is_err());
-        let mut duplicate = bytes;
-        duplicate[3000..3072].copy_from_slice(&fixture()[2880 + 16..2880 + 88]);
-        assert!(locate_mailbox(HANDLER_BASE, 2880, &duplicate).is_err());
     }
 
     #[test]
-    fn refuses_a_probe_block_that_reaches_the_allstars_code_cave() {
-        let mut bytes = vec![0; (HANDLER_END - HANDLER_BASE) as usize];
-        let body_offset = (ALLSTARS_CAVE_START - HANDLER_BASE) as usize - BODY_BYTES as usize + 4;
-        for (index, word) in BODY_WORDS.iter().enumerate() {
-            bytes[body_offset + index * 4..body_offset + index * 4 + 4]
-                .copy_from_slice(&word.to_be_bytes());
-        }
-        assert!(locate_mailbox(HANDLER_BASE, 2880, &bytes)
-            .unwrap_err()
-            .contains("overlaps the PAL AllStars code cave"));
-    }
-
-    #[test]
-    fn fresh_handler_snapshot_must_match_before_ack_write() {
-        let original = fixture();
-        let mailbox = locate_mailbox(HANDLER_BASE, 2880, &original)
-            .unwrap()
-            .unwrap();
-        assert!(snapshot_matches_mailbox(HANDLER_BASE, 2880, &original, mailbox).unwrap());
-        assert!(
-            !snapshot_matches_mailbox(HANDLER_BASE, 2880, &vec![0; original.len()], mailbox)
-                .unwrap()
+    fn snapshot_requires_stable_even_sequence_version_valid_actor_and_finite_coordinates() {
+        let mut bytes = vec![0; SNAPSHOT_BYTES];
+        let put =
+            |b: &mut [u8], i: usize, v: u32| b[i * 4..i * 4 + 4].copy_from_slice(&v.to_be_bytes());
+        put(&mut bytes, MARKER, MAILBOX_MAGIC);
+        put(&mut bytes, VERSION, MAILBOX_VERSION);
+        put(&mut bytes, SEQUENCE, 2);
+        put(&mut bytes, VALID, 1);
+        put(&mut bytes, ACTOR, 0x8000_4000);
+        put(&mut bytes, X, 12.5f32.to_bits());
+        put(&mut bytes, Y, (-3.25f32).to_bits());
+        put(&mut bytes, Z, 99.0f32.to_bits());
+        let decoded = decode_snapshot(&bytes, 2).unwrap().unwrap();
+        assert_eq!((decoded.x, decoded.y, decoded.z), (12.5, -3.25, 99.0));
+        assert_eq!(
+            decode_snapshot(&bytes, 4).unwrap(),
+            Err(SnapshotState::Inconsistent)
         );
-        let mut corrupted = original;
-        corrupted[2880 + 16 + 4] ^= 1;
-        assert!(snapshot_matches_mailbox(HANDLER_BASE, 2880, &corrupted, mailbox).is_err());
+        put(&mut bytes, SEQUENCE, 3);
+        assert_eq!(
+            decode_snapshot(&bytes, 3).unwrap(),
+            Err(SnapshotState::Inconsistent)
+        );
+        put(&mut bytes, SEQUENCE, 4);
+        put(&mut bytes, VALID, 0);
+        assert_eq!(
+            decode_snapshot(&bytes, 4).unwrap(),
+            Err(SnapshotState::Unavailable)
+        );
+        put(&mut bytes, VALID, 1);
+        put(&mut bytes, VALID, 2);
+        assert_eq!(
+            decode_snapshot(&bytes, 4).unwrap(),
+            Err(SnapshotState::Invalid)
+        );
+        put(&mut bytes, VALID, 1);
+        put(&mut bytes, ACTOR, 0x1234);
+        assert_eq!(
+            decode_snapshot(&bytes, 4).unwrap(),
+            Err(SnapshotState::Invalid)
+        );
+    }
+
+    #[test]
+    fn payload_fits_before_allstars_cave() {
+        let (words, _) = payload().unwrap();
+        let start = HANDLER_BASE + 2880 + 16;
+        assert!(start + words.len() as u32 * 4 <= ALLSTARS_CAVE_START);
+        for (index, word) in words.iter().enumerate() {
+            let opcode = word >> 26;
+            let target = match opcode {
+                18 => {
+                    let displacement = ((*word << 6) as i32) >> 6;
+                    Some(index as i32 + displacement / 4)
+                }
+                16 => {
+                    let displacement = ((*word << 16) as i32) >> 16;
+                    Some(index as i32 + displacement / 4)
+                }
+                _ => None,
+            };
+            if let Some(target) = target {
+                assert!(
+                    target >= 0 && (target as usize) < words.len(),
+                    "branch at word {index} targets {target}"
+                );
+            }
+        }
     }
 }

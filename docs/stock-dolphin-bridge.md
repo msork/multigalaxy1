@@ -83,6 +83,18 @@ For lifecycle checks, run the bridge probe and separately verify (a) title scree
 
 If direct shared mapping fails validation, is incoherent during live emulation, or imposes measurable overhead, stop and report. Remaining stock options are a Gecko guest routine that uses a game/IOS-supported network channel (requires separate feasibility research) or accepting that official Dolphin provides no adequate general-purpose bridge. Do not revive the fork without a new explicit project decision.
 
+## PAL coordinate mailbox extension (static/synthetic; live test pending)
+
+The current Rust generator extends the same C0 mailbox with a versioned position snapshot while preserving counter, ACK, and echo word ordering. The guest routine checks the PAL root `0x806A1228` and follows the reviewed fields: GameSystem `+0x24`, SceneController `+0xAC`, Scene `+0x10`, SceneObjHolder Mario slot `+0x50`, MarioHolder actor `+0x0C`, and MarioActor position `+0x0C`. Before each dereference it checks for null, 4-byte alignment, and that the complete next field lies in Wii MEM1 or MEM2. The routine uses the previously clobbered volatile scratch registers r0/r10/r11/r12 and leaves r3-r9 untouched. It writes only its own Gecko mailbox; the Rust host retains its existing sole write to the ACK word.
+
+Mailbox version 1 contains counter, ACK, echo, `MG1P` marker, version, sequence, valid bit, actor address, and X/Y/Z float bits. The guest marks sequence odd and valid false before reading, publishes coordinates, then makes sequence even. An unavailable pointer path keeps valid false and still completes counter/echo processing. The reader requires the unchanged even sequence, expected version/marker, matching frame counter on both sides of the copy, aligned in-range actor, and finite bounded coordinates. It never repeats old coordinates as live. The generated block is checked against the first observed AllStars cave address `0x80002790` and the exact handler fingerprint before ACK writes.
+
+Rust tests currently validate generated code words and labels, supported chain loads, even Gecko pair count, AllStars cave bounds, exact signature discovery, snapshot consistency, and invalid/unavailable state handling. This is only static and synthetic evidence. The expanded PPC block has **not** been run in Dolphin, so real pointer safety, frame cadence, visible gameplay, movement/jump changes, pause recovery, and added performance cost remain unverified. Follow `docs/testing.md` for the user-side test.
+
+## Updated paired performance evidence
+
+The user later supplied controlled playable OFF/ON measurements for the original counter/ACK payload: both 100% speed and 59.94 FPS/VPS; CPU was 3.289% off and 3.383% on. There were 6,667 ACK samples with mean 16.626 ms, p95 30.422 ms, p99 31.237 ms, and max 141.461 ms. These are user-reported measured results; the 0.094 percentage-point CPU change is derived from the two values. The maximum is about 8.5 nominal 60 Hz intervals, but aggregates do not identify its cause. The launcher now logs timestamped ACKs over 50 ms with counter and heartbeat age to gather diagnostic evidence on a future occurrence. Do not optimize or attribute the outlier before collecting such a trace. This benchmark does not cover the coordinate payload above.
+
 ## References
 
 - [Dolphin 2609a Windows MemArena](https://github.com/dolphin-emu/dolphin/blob/2609a/Source/Core/Common/MemArenaWin.cpp)

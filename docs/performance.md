@@ -1,33 +1,24 @@
 # Performance verification
 
-The stock bridge is a PAL Gecko frame counter/echo plus a bounded Rust view of Dolphin 2609a's named MEM1 mapping. GDB is not used for this bridge because it pauses startup and its `M` command has source-verified instruction-cache/disassembly side effects.
+The stock bridge uses the official Dolphin 2609a named MEM1 mapping and a PAL Gecko frame routine. GDB is not used by this bridge. The coordinate payload currently has only synthetic/static verification; the benchmark below is for the proven counter/ACK payload.
 
-## User-observed live result (not a controlled benchmark)
+## Paired live Dolphin benchmark (user-reported measurements)
 
-The user reported an interactive stock-Dolphin 2609a / PAL RMGP01 Rev 0 run with `state=live`, game update rate ~59–60.5 Hz, ACK rate ~59–60 Hz, mean ACK round-trip ~16.7 ms, and shared read/write operations ~2 μs each. They observed smooth gameplay at 100% emulation speed while the bridge was live. These values verify live bidirectional mailbox operation by user observation. They are not a paired bridge-off/bridge-on benchmark, and no FPS/VPS/CPU samples were supplied.
+The user completed a paired playable run on stock Dolphin 2609a / PAL RMGP01 Rev 0 using the same isolated profile and AllStars configuration. These are user-reported measurements; raw process traces and captures were not supplied for independent recalculation.
 
-The user reported per-report-window maximum ACK latency around 30–47 ms. This is occasional jitter of roughly two to three 60 Hz frames. The available mean and max values do not define the distribution. The probe now retains completed ACK latencies for the session and prints mean, population standard deviation, p50, p95, p99, and max when stopped with `Q`.
+| Condition | Speed | FPS | VPS | Dolphin CPU |
+|---|---:|---:|---:|---:|
+| Gecko bridge off | 100% | 59.94 | 59.94 | 3.289% |
+| Gecko bridge on | 100% | 59.94 | 59.94 | 3.383% |
 
-## Paired interactive benchmark
+FPS/VPS and speed were unchanged. CPU increased by 0.094 percentage points. The relative increase of about 2.86% is calculated from the two reported CPU figures, not a separately measured metric. The user also reported ~60 Hz game updates and ACKs across 6,667 ACK samples: mean 16.626 ms, p95 30.422 ms, p99 31.237 ms, and max 141.461 ms. This passes the initial counter/ACK bridge performance gate for that session; it does not establish performance for the larger Mario-position payload.
 
-Run only from the user's visible interactive PowerShell, with Dolphin closed between trials. Keep the same isolated profile, D3D12 backend, AllStars patch, controller, game scene, resolution, and repeatable 60-second movement/jump route. The only changed variable is enabling the test Gecko routine.
+The maximum is about 8.5 times the reported mean, or roughly 8.5 nominal 60 Hz frame intervals (derived comparisons). The aggregate values do not identify whether it came from host scheduling, an emulator frame delay, or delayed echo processing. No optimization is justified yet. The probe logs a timestamped diagnostic for ACKs over 50 ms with the ACK value and time since the last game-counter change, to help locate future outliers. The existing end-of-session p50/p95/p99/max summary remains the distribution report.
 
-Baseline:
+Earlier live observations of ~16.7 ms mean ACK round trip and ~2 microsecond shared-map calls are retained as user-observed behavior, separate from this paired benchmark.
 
-```powershell
-cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0
-cargo run -p multigalaxy -- bench-dolphin <PID> 60 stock-bridge-off
-```
+## Coordinate payload validation
 
-Bridge enabled:
+The new Gecko payload uses a versioned inline mailbox and an even/odd sequence counter. It marks position invalid before following the pointer chain, checks alignment and MEM1/MEM2 bounds before each dereference, and publishes `valid=1` only after all three coordinates are copied. Rust accepts a sample only when version, marker, stable even sequence, actor range, finite floats, and a matching live frame counter pass. A missing holder or stalled game is reported unavailable; previous coordinates are never replayed as live.
 
-```powershell
-cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0 --gecko-bridge-probe
-cargo run -p multigalaxy -- bench-dolphin <PID> 60 stock-bridge-on
-```
-
-Record Dolphin OSD Speed%, FPS, and VPS for each run. `bench-dolphin` samples process CPU once per second and prompts for OSD averages. The bridge console reports game counter update Hz, ACK Hz, read Hz, rolling mean/max ACK latency, and host read/write/validation scan cost. On `Q`, it prints session count, mean, standard deviation, p50, p95, p99, and maximum latency. Run one paired 60-second gameplay trial first; repeat if results vary. `gdb-unattached` is paused and never a running-game comparator.
-
-## Evidence status
-
-Live bridge handshake and cadence are user-observed as above. Synthetic regression tests do not establish performance. The controlled gameplay comparison (FPS/VPS/speed/CPU), title/menu, pause/resume, and scene-transition behavior remain pending interactive validation. Do not infer “no noticeable slowdown” from the smoothness observation alone.
+Payload generation, cave bounds, handler signature, and snapshot decoding have automated synthetic tests. **No runtime coordinate sample or performance measurement for this payload has been observed yet.** Follow the interactive test in `docs/testing.md` before describing X/Y/Z as working.

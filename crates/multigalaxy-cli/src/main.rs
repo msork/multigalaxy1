@@ -611,7 +611,7 @@ fn run_interactive_gecko_bridge_probe(
             "Dolphin codehandler.bin did not match the verified 2609a input (size={handler_size}, sha256={handler_sha256}); refusing to guess a Gecko RAM layout"
         ));
     }
-    println!("Stock Dolphin 2609a named-MEM1 mailbox probe; PID={pid}; handler_bytes={handler_size}; handler_sha256={handler_sha256}. No GDB server is enabled. Type Q to stop.");
+    println!("Stock Dolphin 2609a PAL mailbox probe; PID={pid}; handler_bytes={handler_size}; handler_sha256={handler_sha256}. Counter/ACK is active; timestamped Mario X/Y/Z is printed only for a stable validated snapshot. No GDB server is enabled. Type Q to stop.");
     println!("Waiting for Dolphin's named MEM1 mapping and the isolated-profile Gecko probe...");
     let (tx, rx) = std::sync::mpsc::channel::<String>();
     std::thread::spawn(move || {
@@ -635,7 +635,7 @@ fn run_interactive_gecko_bridge_probe(
     let mut stalled_reported = false;
     let mut last_stall_log = None;
     let mut last_ack_counter = None;
-    let mut pending_ack: Option<(u32, Instant)> = None;
+    let mut pending_ack: Option<(u32, Instant, u32)> = None;
     let mut report_started = Instant::now();
     let mut report_frames = 0u64;
     let mut report_acks = 0u64;
@@ -649,6 +649,7 @@ fn run_interactive_gecko_bridge_probe(
     let mut report_validations = 0u64;
     let mut all_ack_latencies_ms = Vec::new();
     let mut discovery_notice = Instant::now();
+    let mut last_player_status: Option<&'static str> = None;
 
     loop {
         if let Some(status) = child.try_wait().map_err(|error| {
@@ -820,6 +821,67 @@ fn run_interactive_gecko_bridge_probe(
                     stalled_reported = false;
                     last_stall_log = None;
                 }
+
+                // Read a whole versioned snapshot, then re-read its sequence
+                // and counter. A racing/paused/stale sample is never emitted
+                // as live coordinates.
+                let position_game_id: [u8; 6] = view
+                    .read_guest(0x8000_0000, 6)?
+                    .try_into()
+                    .map_err(|_| "MEM1 returned an unexpected game ID length".to_owned())?;
+                let snapshot_state = match bridge_identity::classify_game_id(position_game_id) {
+                    bridge_identity::IdentityStatus::Ready => {
+                        let bytes = view.read_guest(active_mailbox.snapshot_address(), 12 * 4)?;
+                        let sequence_after =
+                            view.read_guest_word(active_mailbox.snapshot_address() + 20)?;
+                        let counter_after =
+                            view.read_guest_word(active_mailbox.counter_address())?;
+                        if counter_after != counter {
+                            Err(gecko_bridge::SnapshotState::Inconsistent)
+                        } else {
+                            gecko_bridge::decode_snapshot(&bytes, sequence_after)?
+                        }
+                    }
+                    bridge_identity::IdentityStatus::Uninitialized => {
+                        Err(gecko_bridge::SnapshotState::Unavailable)
+                    }
+                    bridge_identity::IdentityStatus::WrongGame => {
+                        return Err(format!("runtime game identity changed before position read; validation=wrong_game observed_game_id={}", bridge_identity::describe_game_id(position_game_id)));
+                    }
+                    bridge_identity::IdentityStatus::InvalidMapping => {
+                        return Err(format!("runtime MEM1 identity became invalid before position read; validation=invalid_mapping observed_game_id={}", bridge_identity::describe_game_id(position_game_id)));
+                    }
+                };
+                match snapshot_state {
+                    Ok(sample) if sample.counter == counter => {
+                        last_player_status = Some("live");
+                        println!("unix_ms={} state=player_position counter={} actor=0x{:08x} x={:.4} y={:.4} z={:.4}", timestamp_unix_ms(), sample.counter, sample.actor, sample.x, sample.y, sample.z);
+                    }
+                    Err(gecko_bridge::SnapshotState::Unavailable) => {
+                        if last_player_status != Some("unavailable") {
+                            println!("unix_ms={} state=player_unavailable counter={} reason=mario_holder_or_actor_not_ready", timestamp_unix_ms(), counter);
+                        }
+                        last_player_status = Some("unavailable");
+                    }
+                    Err(gecko_bridge::SnapshotState::Inconsistent) => {
+                        if last_player_status != Some("inconsistent") {
+                            println!("unix_ms={} state=player_snapshot_waiting counter={} reason=seqlock_or_counter_changed", timestamp_unix_ms(), counter);
+                        }
+                        last_player_status = Some("inconsistent");
+                    }
+                    Err(gecko_bridge::SnapshotState::Invalid) => {
+                        if last_player_status != Some("invalid") {
+                            println!("unix_ms={} state=player_unavailable counter={} reason=invalid_actor_or_coordinates", timestamp_unix_ms(), counter);
+                        }
+                        last_player_status = Some("invalid");
+                    }
+                    Ok(_) => {
+                        if last_player_status != Some("inconsistent") {
+                            println!("unix_ms={} state=player_snapshot_waiting counter={} reason=counter_advanced_during_read", timestamp_unix_ms(), counter);
+                        }
+                        last_player_status = Some("inconsistent");
+                    }
+                }
             } else if last_counter_change.elapsed() > Duration::from_secs(3) {
                 if !stalled_reported
                     || last_stall_log.map_or(true, |last: Instant| {
@@ -830,11 +892,22 @@ fn run_interactive_gecko_bridge_probe(
                     stalled_reported = true;
                     last_stall_log = Some(Instant::now());
                 }
+                if last_player_status != Some("stalled") {
+                    println!("unix_ms={} state=player_unavailable counter={} reason=game_heartbeat_stalled", timestamp_unix_ms(), counter);
+                    last_player_status = Some("stalled");
+                }
             }
 
-            if let Some((expected, sent_at)) = pending_ack {
+            if let Some((expected, sent_at, sent_counter)) = pending_ack {
                 if echo == expected {
                     let rtt = sent_at.elapsed();
+                    if rtt >= Duration::from_millis(50) {
+                        println!(
+                            "unix_ms={} state=ack_latency_outlier sent_counter={} current_counter={} ack=0x{expected:08x} rtt_ms={:.3} heartbeat_age_ms={}",
+                            timestamp_unix_ms(), sent_counter, counter, rtt.as_secs_f64() * 1000.0,
+                            last_counter_change.elapsed().as_millis()
+                        );
+                    }
                     report_acks += 1;
                     report_rtt_total += rtt;
                     report_rtt_max = report_rtt_max.max(rtt);
@@ -891,7 +964,7 @@ fn run_interactive_gecko_bridge_probe(
                 view.acknowledge(active_mailbox, acknowledgement)?;
                 report_write_total += write_started.elapsed();
                 report_writes += 1;
-                pending_ack = Some((acknowledgement, write_started));
+                pending_ack = Some((acknowledgement, write_started, counter));
                 last_ack_counter = Some(counter);
             }
 
