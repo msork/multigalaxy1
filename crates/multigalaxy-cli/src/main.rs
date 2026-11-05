@@ -10,6 +10,7 @@ mod memory_inspection;
 mod penguin_observer;
 mod perf_bench;
 mod player_probe;
+mod render_ownership;
 mod scheduler_observer;
 mod startup;
 #[cfg(windows)]

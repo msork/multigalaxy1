@@ -91,9 +91,47 @@ State categories that must be accounted for before GO:
 
 ### Construction and destruction
 
-Petari's `J3DModelX` constructor delegates to base model construction, then generates/stores multiple GX display lists, allocates per-material transient arrays, and initializes callbacks/flags. Mario's separate helper allocates additional aligned per-view matrix blocks. These are not cheap POD fields that may be copied with `memcpy`.
+Petari's `J3DModelX` constructor delegates to model setup, then generates/stores multiple GX display lists, allocates per-material transient arrays, and initializes callbacks/flags. Mario's separate helper allocates additional aligned per-view matrix blocks. These are not cheap POD fields that may be copied with `memcpy`.
 
-The Petari `J3DModelX` destructor body is empty. The base destructor may clean base-owned packets and matrix buffers, but it cannot be assumed to release every derived raw array/display-list allocation. `J3DMtxBuffer` has a PAL destructor symbol, yet its exact pointer-ownership behavior and interaction with a borrowed animation buffer must be audited from the PAL DOL/source before using it. Current constructor-time heap evidence only samples gameplay's current heap and does not prove the heap used at model construction. A clone may leak or outlive model data; only scene-heap reclamation is a hypothesis until teardown and allocation ownership are traced.
+Petari's `J3DModelX` destructor source body is empty, but the PAL deleting-destructor instructions have compiler/member cleanup: they call the embedded vertex-buffer destructor and conditionally delete the object. The inspected body does not call the PAL `J3DModel` destructor or `J3DMtxBuffer` destructor. The latter has a PAL symbol but its destructor body does not enumerate/free the internal arrays. Therefore neither source-level empty-body observation nor a base-class assumption supplies a complete cleanup sequence. Current constructor-time heap evidence only samples gameplay's current heap and does not prove the heap used at model construction. A clone may leak or outlive model data; scene-heap reclamation remains a hypothesis until owner/caller teardown is traced.
+
+### PAL construction and cleanup evidence
+
+The following is a partial PAL instruction trace from the exact RMGP01 Rev 0 DOL, translated by DOL section addresses and checked against `target/petari-rmgp01-symbols.txt`. It confirms call ordering and branch targets; it is not a complete C++ ownership proof.
+
+| PAL address | DOL file offset / word | Observed instruction/call | Evidence and limit |
+|---:|---|---|---|
+| `0x802A7068/6C` | `0x2A25A8: 38630088`; `0x2A25AC: 4817AF0D` | adjusts `r3` by `+0x88`, then calls `0x80421F78` | `J3DVertexBuffer::init` on the embedded vertex-buffer field |
+| `0x802A7074` | `0x2A25B4: 4818A021` | calls `0x80431094` | `J3DModel::initialize` |
+| `0x802A7088` | `0x2A25C8: 4818A095` | calls `0x8043111C` | `J3DModel::entryModelData`; model-data argument and flags originate from constructor inputs |
+| `0x80431144/48/64/78` | `0x42C684: 3860003C`; `0x42C688: 4BFD89CD`; `0x42C6A4: 4BFFF1F9`; `0x42C6B8: 4BFFF229` | requests `0x3C` bytes through `__nw__FUl` at `0x80409B14`, initializes, then calls `create` | Allocates a `J3DMtxBuffer`; initialize is `0x8043035C`, create is `0x804303A0` |
+| `0x804303CC` | `0x42B90C: 480000DD` | calls `createAnmMtx` (`0x804304A8`) | Conditional allocation/setup selected from model-data counts |
+| `0x804303E4` | `0x42B924: 48000129` | calls `createWeightEnvelopeMtx` (`0x8043050C`) | Conditional model-data path |
+| `0x80430408/48` | `0x42B948: 48000165`; `0x42B988: 48000151` | selects no-use draw matrices or calls `createDoubleDrawMtx` (`0x80430598`) | Draw-buffer path depends on flags/arguments; do not assume a fixed count |
+| `0x80430484` | `0x42B9C4: 48000209` | may call `createBumpMtxArray` (`0x8043068C`) | Conditional model-data path |
+| `0x80431190/AC` | `0x42C6D0: 480000FD`; `0x42C6EC: 48000195` | calls shape-packet creation (`0x8043128C`) and material-packet creation (`0x80431340`) on success branches | These are model-instance packet paths; exact cardinalities derive from model data |
+| `0x804311C4/CC` | `0x42C704: 4BFF0D6D`; `0x42C70C: 48000D79` | calls `J3DVertexBuffer::setVertexData` (`0x80421F30`) and `prepareShapePackets` (`0x80431F44`) | Connects vertex/model data and binds packets to the instance's matrix storage |
+| `0x802A66C4/E0` | `0x2A1C04: 48001ACD`; `0x2A1C20: 48000171` | calls `J3DMtxBuffer2::rotationMtx` (`0x802A8190`) and `calcDrawMtx2` (`0x802A6850`) | `viewCalcRef` selects an extra draw-matrix view and calculates destination draw matrices from source model pose |
+| `0x802A66F8/6700` | `0x2A1C38: 481FC8B5`; `0x2A1C40: 4818B845` | calls `DCStoreRangeNoSync` (`0x804A2FAC`) and `prepareShapePackets` (`0x80431F44`) | Draw-matrix cache writeback and packet refresh occur in this path; completion/order relative to GX and normal/bump buffers is not thereby proven |
+| `0x802A80A0` | `0x2A35E0: 48179F19` | calls `J3DVertexBuffer::~J3DVertexBuffer` (`0x80421FB8`) on `this+0x88` | Observed in `J3DModelX` destructor body |
+| `0x802A80B0` | `0x2A35F0: 48161AAD` | conditionally calls `__dl__FPv` (`0x80409B5C`) | Deletes the object when its deleting-destructor flag requests it |
+| `0x80432004` | `0x42D544: 4BFD7B59` | `J3DMtxBuffer` deleting destructor may call `__dl__FPv` | The destructor body does not itself enumerate/free each matrix allocation |
+
+The trace supports this **partial construction order**: construct/initialize the vertex buffer and model fields; enter model data; allocate and initialize a `J3DMtxBuffer`; create model-data-selected animation/envelope/draw/bump storage; create shape/material packets; bind vertex data and prepare packets; then `J3DModelX` performs its derived display-list/transient setup. At render time `viewCalcRef` can write the extra draw-matrix view and refresh packets.
+
+It does **not** support a complete safe cleanup sequence. The inspected `J3DModelX` deleting destructor calls the embedded vertex-buffer destructor and object delete; it has no observed call to `J3DModel::~J3DModel` (`0x802A8134`) or `J3DMtxBuffer::~J3DMtxBuffer` (`0x80431FE0`). The latter also does not visibly release its constituent arrays. The game may rely on a scene heap or a separate owner/caller cleanup path, but that is not proven here. Do not call either destructor manually, free borrowed model data, or infer that one destructor releases the whole graph.
+
+`J3DModel::entryModelData` receives a `J3DModelData*` and builds instance-side buffers/packets around it. This establishes a plausible API-level arrangement where multiple model instances can point at one model-data resource while retaining separate `J3DMtxBuffer` and packet objects. It does **not** establish that Mario's particular model data is immutable during draw: `directDraw`, material/display-list callbacks, shared shape state, and `syncJ3DSysFlags`/other global synchronization paths must be read at the exact PAL callsites. Therefore the answer is **conditionally yes at the `entryModelData` boundary, but not yet yes for a safe duplicate Mario draw**. The source model data/archive must remain resident, every mutable field touched by the actual render path must be instance-local or proven idempotent/read-only, and callbacks must be absent or separately owned.
+
+## Host-side ownership model (synthetic only)
+
+The CLI crate's `render_ownership` module models a validated immutable resource descriptor shared by `Arc`, plus exclusive instance-owned animation/draw/normal matrices, packets, and allocation leases. Construction validates bounded counts and uses a transactional builder; an injected failure at any allocation or initialization stage drops all acquired leases. Tests verify that mutating one instance leaves another and the shared descriptor unchanged, and that successful cleanup returns the synthetic allocation ledger to zero.
+
+These host tests prove Rust ownership behavior for this model only. `Arc`, host allocations, zero-initialized arrays, and RAII are not the Wii allocator ABI, JKRHeap semantics, GX cache protocol, Dolphin behavior, or evidence that actual `J3DModelX` destruction releases all PAL allocations. The model deliberately refuses to encode an executable construction/cleanup recipe.
+
+## Specific next experiment
+
+Run an **offline PAL DOL owner/callsite audit** over every verified `J3DModelX` constructor and deleting-destructor caller, and the `J3DModelData`/archive owner teardown paths. Record exact call instructions and control-flow branches that either explicitly destroy the model/buffer graph or rely on scene heap reclamation. The experiment must not write emulated memory or generate a hook. Stop if the owning heap and the lifetime of the borrowed model data cannot be tied to the same scene generation; runtime remains NO-GO.
 
 ## Exact synchronization and lifecycle contract
 
