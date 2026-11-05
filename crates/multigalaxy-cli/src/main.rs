@@ -3,6 +3,7 @@ mod controller_patch;
 mod dev_config;
 mod gdb;
 mod gecko_bridge;
+mod latency_stats;
 mod perf_bench;
 mod player_probe;
 mod startup;
@@ -631,6 +632,8 @@ fn run_interactive_gecko_bridge_probe(
     let mut next_discovery = Instant::now();
     let mut last_counter = None;
     let mut last_counter_change = Instant::now();
+    let mut stalled_reported = false;
+    let mut last_stall_log = None;
     let mut last_ack_counter = None;
     let mut pending_ack: Option<(u32, Instant)> = None;
     let mut report_started = Instant::now();
@@ -640,8 +643,11 @@ fn run_interactive_gecko_bridge_probe(
     let mut report_rtt_max = Duration::ZERO;
     let mut report_read_total = Duration::ZERO;
     let mut report_write_total = Duration::ZERO;
+    let mut report_validation_total = Duration::ZERO;
     let mut report_reads = 0u64;
     let mut report_writes = 0u64;
+    let mut report_validations = 0u64;
+    let mut all_ack_latencies_ms = Vec::new();
     let mut discovery_notice = Instant::now();
 
     loop {
@@ -719,26 +725,63 @@ fn run_interactive_gecko_bridge_probe(
             }
         }
 
-        if mailbox.is_none() && memory.is_some() && Instant::now() >= next_discovery {
+        if memory.is_some() && Instant::now() >= next_discovery {
             let view = memory.as_ref().expect("mapping checked above");
+            let validation_started = Instant::now();
+            let game_id: [u8; 6] = view
+                .read_guest(0x8000_0000, 6)?
+                .try_into()
+                .map_err(|_| "MEM1 returned an unexpected game ID length".to_owned())?;
+            match bridge_identity::classify_game_id(game_id) {
+                bridge_identity::IdentityStatus::Ready => {}
+                bridge_identity::IdentityStatus::Uninitialized => {
+                    if mailbox.take().is_some() {
+                        println!("elapsed_ms={} pid={pid} mapping_status=valid mapping_view_bytes={} validation=game_id_uninitialized observed_game_id={}", probe_started.elapsed().as_millis(), view.mapped_view_bytes(), bridge_identity::describe_game_id(game_id));
+                    }
+                    last_counter = None;
+                    pending_ack = None;
+                    gecko_deadline = Some(Instant::now() + Duration::from_secs(60));
+                    next_discovery = Instant::now() + Duration::from_millis(500);
+                    continue;
+                }
+                bridge_identity::IdentityStatus::WrongGame => {
+                    return Err(format!("runtime game identity changed; pid={pid} validation=wrong_game observed_game_id={}", bridge_identity::describe_game_id(game_id)));
+                }
+                bridge_identity::IdentityStatus::InvalidMapping => {
+                    return Err(format!("runtime MEM1 identity became invalid; pid={pid} validation=invalid_mapping observed_game_id={}", bridge_identity::describe_game_id(game_id)));
+                }
+            }
             let length = (gecko_bridge::HANDLER_END - gecko_bridge::HANDLER_BASE) as usize;
             let bytes = view.read_guest(gecko_bridge::HANDLER_BASE, length)?;
+            report_validation_total += validation_started.elapsed();
+            report_validations += 1;
             match gecko_bridge::locate_mailbox(gecko_bridge::HANDLER_BASE, handler_size, &bytes) {
                 Ok(Some(found)) => {
-                    println!(
-                        "state=mailbox_ready counter=0x{:08x} ack=0x{:08x} echo=0x{:08x}",
-                        found.counter_address(),
-                        found.acknowledgement_address(),
-                        found.echo_address()
-                    );
-                    mailbox = Some(found);
-                    last_counter = None;
-                    last_counter_change = Instant::now();
-                    report_started = Instant::now();
+                    if mailbox != Some(found) {
+                        println!(
+                            "state=mailbox_ready counter=0x{:08x} ack=0x{:08x} echo=0x{:08x}",
+                            found.counter_address(),
+                            found.acknowledgement_address(),
+                            found.echo_address()
+                        );
+                        mailbox = Some(found);
+                        gecko_deadline = None;
+                        last_counter = None;
+                        pending_ack = None;
+                        last_counter_change = Instant::now();
+                        stalled_reported = false;
+                        report_started = Instant::now();
+                    }
                 }
                 Ok(None) => {
                     if gecko_deadline.is_some_and(|deadline| Instant::now() >= deadline) {
                         return Err(format!("timed out waiting 60 seconds for the Gecko mailbox; pid={pid} mapping_view_bytes={} validation=PAL_RMGP01_verified gecko_signature=not_found elapsed_ms={}", memory.as_ref().map_or(0, stock_memory::StockMem1::mapped_view_bytes), probe_started.elapsed().as_millis()));
+                    }
+                    if mailbox.take().is_some() {
+                        println!("elapsed_ms={} pid={pid} mapping_status=valid mapping_view_bytes={} validation=mailbox_unavailable; writes_suspended=true", probe_started.elapsed().as_millis(), view.mapped_view_bytes());
+                        last_counter = None;
+                        pending_ack = None;
+                        gecko_deadline = Some(Instant::now() + Duration::from_secs(60));
                     }
                     if discovery_notice.elapsed() >= Duration::from_secs(2) {
                         println!("elapsed_ms={} pid={pid} mapping_status=valid mapping_view_bytes={} validation=PAL_RMGP01_verified gecko_signature=waiting", probe_started.elapsed().as_millis(), memory.as_ref().map_or(0, stock_memory::StockMem1::mapped_view_bytes));
@@ -754,11 +797,11 @@ fn run_interactive_gecko_bridge_probe(
             next_discovery = Instant::now() + Duration::from_millis(500);
         }
 
-        if let Some(mailbox) = mailbox {
+        if let Some(active_mailbox) = mailbox {
             let view = memory.as_ref().expect("mailbox requires a mapped view");
             let read_started = Instant::now();
-            let counter = view.read_guest_word(mailbox.counter_address())?;
-            let echo = view.read_guest_word(mailbox.echo_address())?;
+            let counter = view.read_guest_word(active_mailbox.counter_address())?;
+            let echo = view.read_guest_word(active_mailbox.echo_address())?;
             let read_time = read_started.elapsed();
             report_read_total += read_time;
             report_reads += 1;
@@ -772,8 +815,21 @@ fn run_interactive_gecko_bridge_probe(
                 }
                 last_counter = Some(counter);
                 last_counter_change = Instant::now();
+                if stalled_reported {
+                    println!("unix_ms={} state=live_recovered counter={counter}; mailbox writes resumed after game heartbeat recovery", timestamp_unix_ms());
+                    stalled_reported = false;
+                    last_stall_log = None;
+                }
             } else if last_counter_change.elapsed() > Duration::from_secs(3) {
-                return Err("Gecko heartbeat/counter stopped changing for 3 seconds while Dolphin remained alive; the game may be paused or the handler has stopped executing".into());
+                if !stalled_reported
+                    || last_stall_log.map_or(true, |last: Instant| {
+                        last.elapsed() >= Duration::from_secs(2)
+                    })
+                {
+                    println!("unix_ms={} state=stalled counter={counter} writes_suspended=true; waiting for Dolphin/game heartbeat", timestamp_unix_ms());
+                    stalled_reported = true;
+                    last_stall_log = Some(Instant::now());
+                }
             }
 
             if let Some((expected, sent_at)) = pending_ack {
@@ -782,13 +838,57 @@ fn run_interactive_gecko_bridge_probe(
                     report_acks += 1;
                     report_rtt_total += rtt;
                     report_rtt_max = report_rtt_max.max(rtt);
+                    all_ack_latencies_ms.push(rtt.as_secs_f64() * 1000.0);
                     pending_ack = None;
                 }
             }
             if pending_ack.is_none() && counter_changed && last_ack_counter != Some(counter) {
                 let acknowledgement = counter.rotate_left(7) ^ 0x4d47_3141;
+                let live_id: [u8; 6] = view
+                    .read_guest(0x8000_0000, 6)?
+                    .try_into()
+                    .map_err(|_| "MEM1 returned an unexpected game ID length".to_owned())?;
+                match bridge_identity::classify_game_id(live_id) {
+                    bridge_identity::IdentityStatus::Ready => {}
+                    bridge_identity::IdentityStatus::Uninitialized => {
+                        mailbox = None;
+                        pending_ack = None;
+                        last_counter = None;
+                        gecko_deadline = Some(Instant::now() + Duration::from_secs(60));
+                        println!("unix_ms={} validation=game_id_uninitialized observed_game_id={} writes_suspended=true", timestamp_unix_ms(), bridge_identity::describe_game_id(live_id));
+                        continue;
+                    }
+                    bridge_identity::IdentityStatus::WrongGame => {
+                        return Err(format!("runtime game identity changed before mailbox write; validation=wrong_game observed_game_id={}", bridge_identity::describe_game_id(live_id)));
+                    }
+                    bridge_identity::IdentityStatus::InvalidMapping => {
+                        return Err(format!("runtime MEM1 mapping became invalid before mailbox write; validation=invalid_mapping observed_game_id={}", bridge_identity::describe_game_id(live_id)));
+                    }
+                }
+                let handler_len = (gecko_bridge::HANDLER_END - gecko_bridge::HANDLER_BASE) as usize;
+                let validation_started = Instant::now();
+                let live_handler = view.read_guest(gecko_bridge::HANDLER_BASE, handler_len)?;
+                let mailbox_still_valid = gecko_bridge::snapshot_matches_mailbox(
+                    gecko_bridge::HANDLER_BASE,
+                    handler_size,
+                    &live_handler,
+                    active_mailbox,
+                )?;
+                if !mailbox_still_valid {
+                    mailbox = None;
+                    pending_ack = None;
+                    last_counter = None;
+                    gecko_deadline = Some(Instant::now() + Duration::from_secs(60));
+                    println!(
+                        "unix_ms={} validation=mailbox_signature_lost writes_suspended=true",
+                        timestamp_unix_ms()
+                    );
+                    continue;
+                }
+                report_validation_total += validation_started.elapsed();
+                report_validations += 1;
                 let write_started = Instant::now();
-                view.acknowledge(mailbox, acknowledgement)?;
+                view.acknowledge(active_mailbox, acknowledgement)?;
                 report_write_total += write_started.elapsed();
                 report_writes += 1;
                 pending_ack = Some((acknowledgement, write_started));
@@ -812,11 +912,16 @@ fn run_interactive_gecko_bridge_probe(
                 } else {
                     report_write_total.as_secs_f64() * 1000.0 / report_writes as f64
                 };
+                let avg_validation_ms = if report_validations == 0 {
+                    0.0
+                } else {
+                    report_validation_total.as_secs_f64() * 1000.0 / report_validations as f64
+                };
                 println!(
-                    "unix_ms={} state=live counter={} game_update_hz={:.1} ack_hz={:.1} read_hz={:.1} ack_rtt_avg_ms={:.3} ack_rtt_max_ms={:.3} shared_read_avg_ms={:.6} shared_write_avg_ms={:.6}",
+                    "unix_ms={} state=live counter={} game_update_hz={:.1} ack_hz={:.1} read_hz={:.1} ack_rtt_avg_ms={:.3} ack_rtt_max_ms={:.3} shared_read_avg_ms={:.6} shared_validation_avg_ms={:.6} shared_write_avg_ms={:.6}",
                     timestamp_unix_ms(), counter, report_frames as f64 / elapsed,
                     report_acks as f64 / elapsed, report_reads as f64 / elapsed, avg_rtt_ms, report_rtt_max.as_secs_f64() * 1000.0,
-                    avg_read_ms, avg_write_ms
+                    avg_read_ms, avg_validation_ms, avg_write_ms
                 );
                 report_started = Instant::now();
                 report_frames = 0;
@@ -825,14 +930,21 @@ fn run_interactive_gecko_bridge_probe(
                 report_rtt_max = Duration::ZERO;
                 report_read_total = Duration::ZERO;
                 report_write_total = Duration::ZERO;
+                report_validation_total = Duration::ZERO;
                 report_reads = 0;
                 report_writes = 0;
+                report_validations = 0;
             }
             let _ = std::io::stdout().flush();
             std::thread::sleep(Duration::from_millis(1));
         } else {
             std::thread::sleep(Duration::from_millis(20));
         }
+    }
+    if let Some(summary) = latency_stats::summarize(&all_ack_latencies_ms) {
+        println!("bridge_ack_latency_summary count={} mean_ms={:.3} stddev_ms={:.3} p50_ms={:.3} p95_ms={:.3} p99_ms={:.3} max_ms={:.3}", summary.count, summary.mean_ms, summary.stddev_ms, summary.p50_ms, summary.p95_ms, summary.p99_ms, summary.max_ms);
+    } else {
+        println!("bridge_ack_latency_summary count=0; no acknowledgements were verified");
     }
     println!("bridge_probe=stopped; named MEM1 view unmapped");
     Ok(())

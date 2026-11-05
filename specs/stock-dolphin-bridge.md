@@ -12,11 +12,15 @@ Prove a safe, reversible, bidirectional guest/host mailbox at frame cadence usin
 - Windows 2609a does not build MemoryWatcher.
 - Source references and exact limitations are maintained in `docs/stock-dolphin-bridge.md`.
 
+## Evidence status
+
+The user reported visible live counter/ACK exchange on stock Dolphin 2609a with PAL RMGP01 Rev 0 at ~59–60.5 updates/s, ~59–60 ACKs/s, ~16.7 ms mean ACK round trip, and ~2 microseconds per shared read/write. Smooth 100% speed was also user-observed. This verifies interactive bidirectional mailbox behavior by user report. It is not a controlled bridge-on/off gameplay performance benchmark. Reported per-window maxima of 30–47 ms lack raw samples; jitter percentiles are not inferred from them.
+
 ## Functional requirements
 
 - The launcher may append one test Gecko routine only to the selected isolated `RMGP01.ini` profile.
 - The routine increments a counter and copies a host acknowledgement into a game-readable echo.
-- Rust opens the spawned stock Dolphin's named mapping, verifies RMGP01 identity, exact handler bounds/signature, and a unique mailbox before a single aligned acknowledgement write.
+- Rust opens the spawned stock Dolphin's named mapping, verifies RMGP01 identity, exact handler bounds/signature, and a unique mailbox before a single aligned acknowledgement write. It rechecks game ID and handler signature before each write; a stalled game suspends writes, and a missing mailbox is re-scanned for up to 60 seconds.
 - Reject unexpected handler size, unknown game, duplicate/corrupt code, out-of-view pointers, and overlap with the observed AllStars cave.
 - No writes to game images, Dolphin binaries, or regular profile. No GDB for the bridge path.
 - Preserve mandatory AllStars code and requested shoulder swaps.
@@ -35,8 +39,8 @@ The host mapping is unsupported and may change. External writes can race the CPU
 
 ## Acceptance criteria
 
-Interactive Dolphin displays playable PAL SMG1 with AllStars active. The counter changes at approximately 60 Hz, acknowledgements are observed by game code, state is timestamped, and paired FPS/VPS/speed/CPU measurements show no noticeable slowdown. No criterion is satisfied by synthetic tests alone.
+The user-observed counter/ACK exchange at approximately 60 Hz satisfies the live bidirectional handshake portion. Remaining acceptance: controlled playable bridge-on/off FPS/VPS/speed/CPU comparison, title/menu and pause/resume/scene-transition recovery checks, plus per-session jitter summary. No performance acceptance is claimed from anecdotal smoothness.
 
 ## Testing strategy
 
-Rust synthetic tests cover code generation, memory bounds, signature verification, mapping round-trip, and corruption/overlap rejection. User-side paired run compares same scene/profile with probe disabled/enabled. Record live results separately from tests and static source findings. The proof has not yet passed its interactive acceptance criteria.
+Rust tests cover code generation, memory bounds, signature verification, mapped ACK isolation, latency statistics, and corruption/overlap rejection. User-side paired gameplay runs compare the same scene/profile with probe disabled/enabled. Record user observation separately from controlled measurements and synthetic tests. Full milestone acceptance remains pending.

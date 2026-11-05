@@ -6,7 +6,7 @@ Rust-first, online-only multiplayer modification research for PAL Super Mario Ga
 
 - M0 research and PAL DOL analysis tooling are in progress.
 - The Rust CLI parses and compares DOLs; multiplayer runtime behavior is not implemented.
-- Exact PAL revision maps and a Dolphin game-side bridge remain unverified.
+- PAL game-side state extraction remains unverified; the stock Dolphin Gecko mailbox has user-observed live bidirectional operation at approximately 60 Hz.
 - Russian, French, and English client-local localization is a required acceptance case, not a tested feature.
 - The PAL AllStars controller patch with both shoulder swaps is mandatory on every launcher path; source fingerprints and PAL Rev 0 compatibility are checked before Dolphin starts.
 - See [milestones](docs/milestones.md), [testing evidence](docs/testing.md), and [online architecture](docs/networking.md).
@@ -27,4 +27,4 @@ Original MultiGalaxy1 code is released under the [WTFPL Version 2](LICENSE). Thi
 
 ## Stock Dolphin bridge status
 
-MultiGalaxy1 uses an unmodified official Dolphin installation. The retired Dolphin fork is not part of the project. An experimental Windows Dolphin 2609a bridge proof combines a Gecko frame counter with Dolphin's existing named MEM1 mapping; it is version-specific and undocumented. Synthetic mapping tests pass, but live exchange and gameplay performance remain unverified. Online actor synchronization remains blocked on those tests. AllStars stays mandatory on launcher paths. See [bridge feasibility and interactive test instructions](docs/stock-dolphin-bridge.md).
+MultiGalaxy1 uses an unmodified official Dolphin installation. The retired Dolphin fork is not part of the project. A Windows Dolphin 2609a Gecko counter/echo bridge has user-observed live bidirectional operation at about 60 Hz through Dolphin's undocumented named MEM1 mapping. A controlled playable bridge-on/off performance comparison, Mario coordinate extraction, and online actor synchronization remain pending. AllStars stays mandatory on launcher paths. See [bridge evidence and interactive test instructions](docs/stock-dolphin-bridge.md).

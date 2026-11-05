@@ -142,6 +142,17 @@ pub fn locate_mailbox(
     Ok(found)
 }
 
+/// Confirm that a fresh handler snapshot still contains the exact previously
+/// validated mailbox. This guard is run immediately before each host ACK write.
+pub fn snapshot_matches_mailbox(
+    region_base: u32,
+    handler_size: usize,
+    bytes: &[u8],
+    expected: Mailbox,
+) -> Result<bool, String> {
+    Ok(locate_mailbox(region_base, handler_size, bytes)? == Some(expected))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -209,5 +220,21 @@ mod tests {
         assert!(locate_mailbox(HANDLER_BASE, 2880, &bytes)
             .unwrap_err()
             .contains("overlaps the PAL AllStars code cave"));
+    }
+
+    #[test]
+    fn fresh_handler_snapshot_must_match_before_ack_write() {
+        let original = fixture();
+        let mailbox = locate_mailbox(HANDLER_BASE, 2880, &original)
+            .unwrap()
+            .unwrap();
+        assert!(snapshot_matches_mailbox(HANDLER_BASE, 2880, &original, mailbox).unwrap());
+        assert!(
+            !snapshot_matches_mailbox(HANDLER_BASE, 2880, &vec![0; original.len()], mailbox)
+                .unwrap()
+        );
+        let mut corrupted = original;
+        corrupted[2880 + 16 + 4] ^= 1;
+        assert!(snapshot_matches_mailbox(HANDLER_BASE, 2880, &corrupted, mailbox).is_err());
     }
 }

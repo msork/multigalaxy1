@@ -8,9 +8,9 @@ BSMSO is a precedent for a game module, launcher mailbox, and relay server, but 
 
 ## Stock Dolphin go/no-go
 
-MultiGalaxy1 uses official, unmodified Dolphin only. A reversible Gecko counter/echo routine and Dolphin 2609a's existing named Windows MEM1 mapping form the current bridge proof. Dolphin source verifies the mapping name and MEM1-at-offset-zero layout. This is an undocumented internal detail, not a supported API; live cache/synchronization semantics and performance remain unverified. GDB remains a development diagnostic. Windows 2609a excludes MemoryWatcher. See [stock bridge feasibility](stock-dolphin-bridge.md).
+MultiGalaxy1 uses official, unmodified Dolphin only. A reversible Gecko counter/echo routine and Dolphin 2609a's named Windows MEM1 mapping have user-observed live bidirectional operation at approximately 60 Hz. Dolphin source verifies the mapping name and MEM1-at-offset-zero layout. The mapping remains undocumented; controlled overhead and pause/scene recovery are pending. GDB is development-only, and Windows 2609a excludes MemoryWatcher. See [stock bridge feasibility](stock-dolphin-bridge.md).
 
-Do not implement online actor synchronization until interactive testing verifies PAL Gecko activation, bidirectional exchange near 60 Hz, and paired gameplay performance. Synthetic mapping tests are not Dolphin runtime evidence. If the proof fails, document the limitation and alternatives; do not reintroduce a Dolphin fork.
+Do not implement online actor synchronization until a controlled bridge-on/off playable benchmark and interactive lifecycle checks pass, followed by verified PAL Mario state extraction. Synthetic tests are not Dolphin runtime evidence. If the stock bridge fails later checks, document the limitation and alternatives; do not reintroduce a Dolphin fork.
 
 ## Controller and Rust feasibility
 
@@ -20,8 +20,9 @@ Rust remains primary for launcher, networking, protocol, patch tooling, simulati
 
 ## Not established
 
-- Live mailbox exchange, Mario coordinates, verified actor hooks, or remote actor rendering.
-- Performance cost or 60 Hz cadence for the stock mapping probe.
+- Live Mario coordinates, verified actor hooks, or remote actor rendering.
+- Controlled bridge-on/off gameplay FPS/VPS/speed/CPU results.
+- Pause/resume or scene-transition recovery under Dolphin.
 - Online latency, four-player stability, progression, or localization isolation.
 - Rust Wii runtime compilation.
 - Russian patch contents, revision, and license.

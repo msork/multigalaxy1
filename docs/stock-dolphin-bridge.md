@@ -13,7 +13,13 @@ Implemented locally:
 - The Rust probe reports update rate, read/write cost, acknowledgement rate and round-trip latency; `Q` unmaps the view. It enables no GDB server.
 - Windows synthetic tests create a separate named mapping and verify counter-read / acknowledgement-write visibility across two mapped views. This proves the Rust mapping mechanics only, **not Dolphin behavior**.
 
-No live Dolphin exchange, 60 Hz cadence, visible gameplay, or performance comparison has yet been verified. The C0 code's runtime execution, Dolphin's synchronization/cache visibility for external shared-memory writes, and Gecko ordering relative to AllStars still require the interactive test below. The prototype fails closed if validation does not match.
+## Verified user-observed live evidence
+
+After commit `e836776`, the user reported a visible interactive run on stock Dolphin 2609a with PAL RMGP01 Rev 0 and the isolated mandatory-AllStars profile. The console showed `state=live`, game update rate about 59–60.5 Hz, acknowledgement rate about 59–60 Hz, mean acknowledgement round trip about 16.7 ms, and shared-memory read and write calls around 2 microseconds each. The user also observed smooth gameplay at 100% emulation speed during this run. Treat these as verified **user-observed live results**, not an independently captured trace or controlled performance benchmark.
+
+The user reported per-window maximum acknowledgement values around 30–47 ms. This indicates occasional multi-frame jitter relative to the ~16.7 ms average; the underlying individual samples were not supplied, so p50/p95/p99 or standard deviation cannot be recovered from those aggregate reports. The probe now prints a session summary on `Q` with count, mean, population standard deviation, p50, p95, p99, and max. No controlled bridge-on/off Speed/FPS/VPS/CPU comparison is complete yet.
+
+The host now rechecks RMGP01 and the complete Gecko handler signature before every acknowledgement write, and periodically rescans the handler to detect mailbox loss. During a paused/stalled game it suspends writes and waits for the counter to resume; if the mailbox disappears it waits up to 60 seconds for a validated mailbox to return. This recovery behavior is covered by static/synthetic regression tests but still needs the interactive pause/resume and scene-transition checks below.
 
 ## Dolphin 2609a source findings
 
@@ -42,7 +48,7 @@ If Dolphin asks for save import, import using Dolphin's UI, then close setup Dol
 cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0
 ```
 
-Start the game, enter the same playable scene, and leave Mario idle for 30 seconds. Record Dolphin OSD Speed/FPS/VPS and PID. In a second PowerShell, sample CPU for the same interval:
+Start the game, enter the same playable scene, and perform the same repeatable movement/jump route for 60 seconds in each condition. Record Dolphin OSD Speed/FPS/VPS and PID. In a second PowerShell, sample CPU for the same interval:
 
 ```powershell
 cargo run -p multigalaxy -- bench-dolphin <PID> 30 stock-bridge-off
@@ -54,13 +60,15 @@ Close Dolphin, then launch with the probe:
 cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-bridge-test' 0 --gecko-bridge-probe
 ```
 
-Enter the same scene and record the console's `state=live` lines plus matching OSD and CPU measurements:
+Enter the same scene and repeat the same movement/jump route. Record the console's `state=live` lines plus matching OSD and CPU measurements:
 
 ```powershell
 cargo run -p multigalaxy -- bench-dolphin <PID> 30 stock-bridge-on
 ```
 
-Use `Q` in the launcher console to unmap/stop. A live proof requires a changing counter, matching acknowledgements/echoes, approximately 60 game updates per second, stable gameplay, and paired FPS/VPS/speed/CPU data. Keep logs and report both the synthetic and live evidence separately. If no mailbox appears within 60 seconds, the launcher reports the failure; check the isolated Gecko enable section and whether the game reached its title/menu. Do not disable AllStars or GDB silently to work around failure.
+Use `Q` in the launcher console to unmap/stop and print aggregate jitter statistics. A clean benchmark compares the same scene, route, resolution, controller, and saved state. The baseline and bridge trials must each report OSD Speed/FPS/VPS and 30–60 seconds of process CPU samples. Keep user-observed smoothness separate from this controlled comparison.
+
+For lifecycle checks, run the bridge probe and separately verify (a) title screen/menu counter behavior, (b) enter and leave a playable scene, (c) pause for at least 10 seconds and resume, and (d) transition between two scenes. Expected behavior: `state=stalled` with writes suspended during pause, `state=live_recovered` after resume, and `mailbox_unavailable`/`mailbox_ready` during code-handler loss/reinstallation. Do not claim these have passed until observed interactively. On a wrong game ID, invalid mapping, lost signature before a write, or Dolphin exit, the probe fails closed; on a temporarily absent mailbox it waits for a validated return.
 
 ## Interface comparison
 

@@ -262,6 +262,8 @@ mod tests {
                 .unwrap(),
             0x89ab_cdef
         );
+        assert_eq!(view.read_guest_word(mailbox.counter_address()).unwrap(), 7);
+        assert_eq!(view.read_guest_word(mailbox.echo_address()).unwrap(), 0);
         unsafe {
             assert_eq!(
                 u32::from_be(ptr::read_volatile(
