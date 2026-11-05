@@ -5,6 +5,24 @@ use multigalaxy_patch::{
 };
 
 pub const GAME_SYSTEM_SINGLETON: u32 = 0x806A_1228;
+pub const PAL_RUNTIME_SIGNATURES: &[(u32, &[u8])] = &[
+    (
+        0x802E_153C,
+        &[0x80, 0x63, 0x00, 0x0c, 0x4e, 0x80, 0x00, 0x20],
+    ),
+    (
+        0x8034_4A70,
+        &[
+            0x54, 0x80, 0x10, 0x3a, 0x7c, 0x63, 0x00, 0x2e, 0x4e, 0x80, 0x00, 0x20,
+        ],
+    ),
+    (
+        0x8039_D468,
+        &[
+            0x80, 0x63, 0x00, 0xac, 0x80, 0x63, 0x00, 0x10, 0x4e, 0x80, 0x00, 0x20,
+        ],
+    ),
+];
 const PAL_SYMBOLS_SHA256: [u8; 32] = [
     0x0d, 0x63, 0x23, 0xc1, 0x32, 0x87, 0x71, 0xc3, 0xb9, 0x40, 0x37, 0xb6, 0xf8, 0xba, 0xf1, 0x0f,
     0x64, 0x90, 0x62, 0x29, 0xb5, 0xdf, 0x39, 0x4d, 0x2c, 0x5e, 0x4d, 0x2b, 0xa8, 0x92, 0x66, 0x00,
@@ -42,6 +60,13 @@ pub trait GuestMemory {
 impl GuestMemory for DolphinGdb {
     fn read_guest(&mut self, address: u32, length: usize) -> Result<Vec<u8>, String> {
         self.read_memory(address, length)
+    }
+}
+
+#[cfg(windows)]
+impl GuestMemory for crate::stock_memory::StockMem1 {
+    fn read_guest(&mut self, address: u32, length: usize) -> Result<Vec<u8>, String> {
+        crate::stock_memory::StockMem1::read_guest(self, address, length)
     }
 }
 
@@ -155,6 +180,26 @@ pub fn verify_pal_inputs(dol: &[u8], symbols: &[u8]) -> Result<VerifiedPalMap, S
         bss_address: info.bss_address,
         bss_size: info.bss_size,
     })
+}
+
+/// Confirm the live DOL still contains exact PAL Rev 0 function signatures at
+/// selected sites not expected to be touched by the required AllStars patch.
+/// This is an identity check, not a general-purpose code scan.
+pub fn verify_live_pal_signatures(memory: &mut impl GuestMemory, dol: &[u8]) -> Result<(), String> {
+    for &(address, expected) in PAL_RUNTIME_SIGNATURES {
+        if dol_bytes(dol, address, expected.len())? != expected {
+            return Err(format!(
+                "local PAL identity signature differs at 0x{address:08x}"
+            ));
+        }
+        let observed = read_checked(memory, address, expected.len(), "PAL runtime signature")?;
+        if observed != expected {
+            return Err(format!(
+                "live memory does not match PAL RMGP01 Rev 0 at 0x{address:08x}"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn require_symbol(

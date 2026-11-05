@@ -1,11 +1,16 @@
-//! Narrow Windows view of Dolphin 2609a's named MEM1 backing section.
+//! Read-only Windows views into Dolphin 2609a's named emulated-memory section.
 //!
 //! Dolphin's stock Windows MemArenaWin names the page-file mapping
 //! `dolphin-emu.<pid>`. Memmap.cpp assigns MEM1 the first shared-memory offset.
-//! We open only the first 64 KiB of that view and only permit RMGP01 identity,
-//! Gecko-handler reads, and one validated mailbox acknowledgement write.
+//! The persistent 64 KiB view remains for the existing mailbox bridge. Explicit
+//! inspection requests use temporary, allocation-granularity-aligned read-only
+//! views, capped to canonical retail MEM1 and 8 KiB per request.
 
 use crate::gecko_bridge::{Mailbox, HANDLER_BASE, HANDLER_END};
+use crate::memory_inspection::{
+    read_explicit_range, ReadOnlyMappedMemory, GUEST_MEM1_MIN_SIZE, MAX_READ_BYTES,
+    WINDOWS_ALLOCATION_GRANULARITY,
+};
 use std::ffi::{c_void, OsStr};
 use std::os::windows::ffi::OsStrExt;
 use std::ptr::{self, NonNull};
@@ -52,7 +57,11 @@ impl StockMem1 {
     }
 
     pub fn open_dolphin_read_only(pid: u32) -> Result<Self, MappingOpenError> {
-        Self::open_name_access(&format!("dolphin-emu.{pid}"), false)
+        let mapping = Self::open_name_access(&format!("dolphin-emu.{pid}"), false)?;
+        mapping
+            .validate_minimum_mem1()
+            .map_err(MappingOpenError::Invalid)?;
+        Ok(mapping)
     }
 
     fn open_name_access(name: &str, writable: bool) -> Result<Self, MappingOpenError> {
@@ -119,27 +128,61 @@ impl StockMem1 {
     }
 
     pub fn read_guest(&self, address: u32, length: usize) -> Result<Vec<u8>, String> {
-        let offset = Self::guest_offset(address, length)?;
-        let mut bytes = vec![0; length];
-        // SAFETY: the requested range was checked against the 64 KiB view;
-        // each volatile byte read is independent of Dolphin's concurrent CPU.
-        unsafe {
-            for (index, byte) in bytes.iter_mut().enumerate() {
-                *byte = ptr::read_volatile(self.view.as_ptr().add(offset + index));
-            }
-        }
-        Ok(bytes)
+        read_explicit_range(self, address, length)
     }
 
     pub fn read_guest_word(&self, address: u32) -> Result<u32, String> {
         if address & 3 != 0 {
             return Err("guest word reads must be 4-byte aligned".into());
         }
-        let offset = Self::guest_offset(address, 4)?;
-        // SAFETY: MapViewOfFile is page-aligned and the validated address is
-        // aligned; four bytes fit inside the mapped view.
-        let raw = unsafe { ptr::read_volatile(self.view.as_ptr().add(offset).cast::<u32>()) };
-        Ok(u32::from_be(raw))
+        let bytes = self.read_guest(address, 4)?;
+        Ok(u32::from_be_bytes(bytes.try_into().unwrap()))
+    }
+
+    /// Verify the named section reaches the end of the minimum retail MEM1
+    /// region. This maps, but does not read, its last 64 KiB block.
+    pub fn validate_minimum_mem1(&self) -> Result<(), String> {
+        let offset = u64::from(GUEST_MEM1_MIN_SIZE)
+            .checked_sub(WINDOWS_ALLOCATION_GRANULARITY)
+            .ok_or("minimum MEM1 size is smaller than Windows allocation granularity")?;
+        let view = self.map_readonly_window(offset, VIEW_BYTES)?;
+        // SAFETY: the view was successfully mapped and is owned by this scope.
+        let result = unsafe { UnmapViewOfFile(view.as_ptr().cast()) };
+        if result == 0 {
+            return Err(format!(
+                "could not unmap MEM1 compatibility-check view: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        Ok(())
+    }
+
+    fn map_readonly_window(
+        &self,
+        mapping_offset: u64,
+        mapped_length: usize,
+    ) -> Result<NonNull<u8>, String> {
+        if mapping_offset % WINDOWS_ALLOCATION_GRANULARITY != 0 {
+            return Err("shared-memory view offset is not allocation-granularity aligned".into());
+        }
+        if mapped_length == 0 || mapped_length > MAX_READ_BYTES + VIEW_BYTES {
+            return Err("shared-memory view length exceeds bounded read window".into());
+        }
+        let raw = unsafe {
+            MapViewOfFile(
+                self.handle.as_ptr(),
+                FILE_MAP_READ,
+                (mapping_offset >> 32) as u32,
+                mapping_offset as u32,
+                mapped_length,
+            )
+        };
+        NonNull::new(raw.cast::<u8>()).ok_or_else(|| {
+            format!(
+                "could not map read-only Dolphin MEM1 range at shared offset 0x{mapping_offset:x} length 0x{mapped_length:x}: {}",
+                std::io::Error::last_os_error()
+            )
+        })
     }
 
     pub fn acknowledge(&self, mailbox: Mailbox, value: u32) -> Result<(), String> {
@@ -160,6 +203,55 @@ impl StockMem1 {
             ptr::write_volatile(self.view.as_ptr().add(offset).cast::<u32>(), value.to_be());
         }
         Ok(())
+    }
+}
+
+impl ReadOnlyMappedMemory for StockMem1 {
+    fn read_mapped_window(
+        &self,
+        mapping_offset: u64,
+        mapped_length: usize,
+        data_offset: usize,
+        length: usize,
+    ) -> Result<Vec<u8>, String> {
+        let window_end = mapping_offset
+            .checked_add(mapped_length as u64)
+            .ok_or("mapped view range overflow")?;
+        let data_end = (data_offset as u64)
+            .checked_add(length as u64)
+            .ok_or("mapped data range overflow")?;
+        if data_end > mapped_length as u64 || window_end > u64::from(GUEST_MEM1_MIN_SIZE) {
+            return Err("mapped view is outside the validated MEM1 range".into());
+        }
+
+        if mapping_offset == 0 && window_end <= VIEW_BYTES as u64 {
+            let mut bytes = vec![0; length];
+            // SAFETY: offsets and lengths were checked against the owned 64 KiB
+            // view; volatile reads avoid assuming synchronization with Dolphin.
+            unsafe {
+                for (index, byte) in bytes.iter_mut().enumerate() {
+                    *byte = ptr::read_volatile(self.view.as_ptr().add(data_offset + index));
+                }
+            }
+            return Ok(bytes);
+        }
+
+        let view = self.map_readonly_window(mapping_offset, mapped_length)?;
+        let mut bytes = vec![0; length];
+        // SAFETY: the requested range fits the newly mapped bounded view.
+        unsafe {
+            for (index, byte) in bytes.iter_mut().enumerate() {
+                *byte = ptr::read_volatile(view.as_ptr().add(data_offset + index));
+            }
+            let unmapped = UnmapViewOfFile(view.as_ptr().cast());
+            if unmapped == 0 {
+                return Err(format!(
+                    "could not unmap read-only Dolphin MEM1 view: {}",
+                    std::io::Error::last_os_error()
+                ));
+            }
+        }
+        Ok(bytes)
     }
 }
 

@@ -4,6 +4,7 @@ mod dev_config;
 mod gdb;
 mod gecko_bridge;
 mod latency_stats;
+mod memory_inspection;
 mod perf_bench;
 mod player_probe;
 mod startup;
@@ -12,7 +13,8 @@ mod stock_memory;
 mod sync_net;
 
 use multigalaxy_patch::{
-    branch_target, changed_ranges, parse_dol, sha256, DiscIdentity, RevisionCatalog, SectionKind,
+    branch_target, changed_ranges, parse_dol, parse_onframe_patch, sha256, DiscIdentity,
+    RevisionCatalog, SectionKind,
 };
 use std::collections::HashMap;
 use std::io::Write;
@@ -36,6 +38,153 @@ fn timestamp_unix_ms() -> u128 {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis()
+}
+
+#[cfg(windows)]
+fn run_inspect_memory(
+    config_path: &std::path::Path,
+    pid: u32,
+    guest_address: u32,
+    length: usize,
+    format: memory_inspection::ValueFormat,
+) -> Result<(), String> {
+    const EXPECTED_HANDLER_SHA256: &str =
+        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
+
+    memory_inspection::validate_typed_request(guest_address, length, format)?;
+    let config_text = fs::read_to_string(config_path)
+        .map_err(|e| format!("cannot read development config: {e}"))?;
+    let config = dev_config::parse(&config_text)?;
+    validate_dev_inputs(&config)?;
+    let dol = fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
+    let symbols =
+        fs::read(&config.pal_symbols).map_err(|e| format!("cannot read Petari symbol map: {e}"))?;
+    player_probe::verify_pal_inputs(&dol, &symbols)?;
+
+    // Keep the required AllStars patch inputs validated and ensure none of its
+    // current writes overlap the small PAL Rev 0 signatures used at runtime.
+    let patch = controller_patch::prepare_allstars(&config.patch_folder, &dol)?;
+    let patch_writes = parse_onframe_patch(&patch.settings)
+        .map_err(|e| format!("invalid prepared AllStars patch: {e}"))?;
+    for &(signature_address, signature) in player_probe::PAL_RUNTIME_SIGNATURES {
+        let signature_range =
+            u64::from(signature_address)..u64::from(signature_address) + signature.len() as u64;
+        if patch_writes.iter().any(|write| {
+            let write_range = u64::from(write.address)..u64::from(write.address) + 4;
+            write_range.start < signature_range.end && signature_range.start < write_range.end
+        }) {
+            return Err(format!(
+                "required AllStars patch overlaps PAL identity signature at 0x{signature_address:08x}; refusing runtime inspection"
+            ));
+        }
+    }
+
+    let dolphin = config
+        .dolphin
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve configured Dolphin executable: {e}"))?;
+    if !dolphin
+        .file_name()
+        .is_some_and(|name| name.to_string_lossy().eq_ignore_ascii_case("Dolphin.exe"))
+    {
+        return Err("configured executable is not named Dolphin.exe".into());
+    }
+    let process_image = startup::process_image_path(pid)?
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve PID {pid} executable: {e}"))?;
+    if !process_image
+        .to_string_lossy()
+        .eq_ignore_ascii_case(&dolphin.to_string_lossy())
+    {
+        return Err(format!(
+            "PID {pid} executable does not match configured Dolphin: {}",
+            process_image.display()
+        ));
+    }
+    let current_session = startup::desktop_context()
+        .ok_or("cannot determine current Windows session")?
+        .session_id;
+    let process_session = startup::process_session_id(pid)
+        .ok_or_else(|| format!("cannot determine Windows session for Dolphin PID {pid}"))?;
+    if process_session != current_session {
+        return Err(format!(
+            "Dolphin PID {pid} is in session {process_session}, current session is {current_session}"
+        ));
+    }
+
+    let handler_path = dolphin
+        .parent()
+        .ok_or("configured Dolphin executable has no parent directory")?
+        .join("Sys")
+        .join("codehandler.bin");
+    let handler = fs::read(&handler_path)
+        .map_err(|e| format!("cannot read Dolphin's 2609a codehandler: {e}"))?;
+    let handler_hash = sha256(&handler)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
+        return Err(format!(
+            "Dolphin 2609a codehandler validation failed (size={}, sha256={handler_hash})",
+            handler.len()
+        ));
+    }
+
+    let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid)
+        .map_err(|e| format!("cannot open compatible Dolphin MEM1 mapping read-only: {e:?}"))?;
+    let game_id = memory.read_guest(memory_inspection::GUEST_MEM1_BASE, 6)?;
+    if game_id != b"RMGP01" {
+        return Err(format!(
+            "live mapping is not PAL RMGP01: {}",
+            String::from_utf8_lossy(&game_id)
+        ));
+    }
+    player_probe::verify_live_pal_signatures(&mut memory, &dol)?;
+
+    let bytes = memory.read_guest(guest_address, length)?;
+    // Recheck identity after the requested sample so process/scene-independent
+    // guest mapping changes fail closed instead of returning untrusted bytes.
+    if memory.read_guest(memory_inspection::GUEST_MEM1_BASE, 6)? != b"RMGP01" {
+        return Err("live game identity changed during requested read".into());
+    }
+    player_probe::verify_live_pal_signatures(&mut memory, &dol)?;
+
+    let hex = bytes
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    let decoded = match format {
+        memory_inspection::ValueFormat::Bytes => format!("bytes={hex}"),
+        memory_inspection::ValueFormat::U32 => format!(
+            "u32=0x{:08x}",
+            memory_inspection::decode_be_u32(guest_address, &bytes)?
+        ),
+        memory_inspection::ValueFormat::Pointer => {
+            match memory_inspection::decode_be_pointer(guest_address, &bytes)? {
+                Some(pointer) => format!("pointer=0x{pointer:08x}"),
+                None => "pointer=null".into(),
+            }
+        }
+        memory_inspection::ValueFormat::F32 => format!(
+            "f32={}",
+            memory_inspection::decode_be_f32(guest_address, &bytes)?
+        ),
+    };
+    println!(
+        "memory_read=validated pid={pid} game=RMGP01 revision=0 backend=stock-read-only-mem1 address=0x{guest_address:08x} length={length} {decoded}"
+    );
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn run_inspect_memory(
+    _config_path: &std::path::Path,
+    _pid: u32,
+    _guest_address: u32,
+    _length: usize,
+    _format: memory_inspection::ValueFormat,
+) -> Result<(), String> {
+    Err("inspect-memory currently requires official stock Dolphin 2609a on Windows".into())
 }
 
 fn dolphin_config(port: Option<u16>, mute: bool, enable_cheats: bool, development: bool) -> String {
@@ -1406,6 +1555,38 @@ fn run_sync_client(
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if (args.len() == 5 || args.len() == 6) && args[0] == "inspect-memory" {
+        let pid = args[2]
+            .to_str()
+            .ok_or("Dolphin PID must be valid UTF-8")?
+            .parse::<u32>()
+            .map_err(|_| "Dolphin PID must be a positive integer")?;
+        if pid == 0 {
+            return Err("Dolphin PID must be positive".into());
+        }
+        let address = u32::from_str_radix(
+            args[3]
+                .to_str()
+                .ok_or("guest address must be valid UTF-8")?
+                .trim_start_matches("0x")
+                .trim_start_matches("0X"),
+            16,
+        )
+        .map_err(|_| "guest address must be a hexadecimal 32-bit address")?;
+        let length = args[4]
+            .to_str()
+            .ok_or("read length must be valid UTF-8")?
+            .parse::<usize>()
+            .map_err(|_| "read length must be a positive decimal integer")?;
+        let format = if args.len() == 6 {
+            memory_inspection::ValueFormat::parse(
+                args[5].to_str().ok_or("read format must be valid UTF-8")?,
+            )?
+        } else {
+            memory_inspection::ValueFormat::Bytes
+        };
+        return run_inspect_memory(std::path::Path::new(&args[1]), pid, address, length, format);
+    }
     if args.len() == 2 && args[0] == "sync-server" {
         let address = args[1]
             .to_str()
@@ -2056,7 +2237,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
