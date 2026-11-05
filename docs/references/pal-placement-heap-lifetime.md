@@ -26,6 +26,21 @@ The Rust verifier checks the two exact BSS symbol records, relevant function sym
 
 The current heap may legitimately differ from the Scene Napa heap when sampled outside scene-placement setup. The report exposes `current_heap_matches_scene_napa` as true, false, or unavailable; false is a valid observation, not a validation failure. A sample during ordinary gameplay establishes only which pointer was in `sCurrentHeap` at that read, not which heap was active when a Penguin constructor ran.
 
+### User-observed gameplay sample
+
+After commit `847ec17`, the user reported one successful live `observe-heaps` result for PAL RMGP01 Rev 0:
+
+| Field | Reported value |
+|---|---:|
+| Scene | `0x80F8EF70` |
+| AllLiveActorGroup | `0x80FA07D8` |
+| `sCurrentHeap` at sample time | `0x80F8EEF0` |
+| Scene Napa heap | `0x80F8EEF0` |
+| Scene GDDR3 heap | `0x93223500` |
+| Current heap equals Scene Napa | yes |
+
+This is **user-observed live evidence**, not independently recaptured in this turn. It is consistent with Scene Napa being current at that gameplay sample. It does not establish which heap was active when any Penguin constructor or model initializer ran.
+
 ## Normal scene and placement path
 
 The PAL code selects the Scene heap before the normal placement calls:
@@ -100,12 +115,16 @@ The future experiment must be isolated to a reversible patch/profile. On failure
 
 ## Smallest further experiment
 
-The read-only `observe-heaps` command now performs a bounded, double-sampled correlation of `sCurrentHeap`, both Scene heap handles, active scene address, and AllLiveActorGroup address. Run it at separate user-controlled checkpoints: after entering a playable scene, while paused/resumed, and after a scene transition. Each invocation re-resolves the entire GameSystem → controller → scene → holder → group chain and discards the result if scene/group/heap pointers change during the sample. It does not observe the constructor call itself.
+The read-only `observe-heaps` command performs a bounded, double-sampled correlation of `sCurrentHeap`, both Scene heap handles, active scene address, and AllLiveActorGroup address. For a mission-transition comparison, use one Dolphin PID and sample once after gameplay is established in the source mission. Leave it through normal in-game flow, load a different mission, wait until gameplay is established again, and sample once more. Each invocation re-resolves the entire GameSystem → controller → scene → holder → group chain and discards the result if scene/group/heap pointers change during that sample. No continuous polling is needed, and the command does not observe constructor calls.
+
+This comparison is address-based: a changed scene/group/heap pointer is evidence that the sampled identity changed. An unchanged address is inconclusive because memory can be reused; it does not prove no transition occurred. Record mission names separately. A sample during the transition may fail because there is no active scene/group; that is a safe failure, not a reason to retry in a tight loop. The tool does not keep a scene generation counter.
 
 PowerShell from the repository root, with the user's isolated PAL Dolphin session already running:
 
 ```powershell
 $DolphinPid = 12345 # replace with the PID of the isolated Dolphin instance
+cargo run -p multigalaxy -- observe-heaps .\development.local.toml $DolphinPid
+# After a normal in-game mission transition has fully loaded the destination:
 cargo run -p multigalaxy -- observe-heaps .\development.local.toml $DolphinPid
 ```
 
