@@ -2855,8 +2855,19 @@ fn run() -> Result<(), String> {
                         });
                     match attempt {
                         Ok(report) => {
+                            let stub_note = match &report.stub_words {
+                                Some(words) => format!(
+                                    " stub=[{}]",
+                                    words
+                                        .iter()
+                                        .map(|w| format!("{w:08x}"))
+                                        .collect::<Vec<_>>()
+                                        .join(" ")
+                                ),
+                                None => String::new(),
+                            };
                             let line = format!(
-                                "t={:>6}ms hook_word=0x{:08x} {}",
+                                "t={:>6}ms hook_word=0x{:08x} {}{stub_note}",
                                 elapsed_ms,
                                 report.hook_word,
                                 report.describe()

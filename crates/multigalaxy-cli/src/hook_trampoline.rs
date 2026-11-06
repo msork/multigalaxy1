@@ -21,10 +21,14 @@ pub enum HookState {
     Unexpected { word: u32 },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HookReport {
     pub hook_word: u32,
     pub state: HookState,
+    /// The 8 words read at the decoded branch target, when the hook word is a
+    /// plain `b`. Lets the pre-flight timeline show whether the stub itself is
+    /// being overwritten at runtime (e.g. by AllStars cave code).
+    pub stub_words: Option<[u32; gecko_bridge::STUB_WORDS_PUBLIC]>,
 }
 
 /// The exact 8-word stub the installer's hook branch must target.
@@ -122,13 +126,15 @@ pub fn check_live(memory: &mut impl GuestMemory) -> Result<HookReport, String> {
         return Ok(HookReport {
             hook_word,
             state: HookState::Original,
+            stub_words: None,
         });
     }
     let opcode = hook_word >> 26;
     let links = hook_word & 1 == 1;
     if opcode == 18 && !links {
+        // Same decode as multigalaxy_patch::branch_target: target = pc + disp.
         let displacement = ((hook_word << 6) as i32) >> 6;
-        let target = (gecko_bridge::HOOK_ADDRESS as i64 + 4 + displacement as i64) as u32;
+        let target = (gecko_bridge::HOOK_ADDRESS as i64 + displacement as i64) as u32;
         let mut stub = [0u32; gecko_bridge::STUB_WORDS_PUBLIC];
         for (index, slot) in stub.iter_mut().enumerate() {
             *slot = read_word(
@@ -138,16 +144,21 @@ pub fn check_live(memory: &mut impl GuestMemory) -> Result<HookReport, String> {
                     .ok_or("stub address overflow")?,
             )?;
         }
-        if stub == stub_template() {
-            return Ok(HookReport {
-                hook_word,
-                state: HookState::Installed { target },
-            });
-        }
+        let state = if stub == stub_template() {
+            HookState::Installed { target }
+        } else {
+            HookState::Unexpected { word: hook_word }
+        };
+        return Ok(HookReport {
+            hook_word,
+            state,
+            stub_words: Some(stub),
+        });
     }
     Ok(HookReport {
         hook_word,
         state: HookState::Unexpected { word: hook_word },
+        stub_words: None,
     })
 }
 
@@ -191,7 +202,7 @@ mod tests {
 
     fn installed_fixture() -> (Memory, u32) {
         let target = 0x8000_2400;
-        let displacement = target as i64 - (gecko_bridge::HOOK_ADDRESS as i64 + 4);
+        let displacement = target as i64 - gecko_bridge::HOOK_ADDRESS as i64;
         let hook_word = 0x4800_0000 | ((displacement as u32) & 0x03FF_FFFC);
         let mut memory = Memory::default();
         memory.words.insert(gecko_bridge::HOOK_ADDRESS, hook_word);
