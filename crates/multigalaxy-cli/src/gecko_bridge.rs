@@ -344,11 +344,6 @@ fn payload() -> Result<(Vec<u32>, usize), String> {
     payload_with(false)
 }
 
-/// Payload including the Stage 1 trampoline installer and stub.
-pub fn payload_trampoline() -> Result<(Vec<u32>, usize), String> {
-    payload_with(true)
-}
-
 fn mailbox_marker_index() -> Result<usize, String> {
     let (words, _) = payload()?;
     words
@@ -365,19 +360,23 @@ pub(crate) fn payload_words() -> Vec<u32> {
 }
 
 #[cfg(test)]
+pub(crate) fn payload_trampoline_word_count_for_test() -> usize {
+    payload_with(true)
+        .expect("static trampoline PPC payload must assemble")
+        .0
+        .len()
+}
+
+#[cfg(test)]
 pub(crate) fn mailbox_data_word() -> usize {
     payload().expect("static PPC payload must assemble").1
 }
 
 /// Append the local-only test Gecko code after the mandatory AllStars OnFrame
-/// section. The game image remains untouched.
-pub fn append_code(settings: &mut String) {
-    append_code_with(settings, false);
-}
-
-/// Same, optionally including the Stage 1 trampoline installer/stub. The
-/// trampoline variant is not combinable with the interactive mailbox probe in
-/// Stage 1, so `locate_mailbox` keeps matching the plain payload.
+/// section. The game image remains untouched. `trampoline` adds the Stage 1
+/// installer/stub to the C0 block. The trampoline variant is not combinable
+/// with the interactive mailbox probe in Stage 1, so `locate_mailbox` keeps
+/// matching the plain payload.
 pub fn append_code_with(settings: &mut String, trampoline: bool) {
     let Ok((words, _)) = payload_with(trampoline) else {
         return;
@@ -584,7 +583,7 @@ mod tests {
         assert!(words.contains(&lwz(11, 10, 0x0c)));
         assert!(words.contains(&stw(10, 12, 8)));
         let mut settings = "[OnFrame_Enabled]\nAllStars\n".to_owned();
-        append_code(&mut settings);
+        append_code_with(&mut settings, false);
         assert!(settings.contains(&format!("C0000000 {:08X}", words.len() / 2)));
         assert!(settings.ends_with("[Gecko_Enabled]\n$MultiGalaxy1 Stock Dolphin Mailbox Probe\n"));
     }
@@ -656,7 +655,7 @@ mod tests {
 
     #[test]
     fn trampoline_payload_fits_before_allstars_cave_with_valid_branches() {
-        let (words, _) = payload_trampoline().unwrap();
+        let (words, _) = payload_with(true).unwrap();
         let start = HANDLER_BASE + 2880 + 16;
         assert!(start + words.len() as u32 * 4 <= ALLSTARS_CAVE_START);
         assert!(words.len() > payload().unwrap().0.len());

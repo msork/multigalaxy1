@@ -3419,6 +3419,30 @@ mod tests {
         assert!(probe_ini.contains("AllStars"));
         assert!(probe_ini.contains("[Gecko_Enabled]"));
         assert!(probe_ini.contains("MultiGalaxy1 Stock Dolphin Mailbox Probe"));
+        // The trampoline variant must not contain the stub; the plain probe must.
+        assert!(!probe_ini.contains("4E800421"));
+        configure_isolated_profile(
+            &user,
+            &patch,
+            Some(&source_profile),
+            true,
+            Some(55221),
+            true,
+            false,
+            true,
+        )
+        .unwrap();
+        let trampoline_ini = fs::read_to_string(user.join("GameSettings/RMGP01.ini")).unwrap();
+        assert!(trampoline_ini.contains("[Gecko_Enabled]"));
+        // The Stage 1 installer path emits the C0 block containing the stub's
+        // bctrl/bctr pair, proving the launch config invokes the installer.
+        assert!(
+            trampoline_ini.contains("4E800421 4E800420")
+                || trampoline_ini.contains("4E800421\n")
+                || trampoline_ini.lines().any(|line| line.contains("4E800421"))
+        );
+        let expected_pairs = gecko_bridge::payload_trampoline_word_count_for_test() / 2;
+        assert!(trampoline_ini.contains(&format!("C0000000 {expected_pairs:08X}")));
         assert_eq!(fs::read(source_profile).unwrap(), profile_bytes);
         fs::remove_dir_all(root).unwrap();
     }
