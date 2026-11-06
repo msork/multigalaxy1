@@ -113,13 +113,15 @@ Static derivation (pinned by `verify_pal_layout` against the exact PAL DOL):
 
 | Field / path | Offset / address | PAL evidence |
 |---|---:|---|
-| `J3DModelData` joint array | `+0x28` | `invalidateMtxCalc`/`invalidateJointCallback` `lwz r4,0x28(r3)` at `0x803E7FD4`/`0x803E8008` |
-| `J3DModelData` joint count | `+0x2C` | `lhz r6,0x2C(r3)` at `0x803E7FC4`/`0x803E7FF8` |
+| `J3DModelData` joint array | `+0x28` | full 32-bit `lwz r4,0x28(r3)` at `0x803E7FD4`/`0x803E8008` |
+| `J3DModelData` joint count | `+0x2C` | **16-bit** `lhz r6,0x2C(r3)` at `0x803E7FC4`/`0x803E7FF8`; the upper half of the word is a different field and must never be read into the count |
 | joint callback cleared by factory | joint `+0x04` | `stw r5,0x04(r4)` at `0x803E8020` (`invalidateJointCallback`) |
 | joint matrix-calc procedure cleared by factory | joint `+0x54` | `stw r5,0x54(r4)` at `0x803E7FEC` (`invalidateMtxCalc`) |
 | re-arm path | `0x80169678` → `0x80018D98` | `ModelManager::initJointTransform` calls `XanimeCore::enableJointTransform` (branch-target pinned), which reads the model-data joint array (`lwz r4,0x28(r30)` at `0x80018DE8`) |
 
 The command samples the joint table twice within one invocation, 3 seconds apart, re-resolving the full Mario model chain around each sample and rejecting any scene/group/actor/model/heap change. The two within-scene samples plus `within_scene_stable` keep per-frame Xanime writes from being misread as transition effects; the user then runs the command once per scene across a transition for the cross-scene comparison.
+
+Width correction (live failure, fixed): the first live run rejected with `joint count 1966093 exceeds the bounded observer cap 64` because the count word at `+0x2C` was read as 32 bits (`0x001E0005`); the PAL code loads it with `lhz`, so the observer now reads two bytes and the count is the low halfword (5 in that sample). The joint array at `+0x28` is a genuine 32-bit `lwz` and is unchanged. A synthetic regression test pins the halfword width; the fail-closed cap rejection itself worked correctly.
 
 Interpretation rules (endpoint inferences only — the factory clear itself is not traced):
 

@@ -17,6 +17,10 @@ use multigalaxy_patch::{branch_target, parse_dol, SectionKind};
 use std::time::Duration;
 
 // J3DModelData joint table (PAL `invalidateMtxCalc`/`invalidateJointCallback`).
+// Load widths are part of the pinned layout: the joint array at +0x28 is a
+// full `lwz` pointer (`80830028`), while the joint count at +0x2C is a 16-bit
+// `lhz` (`a0c3002c`) — the upper half of that word is a different field, so the
+// count must be read as two bytes, never as a 32-bit word.
 const MODEL_DATA_JOINT_ARRAY: u32 = 0x28;
 const MODEL_DATA_JOINT_COUNT: u32 = 0x2C;
 const JOINT_CALLBACK: u32 = 0x04;
@@ -117,6 +121,15 @@ fn read_word(memory: &mut impl GuestMemory, address: u32) -> Result<u32, String>
     mem::decode_be_u32(address, &bytes)
 }
 
+/// 16-bit big-endian read for fields the PAL code loads with `lhz`.
+fn read_halfword(memory: &mut impl GuestMemory, address: u32) -> Result<u32, String> {
+    let bytes = read_guest(memory, address, 2)?;
+    if bytes.len() != 2 {
+        return Err(format!("short halfword read at 0x{address:08x}"));
+    }
+    Ok(u32::from(u16::from_be_bytes([bytes[0], bytes[1]])))
+}
+
 fn checked_field(base: u32, offset: u32, label: &str) -> Result<u32, String> {
     let address = base
         .checked_add(offset)
@@ -151,7 +164,7 @@ pub fn read_joint_fields(
     memory: &mut impl GuestMemory,
     model_data: u32,
 ) -> Result<JointSample, String> {
-    let count = read_word(
+    let count = read_halfword(
         memory,
         checked_field(
             model_data,
@@ -356,7 +369,8 @@ mod tests {
         fn valid() -> Self {
             let mut memory = Self::default();
             memory.set(MODEL_DATA + MODEL_DATA_JOINT_ARRAY, JOINT_ARRAY);
-            memory.set(MODEL_DATA + MODEL_DATA_JOINT_COUNT, 2);
+            // High half is a different field; the lhz count is the low 16 bits.
+            memory.set(MODEL_DATA + MODEL_DATA_JOINT_COUNT, 0x001E_0002);
             memory.set(JOINT_ARRAY, JOINT0);
             memory.set(JOINT_ARRAY + 4, JOINT1);
             memory.set(JOINT0 + JOINT_CALLBACK, 0x8002_0000);
@@ -369,14 +383,18 @@ mod tests {
 
     impl GuestMemory for Memory {
         fn read_guest(&mut self, address: u32, length: usize) -> Result<Vec<u8>, String> {
-            if length != 4 {
-                return Err(format!("unexpected read 0x{address:08x}+0x{length:x}"));
-            }
-            self.words
+            let word = self
+                .words
                 .get(&address)
                 .copied()
-                .map(|value| value.to_be_bytes().to_vec())
-                .ok_or_else(|| format!("fixture has no word at 0x{address:08x}"))
+                .ok_or_else(|| format!("fixture has no word at 0x{address:08x}"))?;
+            match length {
+                4 => Ok(word.to_be_bytes().to_vec()),
+                // A 2-byte read at a 4-aligned address returns the low half of
+                // the stored big-endian word, matching a guest `lhz`.
+                2 => Ok(((word & 0xFFFF) as u16).to_be_bytes().to_vec()),
+                _ => Err(format!("unexpected read 0x{address:08x}+0x{length:x}")),
+            }
         }
     }
 
@@ -408,6 +426,27 @@ mod tests {
         let mut memory = Memory::valid();
         memory.set(MODEL_DATA + MODEL_DATA_JOINT_COUNT, MAX_JOINTS + 1);
         assert!(read_joint_fields(&mut memory, MODEL_DATA)
+            .unwrap_err()
+            .contains("exceeds the bounded observer cap"));
+    }
+
+    #[test]
+    fn reads_joint_count_as_16bit_lhz_and_ignores_the_upper_half() {
+        // Regression for the live failure where a 32-bit read at +0x2C returned
+        // 0x001E0005 and was rejected by the cap: the count is the low halfword.
+        let mut memory = Memory::valid();
+        memory.set(MODEL_DATA + MODEL_DATA_JOINT_COUNT, 0x001E_0005);
+        for slot in 2..5 {
+            memory.set(JOINT_ARRAY + slot * 4, JOINT0);
+        }
+        let sample = read_joint_fields(&mut memory, MODEL_DATA).unwrap();
+        assert_eq!(sample.joint_count, 5);
+        // A full-width read of the same word would be 0x001E0005 and must never
+        // be treated as a count.
+        assert!(read_joint_fields(&mut memory, MODEL_DATA).is_ok());
+        let mut bogus = Memory::valid();
+        bogus.set(MODEL_DATA + MODEL_DATA_JOINT_COUNT, 0xFFFF_0041);
+        assert!(read_joint_fields(&mut bogus, MODEL_DATA)
             .unwrap_err()
             .contains("exceeds the bounded observer cap"));
     }
