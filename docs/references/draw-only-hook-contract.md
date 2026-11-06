@@ -88,3 +88,27 @@ Gates before any of this runs: `hook_trampoline::verify_hook_layout` (exact PAL 
 Host-side read-only verification: `multigalaxy verify-hook <development.local.toml> <Dolphin-pid>` classifies the live hook word as `original` (rollback confirmed: `0x4BFF083D`), `installed` (plain `b` whose target holds the exact stub template), or `UNEXPECTED`.
 
 Caveat for the acceptance run: this proves the bytes are installed and the trampoline is semantically the original call; whether Dolphin's JIT picks up the runtime-written branch is only observable via your visual check (identical rendering with hook on/off in Beach Bowl, stable across ≥1 transition).
+
+## 9. Stage 1 live failure analysis (Dolphin PID 31336) — delivery is NO-GO
+
+Live evidence: Dolphin reported `Unknown instruction 03d4cb34 at PC=802b62e4 last_PC=8132ffc8 LR=802b62dc`; `verify-hook` read `0x03D4CB34` at `0x802B62E4` consistently (menus, Beach Bowl, Observatory), so reader and CPU agree on the corrupted word. After Ignore, Mario lost all materials except face/gloves/shadow for the rest of the session.
+
+### Q1 — what wrote `0x03D4CB34`?
+
+Not the installer. The installer computes `r0 = 0x48000000 | ((stub - 0x802B62E4) & 0x03FF_FFFC)`, so any word it stores has top byte `0x48`–`0x4B` (a `b`/`bl`). `0x03D4CB34` has top byte `0x03` — impossible from that sequence. Notably `0x03D4CB34 = 0x4BD4CB34 & 0x03FFFFFF`, i.e. a *valid-looking branch word with its top byte masked off*. Static checks: the AllStars diff (`target/allstars-pal-rev0-diff.txt`) contains no write at or near `0x802B62E4`, and the payload word count is even (no dropped trailing word). Conclusion: the hook word was overwritten *after* installation by code that executed at a wrong stub address (see Q2) — the installer's guard was correct but not sufficient, because the guard protects the store, not the memory afterwards.
+
+### Q2 — where is the C0 stub actually placed at runtime?
+
+The layout test assumed our block loads at `HANDLER_BASE + 2880 + 16 = 0x80002350`. That is only true if our code is the *first* Gecko code in the ini. But `configure_isolated_profile` **appended** our `[Gecko]` block after the AllStars `[OnFrame]` section, and Dolphin loads codes into the cave in ini order — so our block (installer + stub) landed **after** AllStars' code, at/after the `0x80002790` region that AllStars' own runtime cave writes use. The stub was therefore in a region subject to AllStars cave writes, and the observed `last_PC=0x8132ffc8` shows execution left the cave entirely (garbage executed as code), consistent with the stub having been overwritten. Fix applied: the Gecko block is now emitted **first** in `RMGP01.ini`, so it loads at the lowest cave address (right after the 2880-byte codehandler) and stays below `0x80002790`; the layout test now also asserts pair parity (odd word counts silently drop the last word in the ini emitter).
+
+### Q3 — path from LR=0x802B62DC to PC=0x802B62E4
+
+`0x802B62D8: bl 0x802A6560` returns to `LR=0x802B62DC`; fall-through runs `0x802B62DC: mr r3,r29`, `0x802B62E0: li r4,0`, then `PC=0x802B62E4` executes the corrupted word `0x03D4CB34` → unknown-instruction exception. The trampoline itself (had the word been intact) would have been: `b stub` → `bl 0x802A6B20` (bctrl, LR=stub+16) → `bctr 0x802B62E8`. The `bctr` return address `0x802B62E8` (callsite+4) is correct against the real runtime layout — the failure was the word at the hook, not the stub's return address.
+
+### Pre-flight added
+
+`dev-launch --trampoline-dry-run` now runs a host-side pre-flight after spawn (read-only MEM1, up to 30 s): `hook_trampoline::preflight_hook` accepts only the exact original `0x4BFF083D` or a verified installed branch (stub template match at the decoded target); on anything else it stops Dolphin and fails closed. The guest installer's only-write-if-original-or-installed guard remains as the second layer.
+
+### Go/no-go update
+
+Delivery (Gecko hook installation) is **NO-GO** until a rerun shows: pre-flight passing, `verify-hook` = `installed` with verified stub across menus + two scenes, no unknown-instruction, and identical rendering hook on/off. Stage 2 remains parked. Rendering remains **NO-GO**.

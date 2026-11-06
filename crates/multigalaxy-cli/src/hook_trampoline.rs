@@ -97,6 +97,21 @@ pub fn ensure_hook_disjoint(writes: &[multigalaxy_patch::PatchWrite]) -> Result<
     Ok(())
 }
 
+/// Launcher-time pre-flight: the hook word must be either the exact original
+/// `bl directDraw` word (not yet armed) or a valid installed branch with the
+/// stub template at its target. Anything else means the word was corrupted by
+/// something else and the hook must not be considered armed.
+pub fn preflight_hook(memory: &mut impl GuestMemory) -> Result<(), String> {
+    match check_live(memory)?.state {
+        HookState::Original | HookState::Installed { .. } => Ok(()),
+        HookState::Unexpected { word } => Err(format!(
+            "pre-flight refused: hook word at 0x{:08x} is 0x{word:08x}, expected 0x{:08x} or a valid branch",
+            gecko_bridge::HOOK_ADDRESS,
+            gecko_bridge::ORIGINAL_HOOK_WORD
+        )),
+    }
+}
+
 /// Read-only live classification of the hook word. An installed hook must be a
 /// plain (non-linking) `b` whose target holds the exact stub template.
 pub fn check_live(memory: &mut impl GuestMemory) -> Result<HookReport, String> {

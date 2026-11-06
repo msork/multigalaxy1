@@ -1208,7 +1208,15 @@ fn configure_isolated_profile(
         .map_err(|e| format!("cannot create isolated GameSettings directory: {e}"))?;
     let mut settings = controller_patch::allstars_game_settings(patch).to_owned();
     if gecko_bridge_probe || trampoline_dry_run {
-        gecko_bridge::append_code_with(&mut settings, trampoline_dry_run);
+        // Gecko codes are loaded into the codehandler cave in ini order, so
+        // our block must come FIRST: it then starts right after the 2880-byte
+        // codehandler (0x80002340) and stays below the AllStars cave writes at
+        // 0x80002790. Appending after AllStars placed our stub inside the
+        // AllStars-written region (Stage 1 live failure, see
+        // docs/references/draw-only-hook-contract.md).
+        let mut gecko = String::new();
+        gecko_bridge::append_code_with(&mut gecko, trampoline_dry_run);
+        settings = format!("{gecko}{settings}");
     }
     if let Some(profile_path) = controller_profile {
         let profile_name = "Pro Con to Classic Con";
@@ -2821,6 +2829,40 @@ fn run() -> Result<(), String> {
         )?;
         if trampoline_dry_run {
             println!("trampoline stage=dry-run; Gecko C0 installer arms 0x802B62E4 -> stub(bl 0x802A6B20; b 0x802B62E8); no duplicate draw, no j3dSys writes");
+            #[cfg(windows)]
+            {
+                use std::time::Instant;
+                let deadline = Instant::now() + Duration::from_secs(30);
+                let mut last_error;
+                loop {
+                    match stock_memory::StockMem1::open_dolphin_read_only(child.id()) {
+                        Ok(mut memory) => {
+                            match player_probe::verify_live_pal_signatures(&mut memory, &dol)
+                                .and_then(|_| hook_trampoline::preflight_hook(&mut memory))
+                            {
+                                Ok(()) => break,
+                                Err(error) => {
+                                    child.kill().ok();
+                                    return Err(format!(
+                                        "trampoline pre-flight failed, Dolphin stopped: {error}"
+                                    ));
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            last_error = format!("{error:?}");
+                            if Instant::now() >= deadline {
+                                child.kill().ok();
+                                return Err(format!(
+                                    "trampoline pre-flight could not open Dolphin MEM1 within 30s, Dolphin stopped: {last_error}"
+                                ));
+                            }
+                            std::thread::sleep(Duration::from_millis(500));
+                        }
+                    }
+                }
+                println!("trampoline pre-flight passed: hook word is the original bl or a verified installed branch");
+            }
         }
         if gecko_bridge_probe {
             println!("bridge stage=stock-mem1; Dolphin is running without GDB; opening a bounded read/write view of its 2609a MEM1 mapping");

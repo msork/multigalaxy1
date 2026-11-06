@@ -656,6 +656,12 @@ mod tests {
     #[test]
     fn trampoline_payload_fits_before_allstars_cave_with_valid_branches() {
         let (words, _) = payload_with(true).unwrap();
+        // Gecko C0 words must form instruction pairs or the trailing word is
+        // silently dropped by the ini emitter.
+        assert_eq!(words.len() % 2, 0);
+        // The block must be emitted FIRST in the ini so it loads at the lowest
+        // cave address (right after the 2880-byte codehandler) and stays below
+        // the AllStars cave writes at 0x80002790.
         let start = HANDLER_BASE + 2880 + 16;
         assert!(start + words.len() as u32 * 4 <= ALLSTARS_CAVE_START);
         assert!(words.len() > payload().unwrap().0.len());
