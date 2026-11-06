@@ -2835,26 +2835,26 @@ fn run() -> Result<(), String> {
                 let deadline = Instant::now() + Duration::from_secs(30);
                 let mut last_error;
                 loop {
-                    match stock_memory::StockMem1::open_dolphin_read_only(child.id()) {
-                        Ok(mut memory) => {
-                            match player_probe::verify_live_pal_signatures(&mut memory, &dol)
+                    // Poll until the deadline on BOTH open failures and
+                    // signature/pre-flight mismatches: MEM1 is mapped before
+                    // the DOL text finishes loading, so a signature read during
+                    // early boot legitimately mismatches (observed live:
+                    // 0x802e153c read as not-PAL before boot completed; that
+                    // address is disjoint from all 419 AllStars writes).
+                    let attempt = stock_memory::StockMem1::open_dolphin_read_only(child.id())
+                        .map_err(|error| format!("{error:?}"))
+                        .and_then(|mut memory| {
+                            player_probe::verify_live_pal_signatures(&mut memory, &dol)
                                 .and_then(|_| hook_trampoline::preflight_hook(&mut memory))
-                            {
-                                Ok(()) => break,
-                                Err(error) => {
-                                    child.kill().ok();
-                                    return Err(format!(
-                                        "trampoline pre-flight failed, Dolphin stopped: {error}"
-                                    ));
-                                }
-                            }
-                        }
+                        });
+                    match attempt {
+                        Ok(()) => break,
                         Err(error) => {
-                            last_error = format!("{error:?}");
+                            last_error = error;
                             if Instant::now() >= deadline {
                                 child.kill().ok();
                                 return Err(format!(
-                                    "trampoline pre-flight could not open Dolphin MEM1 within 30s, Dolphin stopped: {last_error}"
+                                    "trampoline pre-flight failed within 30s, Dolphin stopped: {last_error}"
                                 ));
                             }
                             std::thread::sleep(Duration::from_millis(500));

@@ -112,3 +112,9 @@ The layout test assumed our block loads at `HANDLER_BASE + 2880 + 16 = 0x8000235
 ### Go/no-go update
 
 Delivery (Gecko hook installation) is **NO-GO** until a rerun shows: pre-flight passing, `verify-hook` = `installed` with verified stub across menus + two scenes, no unknown-instruction, and identical rendering hook on/off. Stage 2 remains parked. Rendering remains **NO-GO**.
+
+### Addendum: pre-flight abort on rerun (0x802e153c) — investigated, not an AllStars write
+
+The rerun aborted in the new pre-flight with `live memory does not match PAL RMGP01 Rev 0 at 0x802e153c`. Cross-reference result: `0x802E153C` (`getMarioActor__11MarioHolderCFv`, first PAL runtime signature) has **zero overlapping writes** among all 419 parsed AllStars writes (nearest AllStars write is `0x803302F8`, ~323 KB away), and the raw AllStars patch files contain no reference to it. So per the stop rule this was treated as a real discrepancy and investigated before any change.
+
+Finding: the address is inside DOL text section 1, which loads from disc during boot **after** the MEM1 mapping exists and after the game ID at `0x80000000` is readable. The pre-flight loop only retried when the MEM1 open failed; on a successful open it asserted the signatures once and aborted — so a read during early boot (text not yet loaded) produced the false mismatch. Every other startup path (bridge probe, observers) polls with a deadline for exactly this reason. Fix: the pre-flight now retries signature/pre-flight mismatches until the 30 s deadline and only then fails closed, stopping Dolphin. Regression test added (`preflight_accepts_original_and_installed_but_rejects_corruption`, including the observed `0x03D4CB34` word). Delivery remains **NO-GO** pending a clean rerun; Stage 2 parked.

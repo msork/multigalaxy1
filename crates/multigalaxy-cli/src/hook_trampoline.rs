@@ -230,6 +230,26 @@ mod tests {
     }
 
     #[test]
+    fn preflight_accepts_original_and_installed_but_rejects_corruption() {
+        let mut original = Memory::default();
+        original
+            .words
+            .insert(gecko_bridge::HOOK_ADDRESS, gecko_bridge::ORIGINAL_HOOK_WORD);
+        assert!(preflight_hook(&mut original).is_ok());
+
+        let (mut installed, _) = installed_fixture();
+        assert!(preflight_hook(&mut installed).is_ok());
+
+        // Regression for the PID 31336 rerun abort: a word that is neither the
+        // original bl nor a valid branch-to-verified-stub must be refused.
+        let mut corrupted = Memory::default();
+        corrupted
+            .words
+            .insert(gecko_bridge::HOOK_ADDRESS, 0x03D4_CB34);
+        assert!(preflight_hook(&mut corrupted).is_err());
+    }
+
+    #[test]
     fn rejects_allstars_writes_overlapping_the_hook_word() {
         assert!(ensure_hook_disjoint(&[multigalaxy_patch::PatchWrite {
             address: gecko_bridge::HOOK_ADDRESS,
