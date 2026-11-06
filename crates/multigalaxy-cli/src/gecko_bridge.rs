@@ -128,6 +128,9 @@ fn lis(rt: u8, imm: u16) -> u32 {
 fn ori(ra: u8, rs: u8, imm: u16) -> u32 {
     0x6000_0000 | (u32::from(rs) << 21) | (u32::from(ra) << 16) | u32::from(imm)
 }
+fn oris(ra: u8, rs: u8, imm: u16) -> u32 {
+    0x6400_0000 | (u32::from(rs) << 21) | (u32::from(ra) << 16) | u32::from(imm)
+}
 fn cmpwi(ra: u8, imm: u16) -> u32 {
     0x2c00_0000 | (u32::from(ra) << 16) | u32::from(imm)
 }
@@ -218,7 +221,10 @@ fn emit_trampoline_installer(p: &mut Program, stub_delta: u16) {
     p.emit(ori(11, 11, HOOK_ADDRESS as u16)); // r11 = HOOK_ADDRESS
     p.emit(subf(0, 11, 10)); // r0 = stub - hook
     p.emit(rlwinm(0, 0, 0, 6, 29)); // mask to the 26-bit branch displacement
-    p.emit(ori(0, 0, 0x4800)); // r0 = b <stub> hook word
+                                    // oris (not ori): the 0x48 opcode byte lives in the HIGH halfword.
+                                    // Stage 1 bug: ori r0,r0,0x4800 only ORed the low halfword, so the stored
+                                    // hook word was the bare displacement 0x03D4CB34 (observed live twice).
+    p.emit(oris(0, 0, 0x4800)); // r0 = b <stub> hook word
     p.emit(lwz(12, 11, 0)); // current word at the hook
     p.emit(lis(10, (ORIGINAL_HOOK_WORD >> 16) as u16));
     p.emit(ori(10, 10, ORIGINAL_HOOK_WORD as u16));
@@ -680,6 +686,40 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn trampoline_installer_composes_the_full_branch_word() {
+        // Regression for the live corruption (hook word stored as 0x03D4CB34):
+        // the high opcode byte 0x48 lives in the HIGH halfword, so the OR step
+        // must be `oris`, not `ori`.
+        let (words, _) = payload_with(true).unwrap();
+        let pos = words
+            .iter()
+            .position(|w| *w == 0x3D60_802B)
+            .expect("installer lis r11,0x802B present");
+        assert_eq!(words[pos + 3], 0x5400_01BA, "rlwinm mask 0x03FFFFFC");
+        assert_eq!(
+            words[pos + 4],
+            0x6400_4800,
+            "must be oris r0,r0,0x4800 (high halfword), not ori"
+        );
+        // Semantic check: compose the stored value the way the emitted
+        // instructions do and require the full branch word.
+        let hook = HOOK_ADDRESS;
+        let stub = HANDLER_BASE + 2880 + 16 + (words.len() - STUB_WORDS) as u32 * 4;
+        let delta = stub.wrapping_sub(hook) & 0x03FF_FFFC;
+        let stored = delta | 0x4800_0000;
+        assert_eq!(stored >> 26, 18);
+        assert_eq!(stored & 1, 0, "plain b, no link");
+        let disp = (stored & 0x03FF_FFFC) as i32;
+        let disp = if disp & 0x0200_0000 != 0 {
+            disp - 0x0400_0000
+        } else {
+            disp
+        };
+        let target = hook.wrapping_add(disp as u32);
+        assert_eq!(target, stub);
     }
 
     #[test]

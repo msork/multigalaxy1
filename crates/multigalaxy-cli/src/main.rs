@@ -2847,6 +2847,19 @@ fn run() -> Result<(), String> {
                 let mut stable_run: Option<(u32, usize)> = None;
                 loop {
                     let elapsed_ms = started.elapsed().as_millis();
+                    if let Ok(Some(status)) = child.try_wait() {
+                        child.kill().ok();
+                        println!(
+                            "trampoline pre-flight timeline ({} samples):",
+                            timeline.len()
+                        );
+                        for line in &timeline {
+                            println!("  {line}");
+                        }
+                        return Err(format!(
+                            "Dolphin exited during pre-flight (status {status}); not retrying"
+                        ));
+                    }
                     let attempt = stock_memory::StockMem1::open_dolphin_read_only(child.id())
                         .map_err(|error| format!("{error:?}"))
                         .and_then(|mut memory| {
@@ -2855,14 +2868,18 @@ fn run() -> Result<(), String> {
                         });
                     match attempt {
                         Ok(report) => {
+                            // Log the stub words at the decoded branch target on
+                            // every sample where the word is a branch (acceptable
+                            // or not) so Addendum 3's discriminator always fires.
                             let stub_note = match &report.stub_words {
                                 Some(words) => format!(
-                                    " stub=[{}]",
+                                    " stub=[{}] match={}",
                                     words
                                         .iter()
                                         .map(|w| format!("{w:08x}"))
                                         .collect::<Vec<_>>()
-                                        .join(" ")
+                                        .join(" "),
+                                    words == &hook_trampoline::stub_template()
                                 ),
                                 None => String::new(),
                             };
@@ -2915,7 +2932,15 @@ fn run() -> Result<(), String> {
                                 .into(),
                         );
                     }
-                    std::thread::sleep(Duration::from_millis(500));
+                    // Bracket the boot window tightly: poll fast for the first
+                    // ~10s (loader copy / installer arm happen there), then
+                    // settle to 500ms.
+                    let poll_ms = if started.elapsed() < Duration::from_secs(10) {
+                        100
+                    } else {
+                        500
+                    };
+                    std::thread::sleep(Duration::from_millis(poll_ms));
                 }
             }
         }
