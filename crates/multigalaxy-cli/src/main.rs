@@ -2832,36 +2832,80 @@ fn run() -> Result<(), String> {
             #[cfg(windows)]
             {
                 use std::time::Instant;
-                let deadline = Instant::now() + Duration::from_secs(30);
-                let mut last_error;
+                // Diagnostic pre-flight: poll the hook word every ~500ms and
+                // log the full value timeline (zero -> loader copy -> original
+                // -> install -> corrupt) until the deadline. Boot includes the
+                // Wii safety screen + intro and can exceed 30s, so allow 180s.
+                // Pass only when the word is acceptable (original or verified
+                // installed branch) AND unchanged across several consecutive
+                // polls - not on a one-shot match.
+                const PREFLIGHT_DEADLINE: Duration = Duration::from_secs(180);
+                const STABLE_POLLS: usize = 6;
+                let started = Instant::now();
+                let deadline = started + PREFLIGHT_DEADLINE;
+                let mut timeline: Vec<String> = Vec::new();
+                let mut stable_run: Option<(u32, usize)> = None;
                 loop {
-                    // Poll until the deadline on BOTH open failures and
-                    // signature/pre-flight mismatches: MEM1 is mapped before
-                    // the DOL text finishes loading, so a signature read during
-                    // early boot legitimately mismatches (observed live:
-                    // 0x802e153c read as not-PAL before boot completed; that
-                    // address is disjoint from all 419 AllStars writes).
+                    let elapsed_ms = started.elapsed().as_millis();
                     let attempt = stock_memory::StockMem1::open_dolphin_read_only(child.id())
                         .map_err(|error| format!("{error:?}"))
                         .and_then(|mut memory| {
-                            player_probe::verify_live_pal_signatures(&mut memory, &dol)
-                                .and_then(|_| hook_trampoline::preflight_hook(&mut memory))
+                            player_probe::verify_live_pal_signatures(&mut memory, &dol)?;
+                            hook_trampoline::check_live(&mut memory)
                         });
                     match attempt {
-                        Ok(()) => break,
-                        Err(error) => {
-                            last_error = error;
-                            if Instant::now() >= deadline {
-                                child.kill().ok();
-                                return Err(format!(
-                                    "trampoline pre-flight failed within 30s, Dolphin stopped: {last_error}"
-                                ));
+                        Ok(report) => {
+                            let line = format!(
+                                "t={:>6}ms hook_word=0x{:08x} {}",
+                                elapsed_ms,
+                                report.hook_word,
+                                report.describe()
+                            );
+                            println!("trampoline preflight {line}");
+                            timeline.push(line);
+                            if report.is_acceptable() {
+                                stable_run = Some(match stable_run {
+                                    Some((word, count)) if word == report.hook_word => {
+                                        (word, count + 1)
+                                    }
+                                    _ => (report.hook_word, 1),
+                                });
+                                if let Some((_, count)) = stable_run {
+                                    if count >= STABLE_POLLS {
+                                        println!(
+                                            "trampoline pre-flight passed: {} stable for {STABLE_POLLS} polls",
+                                            report.describe()
+                                        );
+                                        break;
+                                    }
+                                }
+                            } else {
+                                stable_run = None;
                             }
-                            std::thread::sleep(Duration::from_millis(500));
+                        }
+                        Err(error) => {
+                            let line = format!("t={elapsed_ms:>6}ms open/signature error: {error}");
+                            println!("trampoline preflight {line}");
+                            timeline.push(line);
+                            stable_run = None;
                         }
                     }
+                    if Instant::now() >= deadline {
+                        child.kill().ok();
+                        println!(
+                            "trampoline pre-flight timeline ({} samples):",
+                            timeline.len()
+                        );
+                        for line in &timeline {
+                            println!("  {line}");
+                        }
+                        return Err(
+                            "trampoline pre-flight failed within 180s or word never stabilized, Dolphin stopped"
+                                .into(),
+                        );
+                    }
+                    std::thread::sleep(Duration::from_millis(500));
                 }
-                println!("trampoline pre-flight passed: hook word is the original bl or a verified installed branch");
             }
         }
         if gecko_bridge_probe {

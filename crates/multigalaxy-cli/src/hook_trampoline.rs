@@ -97,18 +97,20 @@ pub fn ensure_hook_disjoint(writes: &[multigalaxy_patch::PatchWrite]) -> Result<
     Ok(())
 }
 
-/// Launcher-time pre-flight: the hook word must be either the exact original
-/// `bl directDraw` word (not yet armed) or a valid installed branch with the
-/// stub template at its target. Anything else means the word was corrupted by
-/// something else and the hook must not be considered armed.
-pub fn preflight_hook(memory: &mut impl GuestMemory) -> Result<(), String> {
-    match check_live(memory)?.state {
-        HookState::Original | HookState::Installed { .. } => Ok(()),
-        HookState::Unexpected { word } => Err(format!(
-            "pre-flight refused: hook word at 0x{:08x} is 0x{word:08x}, expected 0x{:08x} or a valid branch",
-            gecko_bridge::HOOK_ADDRESS,
-            gecko_bridge::ORIGINAL_HOOK_WORD
-        )),
+impl HookReport {
+    /// One-line timeline label for the pre-flight diagnostic log.
+    pub fn describe(&self) -> String {
+        match self.state {
+            HookState::Original => format!("original(0x{:08x})", self.hook_word),
+            HookState::Installed { target } => {
+                format!("installed(0x{:08x}->stub 0x{target:08x})", self.hook_word)
+            }
+            HookState::Unexpected { word } => format!("UNEXPECTED(0x{word:08x})"),
+        }
+    }
+
+    pub fn is_acceptable(&self) -> bool {
+        !matches!(self.state, HookState::Unexpected { .. })
     }
 }
 
@@ -230,15 +232,39 @@ mod tests {
     }
 
     #[test]
+    fn report_descriptions_are_distinct_per_state() {
+        let mut original = Memory::default();
+        original
+            .words
+            .insert(gecko_bridge::HOOK_ADDRESS, gecko_bridge::ORIGINAL_HOOK_WORD);
+        let report = check_live(&mut original).unwrap();
+        assert!(report.is_acceptable());
+        assert!(report.describe().starts_with("original(0x4bff083d)"));
+
+        let (mut installed, _) = installed_fixture();
+        let report = check_live(&mut installed).unwrap();
+        assert!(report.is_acceptable());
+        assert!(report.describe().starts_with("installed("));
+
+        let mut corrupted = Memory::default();
+        corrupted
+            .words
+            .insert(gecko_bridge::HOOK_ADDRESS, 0x03D4_CB34);
+        let report = check_live(&mut corrupted).unwrap();
+        assert!(!report.is_acceptable());
+        assert!(report.describe().starts_with("UNEXPECTED(0x03d4cb34)"));
+    }
+
+    #[test]
     fn preflight_accepts_original_and_installed_but_rejects_corruption() {
         let mut original = Memory::default();
         original
             .words
             .insert(gecko_bridge::HOOK_ADDRESS, gecko_bridge::ORIGINAL_HOOK_WORD);
-        assert!(preflight_hook(&mut original).is_ok());
+        assert!(check_live(&mut original).unwrap().is_acceptable());
 
         let (mut installed, _) = installed_fixture();
-        assert!(preflight_hook(&mut installed).is_ok());
+        assert!(check_live(&mut installed).unwrap().is_acceptable());
 
         // Regression for the PID 31336 rerun abort: a word that is neither the
         // original bl nor a valid branch-to-verified-stub must be refused.
@@ -246,7 +272,7 @@ mod tests {
         corrupted
             .words
             .insert(gecko_bridge::HOOK_ADDRESS, 0x03D4_CB34);
-        assert!(preflight_hook(&mut corrupted).is_err());
+        assert!(!check_live(&mut corrupted).unwrap().is_acceptable());
     }
 
     #[test]

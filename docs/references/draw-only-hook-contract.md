@@ -118,3 +118,20 @@ Delivery (Gecko hook installation) is **NO-GO** until a rerun shows: pre-flight 
 The rerun aborted in the new pre-flight with `live memory does not match PAL RMGP01 Rev 0 at 0x802e153c`. Cross-reference result: `0x802E153C` (`getMarioActor__11MarioHolderCFv`, first PAL runtime signature) has **zero overlapping writes** among all 419 parsed AllStars writes (nearest AllStars write is `0x803302F8`, ~323 KB away), and the raw AllStars patch files contain no reference to it. So per the stop rule this was treated as a real discrepancy and investigated before any change.
 
 Finding: the address is inside DOL text section 1, which loads from disc during boot **after** the MEM1 mapping exists and after the game ID at `0x80000000` is readable. The pre-flight loop only retried when the MEM1 open failed; on a successful open it asserted the signatures once and aborted — so a read during early boot (text not yet loaded) produced the false mismatch. Every other startup path (bridge probe, observers) polls with a deadline for exactly this reason. Fix: the pre-flight now retries signature/pre-flight mismatches until the 30 s deadline and only then fails closed, stopping Dolphin. Regression test added (`preflight_accepts_original_and_installed_but_rejects_corruption`, including the observed `0x03D4CB34` word). Delivery remains **NO-GO** pending a clean rerun; Stage 2 parked.
+
+### Addendum 2: timeline diagnostic pre-flight (rerun 2 abort) + corrupter analysis
+
+The rerun's pre-flight hit the 30 s deadline with the hook word at `0x03D4CB34` — the same masked value as the crash run (`0x4BD4CB34 & 0x03FFFFFF`), unchanged by the ini-order fix. Notably, the unmasked `0x4BD4CB34` decodes as a `bl` from `0x802B62E4` to **`0x80002E1C`** — inside the Gecko cave below `0x80002790`, i.e. a plausible stub address. So the sequence was: installer armed a branch to the stub, then a separate writer masked the top byte (`0x4B`→`0x03`), turning a valid branch into an invalid opcode. The corrupter is independent of stub placement.
+
+Diagnostic pre-flight implemented (no rerun yet): `dev-launch --trampoline-dry-run` now polls the hook word every ~500 ms for up to **180 s** (Wii safety screen + intro exceed 30 s), printing a timestamped timeline line per sample (`t=…ms hook_word=0x… original|installed|UNEXPECTED`), and passes only when the word is acceptable (original `0x4BFF083D` or branch-to-verified-stub) **and unchanged across 6 consecutive polls**. On deadline it stops Dolphin and dumps the full timeline.
+
+Expected timeline shapes and what each proves:
+
+| Observed sequence | Interpretation |
+|---|---|
+| `0x00000000` → `0x4BFF083D` → branch → (stable) | boot loader copy, then installer armed after copy; healthy |
+| `0x00000000` → `0x03D4CB34` (never original) | writer acted on the unloaded region before the apploader copy; boot-race hypothesis confirmed |
+| `0x4BFF083D` → branch → `0x03D4CB34` and stays | corrupter fires after install, independent of placement; hypothesis 2 confirmed |
+| branch → `0x4BFF083D` → branch oscillation | guard re-arm fighting the loader copy |
+
+The timeline discriminates hypotheses 1 and 2 by *when* the masked value first appears relative to the original word appearing.
