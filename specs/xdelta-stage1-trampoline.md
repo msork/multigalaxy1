@@ -1,12 +1,22 @@
 # Plan/spec: Stage 1 trampoline via xdelta-patched image (pivot from Gecko)
 
-Status: **plan only — no code, no patch generated or applied.** Stage 1 acceptance criteria are unchanged: installed state verified by read-only host checks (`verify-hook`), identical rendering hook on/off in Beach Bowl, stability across ≥1 scene transition, clean rollback. The Gecko thread landed and closed its bug (installer used `ori` instead of `oris`; see draw-only-hook-contract.md Addendum 4), so the second-writer question is settled: there is no second writer; the Gecko path remains the working carrier until the image route proves out.
+Status: **implemented (code + tests), live boot pending.** Stage 1 proves THE PIPELINE, not hook semantics: the 5-word window at `0x802B62D8..0x802B62EC` (`bl 0x802A6560; mr r3,r29; li r4,0; bl 0x802A6B20; li r0,0`) is replaced with byte-identical content (identity patch, pinned against the exact PAL DOL and verified against the real DOL). Acceptance means: patched image boots, hook window bytes verified read-only at runtime (`verify-hook` now reports `window=original` + words), rendering identical, rollback = launch the clean copy.
 
-## 1. Where the 8-word stub can live in PAL DOL text
+Explicit spec points (approved):
+
+1. Pipeline proof only — identity window; Stage 2 hook semantics unchanged and parked.
+2. Size-preserving in-place DOL patching at the located image offset; no FST/partition rebuild (that blocker stays documented for Stage 2+).
+3. Wii disc integrity: Wii data clusters carry ECC/hash material, but Dolphin 2609a does not verify cluster hashes unless disc-integrity verification is explicitly enabled (off by default), so a byte-patched ISO boots. Recorded here as the source-level expectation; the live boot is the user's acceptance step and must be recorded when observed.
+4. All identity gates fail closed: RMGP01 Rev 0 disc header, source image SHA-256, pinned DOL SHA-256 (`8200fb72…fbee`), Petari symbol hash, pinned window words, AllStars non-overlap (the window is disjoint from all 419 parsed AllStars writes). The original image is opened read-only and never modified; the patch applies only to a new user-owned output path (refuses to overwrite).
+5. Pure-Rust VCDIFF (RFC 3284 restricted profile) in `multigalaxy-patch::vcdiff`; `patch-image <dev.toml> <source-image> <output-image>` CLI; `dev-launch --patched-image <path>`; `verify-hook` extended to check the window. Gecko stays for AllStars only.
+
+The Gecko thread landed and closed its bug (installer used `ori` instead of `oris`; see draw-only-hook-contract.md Addendum 4), so the second-writer question is settled: there is no second writer; the Gecko path remains the working carrier until the image route proves out.
+
+## 1. Where the stub lives in PAL DOL text
 
 Scanned both DOL text sections of the exact PAL DOL (`text0` `0x80004000`+0x24E0, `text1` `0x800070A0`+0x5261E0) for nop (`0x60000000`) / zero runs: **no padding run ≥ 8 words (32 bytes) exists anywhere**, and section tails are real code, not padding. So there is no free 32-byte cave in the DOL text.
 
-Recommended Stage 1 placement: **inline at the callsite window**, not a cave. `0x802B62DC..0x802B62F0` is 5 words (`mr r3,r29; li r4,0; bl directDraw; li r0,0; stw r0,0x1B0(r29)`) — enough to hold the whole Stage 1 trampoline inline (original `bl 0x802A6B20` + flag clear + branch back), zero cave needed, zero displacement risk. Disjointness discipline unchanged: reject if any AllStars write (419 parsed), pinned observer signature, or mailbox range overlaps the window; the window is currently disjoint (verified: no AllStars write near `0x802B62E4`). Stage 2's larger duplicate-draw stub has no inline space — it would need an appended DOL text section (header/size/hash change, re-fingerprint) or a proven-dead function; both require separate evidence and are out of scope for Stage 1.
+Implemented Stage 1 placement: **inline at the callsite window**, not a cave. `0x802B62D8..0x802B62EC` is the 5-word window (`bl 0x802A6560; mr r3,r29; li r4,0; bl 0x802A6B20; li r0,0`) — enough for the whole Stage 1 trampoline inline, zero cave, zero displacement risk. Disjointness: the window is verified disjoint from all 419 parsed AllStars writes and every pinned observer signature; `patch-image` additionally re-verifies the pinned window words against the exact PAL DOL before writing. Stage 2's larger duplicate-draw stub has no inline space — it would need an appended DOL text section (header/size/hash change, re-fingerprint) or a proven-dead function; both require separate evidence and are out of scope for Stage 1.
 
 ## 2. Patch mechanics
 

@@ -2,6 +2,7 @@
 mod dolphin_patch;
 mod revision;
 mod shared_render;
+pub mod vcdiff;
 
 use std::fmt;
 

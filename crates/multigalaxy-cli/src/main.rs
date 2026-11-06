@@ -6,6 +6,7 @@ mod gdb;
 mod gecko_bridge;
 mod heap_observer;
 mod hook_trampoline;
+mod image_patch;
 mod latency_stats;
 mod mario_model_observer;
 mod memory_inspection;
@@ -682,6 +683,20 @@ fn run_verify_hook(config_path: &std::path::Path, pid: u32) -> Result<(), String
     })?;
     player_probe::verify_live_pal_signatures(&mut memory, &dol)?;
     let report = hook_trampoline::check_live(&mut memory)?;
+    let expected_window = image_patch::window_words(&dol, image_patch::WINDOW_GUEST)?;
+    let mut live_window = [0u32; image_patch::WINDOW_WORDS];
+    for (i, w) in live_window.iter_mut().enumerate() {
+        let at = image_patch::WINDOW_GUEST + (i * 4) as u32;
+        let bytes = memory
+            .read_guest(at, 4)
+            .map_err(|e| format!("window read at 0x{at:08x} failed: {e}"))?;
+        *w = u32::from_be_bytes(bytes.try_into().expect("four bytes"));
+    }
+    let window_state = if live_window == expected_window {
+        "original"
+    } else {
+        "MISMATCH"
+    };
     player_probe::verify_live_pal_signatures(&mut memory, &dol)?;
     let state = match report.state {
         hook_trampoline::HookState::Original => {
@@ -699,11 +714,14 @@ fn run_verify_hook(config_path: &std::path::Path, pid: u32) -> Result<(), String
         }
     };
     println!(
-        "verify_hook=validated_read_only unix_ms={} pid={pid} game=RMGP01 revision=0 hook_address=0x{:08x} hook_word=0x{:08x} state={}",
+        "verify_hook=validated_read_only unix_ms={} pid={pid} game=RMGP01 revision=0 hook_address=0x{:08x} hook_word=0x{:08x} state={} window_guest=0x{:08x} window={} window_words={:08x?}",
         timestamp_unix_ms(),
         gecko_bridge::HOOK_ADDRESS,
         report.hook_word,
         state,
+        image_patch::WINDOW_GUEST,
+        window_state,
+        live_window,
     );
     Ok(())
 }
@@ -711,6 +729,35 @@ fn run_verify_hook(config_path: &std::path::Path, pid: u32) -> Result<(), String
 #[cfg(not(windows))]
 fn run_verify_hook(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
     Err("verify-hook requires official stock Dolphin 2609a on Windows".into())
+}
+
+fn run_patch_image(
+    config_path: &std::path::Path,
+    source: &std::path::Path,
+    output: &std::path::Path,
+) -> Result<(), String> {
+    let config_text = fs::read_to_string(config_path)
+        .map_err(|error| format!("cannot read development config: {error}"))?;
+    let config = dev_config::parse(&config_text)?;
+    validate_dev_inputs(&config)?;
+    let dol =
+        fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
+    let symbols = fs::read(&config.pal_symbols)
+        .map_err(|error| format!("cannot read Petari symbol map: {error}"))?;
+    player_probe::verify_pal_inputs(&dol, &symbols)?;
+    hook_trampoline::verify_hook_layout(&dol, &symbols)?;
+    let manifest = image_patch::patch_image(source, output, &dol)?;
+    println!(
+        "patch_image=ok patch_id={} source_image_sha256={} output_image_sha256={} delta_sha256={} window_guest=0x{:08x} window_len={}",
+        manifest.patch_id,
+        manifest.source_image_sha256,
+        manifest.output_image_sha256,
+        manifest.delta_sha256,
+        manifest.window_guest,
+        manifest.window_len
+    );
+    println!("manifest written next to the output image; original image untouched");
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -2487,6 +2534,13 @@ fn run() -> Result<(), String> {
         }
         return run_verify_hook(std::path::Path::new(&args[1]), pid);
     }
+    if args.len() == 4 && args[0] == "patch-image" {
+        return run_patch_image(
+            std::path::Path::new(&args[1]),
+            std::path::Path::new(&args[2]),
+            std::path::Path::new(&args[3]),
+        );
+    }
     if args.len() == 3 && args[0] == "observe-scheduler" {
         let pid = args[2]
             .to_str()
@@ -2727,10 +2781,12 @@ fn run() -> Result<(), String> {
         let mut mute = true;
         let mut gecko_bridge_probe = false;
         let mut trampoline_dry_run = false;
+        let mut patched_image: Option<String> = None;
         let mut bridge_startup_timeout = Duration::from_secs(60);
         let mut custom_bridge_timeout = false;
-        for option in &args[4..] {
-            let option_text = option
+        let mut option_index = 4usize;
+        while option_index < args.len() {
+            let option_text = args[option_index]
                 .to_str()
                 .ok_or("dev-launch option must be valid UTF-8")?;
             if let Some(timeout) = bridge_identity::parse_timeout_option(option_text)? {
@@ -2739,24 +2795,32 @@ fn run() -> Result<(), String> {
                 }
                 bridge_startup_timeout = timeout;
                 custom_bridge_timeout = true;
+                option_index += 1;
                 continue;
             }
-            match Some(option_text) {
-                Some("--debug") if !debug && !gdb_unattached => debug = true,
-                Some("--debug-unattached") if !debug && !gdb_unattached => gdb_unattached = true,
-                Some("--unmute") if mute => mute = false,
-                Some("--gecko-bridge-probe") if !gecko_bridge_probe => {
-                    gecko_bridge_probe = true
-                }
-                Some("--trampoline-dry-run") if !trampoline_dry_run => {
-                    trampoline_dry_run = true
+            match option_text {
+                "--debug" if !debug && !gdb_unattached => debug = true,
+                "--debug-unattached" if !debug && !gdb_unattached => gdb_unattached = true,
+                "--unmute" if mute => mute = false,
+                "--gecko-bridge-probe" if !gecko_bridge_probe => gecko_bridge_probe = true,
+                "--trampoline-dry-run" if !trampoline_dry_run => trampoline_dry_run = true,
+                "--patched-image" => {
+                    let Some(value) = args.get(option_index + 1) else {
+                        return Err("--patched-image requires a path".into());
+                    };
+                    if patched_image.is_some() {
+                        return Err("--patched-image may be specified only once".into());
+                    }
+                    patched_image = Some(value.to_string_lossy().into_owned());
+                    option_index += 1;
                 }
                 _ => {
                     return Err(
-                        "dev-launch options: [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--bridge-startup-timeout-secs=5..300]".into(),
+                        "dev-launch options: [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <path>] [--bridge-startup-timeout-secs=5..300]".into(),
                     )
                 }
             }
+            option_index += 1;
         }
         if gecko_bridge_probe && (debug || gdb_unattached) {
             return Err("--gecko-bridge-probe uses stock Dolphin's named MEM1 mapping and must run without --debug or --debug-unattached".into());
@@ -2818,10 +2882,21 @@ fn run() -> Result<(), String> {
             gecko_bridge_probe,
             trampoline_dry_run,
         )?;
+        let game_path = if let Some(ref patched) = patched_image {
+            let manifest =
+                image_patch::validate_patched_image(std::path::Path::new(patched), &dol)?;
+            println!(
+                "patched image validated: patch_id={} output_image_sha256={}",
+                manifest.patch_id, manifest.output_image_sha256
+            );
+            std::path::PathBuf::from(patched)
+        } else {
+            config.game.clone()
+        };
         let mut child = spawn_game(
             &config.dolphin,
             &user_dir,
-            &config.game,
+            &game_path,
             gdb_enabled,
             port,
             mute,
@@ -3365,7 +3440,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy patch-image <development.local.toml> <source-image> <output-image> | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <path>] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
