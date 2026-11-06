@@ -105,6 +105,28 @@ The approved plan listed "the holder's recorded heap identity if present". Stati
 
 The remaining M5 hazard is `MR::newJ3DModel` calling `invalidateMtxCalc` (`0x803E7FC4`, zeroes joint `+0x54`) and `invalidateJointCallback` (`0x803E7FF8`, zeroes joint `+0x04`) on the shared `J3DModelData` joints (array at model-data `+0x28`, count at `+0x2C`), with re-arming attributed to `XanimeCore::enableJointTransform` (`0x80018D98`) via `ModelManager::initJointTransform` (`0x80169678`). The smallest next bounded, read-only experiment: extend the observer to sample the shared ModelData's joint count and each joint's `+0x04`/`+0x54` words across the same Beach Bowl → Observatory transition (fixed, plan-checked reads through the already-validated `J3DModelData` pointer). Non-zero and stable joint fields across the transition would show the invalidation is transient and re-armed per scene rather than a persistent shared-state hazard; zeroed fields would confirm the factory's clear is what the live model runs on. Either way it bounds the coexistence risk without constructing a second model. Static complement: trace all PAL write sites to joint `+0x04`/`+0x54` to confirm `enableJointTransform` is the only re-arm path. Rendering remains **NO-GO**.
 
+## Joint-field observer (`observe-model-joints`)
+
+The smallest next evidence step above is implemented as a sibling opt-in command, `observe-model-joints <development.local.toml> <Dolphin-pid>` (`crates/multigalaxy-cli/src/model_joint_observer.rs`). `observe-mario-model` and `observe-resource-holder` outputs are unchanged.
+
+Static derivation (pinned by `verify_pal_layout` against the exact PAL DOL):
+
+| Field / path | Offset / address | PAL evidence |
+|---|---:|---|
+| `J3DModelData` joint array | `+0x28` | `invalidateMtxCalc`/`invalidateJointCallback` `lwz r4,0x28(r3)` at `0x803E7FD4`/`0x803E8008` |
+| `J3DModelData` joint count | `+0x2C` | `lhz r6,0x2C(r3)` at `0x803E7FC4`/`0x803E7FF8` |
+| joint callback cleared by factory | joint `+0x04` | `stw r5,0x04(r4)` at `0x803E8020` (`invalidateJointCallback`) |
+| joint matrix-calc procedure cleared by factory | joint `+0x54` | `stw r5,0x54(r4)` at `0x803E7FEC` (`invalidateMtxCalc`) |
+| re-arm path | `0x80169678` → `0x80018D98` | `ModelManager::initJointTransform` calls `XanimeCore::enableJointTransform` (branch-target pinned), which reads the model-data joint array (`lwz r4,0x28(r30)` at `0x80018DE8`) |
+
+The command samples the joint table twice within one invocation, 3 seconds apart, re-resolving the full Mario model chain around each sample and rejecting any scene/group/actor/model/heap change. The two within-scene samples plus `within_scene_stable` keep per-frame Xanime writes from being misread as transition effects; the user then runs the command once per scene across a transition for the cross-scene comparison.
+
+Interpretation rules (endpoint inferences only — the factory clear itself is not traced):
+
+- joint `+0x04`/`+0x54` **non-zero in both scenes** → the factory clear is transient and re-armed per scene; supports the safety of a second instance on shared ModelData;
+- **zeroed in live scenes** → local Mario itself runs on cleared joints, so a second construction would act on already-cleared state;
+- pointer equality of joint fields is support, never proof.
+
 ## Synthetic coverage and live status
 
 Synthetic tests cover holder/ResTable resolution, the model-data entry probe (hit, miss, window cap), null animation holder, the `0xFFFFFFFF` pre-mount archive sentinel, invalid/null/out-of-bounds pointers, holder span crossing the MEM1 end, and AllStars overlap rejection. `verify_pal_layout` was additionally run once against the repository's exact PAL DOL and Petari symbol map during development (all 15 pinned code signatures, 15 expected symbol lines, and 3 branch-target checks passed). Phase 2 live samples (PID 113428) are recorded above. Rendering remains **NO-GO**.
