@@ -69,3 +69,22 @@ One opt-in Gecko-delivered hook at `0x802B62E4` in one scene (Beach Bowl): the c
 ## 7. Status
 
 Static contract only. Rendering remains **NO-GO** until the §5 NO-GO rows are cleared and the §6 experiment is separately approved and observed.
+
+## 8. Stage 1 implemented: trampoline dry-run (delivery proof only)
+
+Implemented as an opt-in `dev-launch --trampoline-dry-run` flag (not combinable with `--debug`/`--debug-unattached`/`--gecko-bridge-probe` in Stage 1). When set, `configure_isolated_profile` appends the trampoline variant of the Gecko C0 block to the isolated profile's `GameSettings/RMGP01.ini` only (`gecko_bridge::append_code_with`). Nothing changes by default.
+
+Guest side (per-frame C0 installer, scratch regs r0/r10/r11/r12 only): compute the runtime stub address PC-relative, then store `b <stub>` at `0x802B62E4` **only if** the current word is the original `0x4BFF083D` or the already-installed branch — anything else is left untouched. The 8-word stub is constant and sits after the mailbox data inside the same C0 block, below the AllStars cave `0x80002790` (layout test enforced):
+
+```
+lis r11,0x802A; ori r11,r11,0x6B20; mtctr r11; bctrl   ; call original directDraw
+lis r11,0x802B; ori r11,r11,0x62E8; mtctr r11; bctr    ; jump to 0x802B62E8
+```
+
+The cave executes **only** the original `bl 0x802A6B20` — no duplicate draw, no j3dSys writes. Rollback is relaunch without the flag (the ini is regenerated; MEM1 reloads the original DOL word).
+
+Gates before any of this runs: `hook_trampoline::verify_hook_layout` (exact PAL DOL/symbol hashes; DOL word at `0x802B62E4` must equal `0x4BFF083D`), AllStars disjointness (`ensure_hook_disjoint` rejects any patch write overlapping the hook word; the cave layout test rejects overlap with `0x80002790`), Dolphin 2609a codehandler size/SHA-256, live RMGP01 identity.
+
+Host-side read-only verification: `multigalaxy verify-hook <development.local.toml> <Dolphin-pid>` classifies the live hook word as `original` (rollback confirmed: `0x4BFF083D`), `installed` (plain `b` whose target holds the exact stub template), or `UNEXPECTED`.
+
+Caveat for the acceptance run: this proves the bytes are installed and the trampoline is semantically the original call; whether Dolphin's JIT picks up the runtime-written branch is only observable via your visual check (identical rendering with hook on/off in Beach Bowl, stable across ≥1 transition).

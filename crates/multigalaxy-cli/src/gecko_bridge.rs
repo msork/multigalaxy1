@@ -7,6 +7,14 @@
 pub const HANDLER_BASE: u32 = 0x8000_1800;
 pub const HANDLER_END: u32 = 0x8000_3000;
 const ALLSTARS_CAVE_START: u32 = 0x8000_2790;
+
+// Stage 1 trampoline dry-run hook points (docs/references/draw-only-hook-contract.md).
+pub const HOOK_ADDRESS: u32 = 0x802B_62E4;
+pub const HOOK_RETURN_ADDRESS: u32 = 0x802B_62E8;
+pub const ORIGINAL_HOOK_WORD: u32 = 0x4BFF_083D;
+const DIRECT_DRAW: u32 = 0x802A_6B20;
+const STUB_WORDS: usize = 8;
+pub const STUB_WORDS_PUBLIC: usize = STUB_WORDS;
 const MAILBOX_MAGIC: u32 = 0x4d47_3150; // "MG1P"
 pub const MAILBOX_VERSION: u32 = 1;
 const MAILBOX_WORDS: usize = 14;
@@ -129,6 +137,22 @@ fn andi_dot(ra: u8, rs: u8, imm: u16) -> u32 {
 fn cmplw(ra: u8, rb: u8) -> u32 {
     0x7c00_0040 | (u32::from(ra) << 16) | (u32::from(rb) << 11)
 }
+fn subf(rd: u8, ra: u8, rb: u8) -> u32 {
+    0x7c00_0000 | (u32::from(rd) << 21) | (u32::from(ra) << 16) | (u32::from(rb) << 11) | (40 << 1)
+}
+fn rlwinm(ra: u8, rs: u8, sh: u8, mb: u8, me: u8) -> u32 {
+    0x5400_0000
+        | (u32::from(rs) << 21)
+        | (u32::from(ra) << 16)
+        | (u32::from(sh) << 11)
+        | (u32::from(mb) << 6)
+        | (u32::from(me) << 1)
+}
+fn mtctr(rs: u8) -> u32 {
+    0x7c00_03a6 | (u32::from(rs) << 21)
+}
+const BCTRL: u32 = 0x4e80_0421;
+const BCTR: u32 = 0x4e80_0420;
 
 fn emit_pointer_check(p: &mut Program, reg: u8, field_end: u32, unavailable: usize) {
     let check_mem2 = p.label();
@@ -160,7 +184,56 @@ fn emit_pointer_check(p: &mut Program, reg: u8, field_end: u32, unavailable: usi
     p.bind(valid);
 }
 
-fn payload() -> Result<(Vec<u32>, usize), String> {
+/// Constant 8-word trampoline stub executed when the hook branch is taken:
+/// call the original `directDraw` via CTR, then jump back to the callsite's
+/// next instruction. Fully position-independent (absolute addresses only).
+fn stub_template() -> [u32; STUB_WORDS] {
+    stub_template_public()
+}
+
+/// Public copy of the trampoline stub template for host-side verification.
+pub fn stub_template_public() -> [u32; STUB_WORDS] {
+    [
+        lis(11, (DIRECT_DRAW >> 16) as u16),
+        ori(11, 11, DIRECT_DRAW as u16),
+        mtctr(11),
+        BCTRL,
+        lis(11, (HOOK_RETURN_ADDRESS >> 16) as u16),
+        ori(11, 11, HOOK_RETURN_ADDRESS as u16),
+        mtctr(11),
+        BCTR,
+    ]
+}
+
+/// Emit the per-frame installer that writes the `b <stub>` hook word at
+/// `HOOK_ADDRESS`. Idempotent and fail-safe: it stores only if the current word
+/// is the original `bl directDraw` or the already-installed branch; anything
+/// else is left untouched. Uses only the documented scratch regs r0/r10/r11/r12;
+/// at this point r12 still holds the PC-relative mailbox base.
+fn emit_trampoline_installer(p: &mut Program, stub_delta: u16) {
+    let do_write = p.label();
+    let done = p.label();
+    p.emit(addi(10, 12, stub_delta)); // r10 = runtime stub address
+    p.emit(lis(11, (HOOK_ADDRESS >> 16) as u16));
+    p.emit(ori(11, 11, HOOK_ADDRESS as u16)); // r11 = HOOK_ADDRESS
+    p.emit(subf(0, 11, 10)); // r0 = stub - hook
+    p.emit(rlwinm(0, 0, 0, 6, 29)); // mask to the 26-bit branch displacement
+    p.emit(ori(0, 0, 0x4800)); // r0 = b <stub> hook word
+    p.emit(lwz(12, 11, 0)); // current word at the hook
+    p.emit(lis(10, (ORIGINAL_HOOK_WORD >> 16) as u16));
+    p.emit(ori(10, 10, ORIGINAL_HOOK_WORD as u16));
+    p.emit(cmplw(12, 10));
+    p.bc(12, 2, do_write); // beq: original word present -> install
+    p.emit(cmplw(12, 0));
+    p.bc(12, 2, done); // beq: already installed
+    p.b(done); // unknown content: never clobber
+    p.bind(do_write);
+    p.emit(stw(0, 11, 0));
+    p.b(done);
+    p.bind(done);
+}
+
+fn payload_with(trampoline: bool) -> Result<(Vec<u32>, usize), String> {
     let mut p = Program::default();
     let unavailable = p.label();
     let finalize = p.label();
@@ -226,6 +299,15 @@ fn payload() -> Result<(Vec<u32>, usize), String> {
     p.emit(lwz(0, 12, (SAVED_LR * 4) as u16));
     p.emit(0x7c08_03a6); // mtlr r0
     p.b(ret);
+    p.bind(ret);
+    let installer_addi = if trampoline {
+        let at = p.words.len();
+        emit_trampoline_installer(&mut p, 0);
+        Some(at)
+    } else {
+        None
+    };
+    p.emit(0x4e80_0020); // blr
     if p.words.len() & 1 != 0 {
         p.emit(0x6000_0000); // nop; keep Gecko's instruction-pair count aligned
     }
@@ -245,11 +327,26 @@ fn payload() -> Result<(Vec<u32>, usize), String> {
     p.emit(0); // reserved
     p.emit(0); // saved LR
     p.emit(0); // reserved/pad
-    p.bind(ret);
-    p.emit(0x4e80_0020); // blr
-    p.emit(0x6000_0000); // nop
+    if trampoline {
+        let stub_offset = p.words.len() * 4;
+        // r12 holds the mailbox base; the stub sits stub_delta bytes after it.
+        let stub_delta = (stub_offset - mailbox_offset) as u16;
+        p.words[installer_addi.expect("installer emitted")] = addi(10, 12, stub_delta);
+        for word in stub_template() {
+            p.emit(word);
+        }
+    }
     let words = p.resolve()?;
     Ok((words, mailbox_offset / 4))
+}
+
+fn payload() -> Result<(Vec<u32>, usize), String> {
+    payload_with(false)
+}
+
+/// Payload including the Stage 1 trampoline installer and stub.
+pub fn payload_trampoline() -> Result<(Vec<u32>, usize), String> {
+    payload_with(true)
 }
 
 fn mailbox_marker_index() -> Result<usize, String> {
@@ -275,7 +372,14 @@ pub(crate) fn mailbox_data_word() -> usize {
 /// Append the local-only test Gecko code after the mandatory AllStars OnFrame
 /// section. The game image remains untouched.
 pub fn append_code(settings: &mut String) {
-    let Ok((words, _)) = payload() else {
+    append_code_with(settings, false);
+}
+
+/// Same, optionally including the Stage 1 trampoline installer/stub. The
+/// trampoline variant is not combinable with the interactive mailbox probe in
+/// Stage 1, so `locate_mailbox` keeps matching the plain payload.
+pub fn append_code_with(settings: &mut String, trampoline: bool) {
+    let Ok((words, _)) = payload_with(trampoline) else {
         return;
     };
     let count = words.len() / 2;
@@ -548,6 +652,29 @@ mod tests {
             decode_snapshot(&bytes, 4).unwrap(),
             Err(SnapshotState::Invalid)
         );
+    }
+
+    #[test]
+    fn trampoline_payload_fits_before_allstars_cave_with_valid_branches() {
+        let (words, _) = payload_trampoline().unwrap();
+        let start = HANDLER_BASE + 2880 + 16;
+        assert!(start + words.len() as u32 * 4 <= ALLSTARS_CAVE_START);
+        assert!(words.len() > payload().unwrap().0.len());
+        assert_eq!(&words[words.len() - STUB_WORDS..], &stub_template_public());
+        for (index, word) in words.iter().enumerate() {
+            if word >> 26 == 18 || word >> 26 == 16 {
+                let displacement = if word >> 26 == 18 {
+                    ((*word << 6) as i32) >> 6
+                } else {
+                    ((*word << 16) as i32) >> 16
+                };
+                let target = index as i64 + displacement as i64 / 4;
+                assert!(
+                    (0..words.len() as i64).contains(&target),
+                    "branch at word {index} targets {target}"
+                );
+            }
+        }
     }
 
     #[test]
