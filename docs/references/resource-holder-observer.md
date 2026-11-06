@@ -77,6 +77,34 @@ SMG1/JKR has no verified generation counter or allocation timestamp, so the tabl
 
 Pointer equality is reported as support, never proof of uninterrupted lifetime; changed identities establish replacement, not destructor timing. A successful sample is a consistent read window only — the emulator keeps running, and any scene/group/model/heap change during the sample rejects the whole observation.
 
+## Phase 2 live samples (user-observed, Dolphin PID 113428)
+
+The user ran `observe-resource-holder` twice with the same Dolphin PID (113428, PAL RMGP01 Rev 0 validated) around one ordinary Beach Bowl → Comet Observatory transition. These are user-observed live samples, not independently recaptured in this documentation pass.
+
+| Field | Beach Bowl sample | Observatory sample | Set |
+|---|---:|---:|---|
+| `model_resource_holder` | `0x80D68630` | `0x80D68630` | persist |
+| `holder_res_table` | `0x80D68690` | `0x80D68690` | persist |
+| `res_table_entries` (count, model-data index) | `0x80D686B8` (1, 0) | `0x80D686B8` (1, 0) | persist |
+| `holder_archive` | `0x80A32C90` | `0x80A32C90` | persist |
+| `J3DModelData` | `0x80D6874C` | `0x80D6874C` | persist |
+| `anm_resource_holder` | `0x810B971C` | `0x810B235C` | changed |
+| `MarioActor` | `0x810B29CC` | `0x810AB5FC` | changed |
+| `ModelManager` | `0x810B96F4` | `0x810B2334` | changed |
+| `AllLiveActorGroup` | `0x80FA07D8` | `0x80FA074C` | changed |
+
+The changed instance values match the PID 119844 model-observer round exactly. The persist set occupies the `0x80A3`–`0x80D6` region (archive-backed resource space), while the changed set sits in the `0x810x`/`0x80FA` scene-instance block.
+
+Interpretation per the discriminator table: every persist signal holds — identical model holder, ResTable, entry array, single-entry count with the model data at index 0, archive, and `J3DModelData` — while the animation holder tracks the per-scene `ModelManager`. This is the strongest support yet for a persistent holder / cache hit over reload-at-reused-address. Per the standing rule, pointer equality is support, never proof: there is no generation counter and no free-list evidence (`heap_free_list=unavailable`), so reload-at-reused-address is not excluded, only unsupported by every available signal.
+
+## Why `holder_recorded_heap` is not an output field
+
+The approved plan listed "the holder's recorded heap identity if present". Static tracing shows it is **not present on the holder**: the heap is recorded in the `ResourceHolderManager` entry (`+0x0C` of the 0x10-byte `{name, holder, hash, heap}` record, compared by `removeIfIsEqualHeap` at `0x803A6BFC`), not in the 0x50-byte `ResourceHolder` object itself. Reaching that field for the model holder would require locating its manager entry via `ResourceHolderManager::find`, which needs the archive name's hash and a walk of the manager entry table — precisely the manager enumeration the plan prohibited ("do not scan manager entries"). The observer therefore reports the scene-heap identities from the existing heap observer instead, and the persist/reload interpretation uses holder/archive/ResTable/entry identity plus the indirect heap-keyed-removal reasoning in the construction-path table above. If the recorded heap ever becomes necessary, the bounded route is to compute the model archive name's hash from the pinned DOL string and call-equivalent `find` semantics offline, then read that one entry — not a general scan.
+
+## Smallest next evidence step toward the shared-joint mutation risk
+
+The remaining M5 hazard is `MR::newJ3DModel` calling `invalidateMtxCalc` (`0x803E7FC4`, zeroes joint `+0x54`) and `invalidateJointCallback` (`0x803E7FF8`, zeroes joint `+0x04`) on the shared `J3DModelData` joints (array at model-data `+0x28`, count at `+0x2C`), with re-arming attributed to `XanimeCore::enableJointTransform` (`0x80018D98`) via `ModelManager::initJointTransform` (`0x80169678`). The smallest next bounded, read-only experiment: extend the observer to sample the shared ModelData's joint count and each joint's `+0x04`/`+0x54` words across the same Beach Bowl → Observatory transition (fixed, plan-checked reads through the already-validated `J3DModelData` pointer). Non-zero and stable joint fields across the transition would show the invalidation is transient and re-armed per scene rather than a persistent shared-state hazard; zeroed fields would confirm the factory's clear is what the live model runs on. Either way it bounds the coexistence risk without constructing a second model. Static complement: trace all PAL write sites to joint `+0x04`/`+0x54` to confirm `enableJointTransform` is the only re-arm path. Rendering remains **NO-GO**.
+
 ## Synthetic coverage and live status
 
-Synthetic tests cover holder/ResTable resolution, the model-data entry probe (hit, miss, window cap), null animation holder, the `0xFFFFFFFF` pre-mount archive sentinel, invalid/null/out-of-bounds pointers, holder span crossing the MEM1 end, and AllStars overlap rejection. `verify_pal_layout` was additionally run once against the repository's exact PAL DOL and Petari symbol map during development (all 15 pinned code signatures, 15 expected symbol lines, and 3 branch-target checks passed). No live Dolphin sample has yet captured holder/archive/ResTable identity; that live run is the pending evidence item. Rendering remains **NO-GO**.
+Synthetic tests cover holder/ResTable resolution, the model-data entry probe (hit, miss, window cap), null animation holder, the `0xFFFFFFFF` pre-mount archive sentinel, invalid/null/out-of-bounds pointers, holder span crossing the MEM1 end, and AllStars overlap rejection. `verify_pal_layout` was additionally run once against the repository's exact PAL DOL and Petari symbol map during development (all 15 pinned code signatures, 15 expected symbol lines, and 3 branch-target checks passed). Phase 2 live samples (PID 113428) are recorded above. Rendering remains **NO-GO**.

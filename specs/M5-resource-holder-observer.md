@@ -1,6 +1,6 @@
 # M5: Read-only ResourceHolder/ResTable identity observer
 
-Status: implemented and statically validated; live sampling pending. The observer is opt-in and reads stock Dolphin's validated read-only MEM1 mapping only. It performs no game-memory writes, holder destruction, callback invocation, hooks, actor creation, manager-list enumeration, or M4/AllStars changes.
+Status: implemented, statically validated, and live-sampled (Phase 2, Dolphin PID 113428: persist set identical across Beach Bowl → Observatory, see [research](../docs/references/resource-holder-observer.md)). The observer is opt-in and reads stock Dolphin's validated read-only MEM1 mapping only. It performs no game-memory writes, holder destruction, callback invocation, hooks, actor creation, manager-list enumeration, or M4/AllStars changes.
 
 ## Objective
 
@@ -34,7 +34,7 @@ Take one bounded snapshot of the ResourceHolder/ResTable identities behind the e
 
 - `verify_pal_layout` accepts only the exact PAL Rev 0 DOL/symbol set; synthetic tests cover both holder branches, the entry probe (hit/miss/window), invalid pointers, span overflow, and patch overlap.
 - Output includes holder, ResTable, entries, count, entry index, archive, and the re-validated chain/heap tuple with a timestamp.
-- No runtime claim is made until the user runs the command twice around one ordinary transition in an interactive Dolphin session.
+- No runtime claim was made until the user ran the command twice around one ordinary transition in an interactive Dolphin session (PID 113428); those samples are recorded as Phase 2 evidence and support persist/cache-hit without proving it.
 
 ## Testing strategy
 
