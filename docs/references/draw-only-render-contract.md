@@ -227,6 +227,8 @@ For the animated branch, Petari's `ModelManager::initModelAndAnimation` passes t
 
 **Finding:** a second instance cannot currently be described as sharing immutable model data safely. The PAL factory itself clears two per-joint model-data fields. Another initialization/animation path receives and enables transforms on the same model data. A second construction could reset state used by an existing model; subsequent animation setup could then replace shared joint behavior. This is a concrete shared-mutable-state hazard, not proof that every pair of instances visibly fails. Do not call `newJ3DModel` for a duplicate or implement model-data cloning until field-level coexistence and ownership are proven.
 
+**Phase 1.29 live update (PID 107916, Beach Bowl → Comet Observatory):** `observe-model-joints` shows all 30 Mario joints at `callback=0` (`+0x04`) and `mtx_calc=0` (`+0x54`) in both scenes and both within-scene passes. For these two fields the factory clear is therefore idempotent w.r.t. the running local Mario, and the re-arm hypothesis via `XanimeCore::enableJointTransform` is disconfirmed for them. This weakens — but does not remove — the shared-data hazard: `enableJointTransform` internals and all other shared joint/model-data fields remain unaudited, and the clear itself was not traced. The remaining NO-GO blockers are unchanged: directDraw global/GX/per-instance state, callsite hook ABI, buffer/packet lifetime, teardown ordering, and cache coherency.
+
 #### Evidence-backed ownership status
 
 | Resource | Verified PAL behavior | Unknown / not claimed |

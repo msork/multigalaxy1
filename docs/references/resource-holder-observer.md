@@ -123,6 +123,16 @@ The command samples the joint table twice within one invocation, 3 seconds apart
 
 Width correction (live failure, fixed): the first live run rejected with `joint count 1966093 exceeds the bounded observer cap 64` because the count word at `+0x2C` was read as 32 bits (`0x001E0005`); the PAL code loads it with `lhz`, so the observer now reads two bytes and the count is the low halfword (5 in that sample). The joint array at `+0x28` is a genuine 32-bit `lwz` and is unchanged. A synthetic regression test pins the halfword width; the fail-closed cap rejection itself worked correctly.
 
+### Phase 1.29 live joint samples (user-observed, Dolphin PID 107916)
+
+`observe-model-joints` run once per scene across a Beach Bowl → Comet Observatory transition, same Dolphin PID 107916, both PAL-validated. `joint_count=30`; all 30 joints report `callback=0x00000000` and `mtx_calc=0x00000000` in **both scenes and both within-scene passes** (`within_scene_stable=true`). User-observed live samples, not independently recaptured here.
+
+Endpoint interpretation (per the approved rules; the factory clear itself was not traced):
+
+- Local Mario runs on **cleared joints** — the `invalidateMtxCalc`/`invalidateJointCallback` clear is not transient, and these two words are not re-armed during live gameplay. The `XanimeCore::enableJointTransform` re-arm hypothesis is disconfirmed **for these specific fields**.
+- Consequence: a second model construction's invalidation writes would clear already-zero words — **idempotent with respect to the running local Mario**. This is the first live counter-evidence against the shared-joint-mutation NO-GO reason.
+- Residual limit: `enableJointTransform` internals and all other shared-joint fields remain unaudited, so this bounds only joint `+0x04`/`+0x54`; cleanup ordering, matrix-buffer/packet allocation lifetime, and GX state remain unresolved. Rendering remains **NO-GO**.
+
 Interpretation rules (endpoint inferences only — the factory clear itself is not traced):
 
 - joint `+0x04`/`+0x54` **non-zero in both scenes** → the factory clear is transient and re-armed per scene; supports the safety of a second instance on shared ModelData;
