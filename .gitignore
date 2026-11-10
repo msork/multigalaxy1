@@ -5,6 +5,7 @@ build/
 dist/
 /target/
 /development.local.toml
+/development.2609a.local.toml
 *.elf
 *.dol
 *.iso

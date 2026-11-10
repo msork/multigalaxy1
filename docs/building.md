@@ -6,6 +6,14 @@ Host tooling is a Cargo workspace. Run `cargo fmt --all -- --check`, `cargo test
 
 Use an official, unmodified Dolphin installation and a game image you are entitled to use. MultiGalaxy does not build or alter Dolphin or DolphinTool and never edits the supplied game image in place. The separate ISO rebuild command below can create a new user-owned output image. The launcher takes explicit paths and writes emulator settings only under the selected isolated user directory.
 
+The launcher accepts official Dolphin 2609a and 2609b. Before any setup or launch it checks the embedded version markers in `Dolphin.exe` and the sibling `DolphinTool`, requires them to match, and validates the known Dolphin `Sys/codehandler.bin` fingerprint. Check an installation without starting Dolphin:
+
+```powershell
+cargo run -p multigalaxy -- discover-dolphin '<Dolphin installation directory>'
+```
+
+The command reports the unique executable path and validated version, or fails on missing/ambiguous executables, mixed-version binaries, or incomplete installation files. Put the verified executable path in the local config. PAL memory observers, Gecko mailbox probing, trampoline diagnostics, and the current M4 Dolphin mailbox client remain gated to 2609a because their emulator mapping/handler observations have not been revalidated on 2609b. Ordinary launch with AllStars and a patched ISO does not enable those probes. See [Dolphin version migration](references/dolphin-version-migration.md).
+
 Validate the PAL image read-only with the matching official DolphinTool:
 
 ```powershell
@@ -28,7 +36,7 @@ cargo run --release -p multigalaxy -- rebuild-iso `
   '<matching Petari PAL symbols.txt>'
 ```
 
-The completed local test verifies PAL RMGP01 revision 0, the pinned source DOL, WIT partition integrity before/after, output DOL and game-file hashes, source immutability, and deterministic recomposition. `dev-launch --patched-image` accepts only a WIT `rebuild-iso-dol` manifest and revalidates both ISO extractions, hashes, tool versions, PAL headers, and AllStars non-overlap before configuring the isolated profile. It does not enable the M4 mailbox unless `--gecko-bridge-probe` is separately provided. No Dolphin boot has been tested. See [Wii image rebuild evidence](references/wii-image-rebuild.md).
+The completed local test verifies PAL RMGP01 revision 0, the pinned source DOL, WIT partition integrity before/after, output DOL and game-file hashes, source immutability, and deterministic recomposition. `dev-launch --patched-image` accepts only a WIT `rebuild-iso-dol` manifest and revalidates both ISO extractions, hashes, tool versions, PAL headers, and AllStars non-overlap before configuring the isolated profile. It does not enable the M4 mailbox unless `--gecko-bridge-probe` is separately provided. The changed-byte ISO has a user-confirmed live boot regression on 2609a; this is not trampoline validation, and 2609b remains untested. See [Wii image rebuild evidence](references/wii-image-rebuild.md).
 
 For a separately built and hash-pinned candidate DOL, use `rebuild-iso-dol` with the exact PAL source DOL, symbol map, candidate DOL, candidate SHA-256, and external AllStars folder. It rejects changes outside DOL text or overlapping AllStars writes and verifies the re-extracted target bytes. This is not a trampoline generator and is not ready for Dolphin boot until the changed output has passed an offline WIT round trip and the hook's code location is verified. The exact candidate command is recorded in [Wii image rebuild evidence](references/wii-image-rebuild.md).
 
@@ -60,7 +68,7 @@ cargo run --release -p multigalaxy -- dev-launch development.local.toml `
   --wit $Wit
 ```
 
-The launcher infers DolphinTool beside the configured Dolphin executable. It hashes the explicit source/output ISOs and tools, verifies PAL identity and WIT partitions, extracts both images, confirms the source DOL and exact authorized candidate DOL, checks deterministic delta and unchanged DATA files, and rejects AllStars overlap. The operation is intentionally disk intensive. It keeps mandatory AllStars and the copied controller profile; M4 remains off unless `--gecko-bridge-probe` is explicitly added. No Dolphin boot has yet been performed.
+The launcher infers DolphinTool beside the configured Dolphin executable. It hashes the explicit source/output ISOs and tools, verifies PAL identity and WIT partitions, extracts both images, confirms the source DOL and exact authorized candidate DOL, checks deterministic delta and unchanged DATA files, and rejects AllStars overlap. The operation is intentionally disk intensive. It keeps mandatory AllStars and the copied controller profile; M4 remains off unless `--gecko-bridge-probe` is explicitly added. The live 2609a baseline and the untested 2609b repeat command are in [Dolphin version migration](references/dolphin-version-migration.md).
 
 ## Local Windows development profile
 

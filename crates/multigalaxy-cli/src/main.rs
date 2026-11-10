@@ -3,6 +3,7 @@ mod callback_observer;
 mod controller_patch;
 mod dev_config;
 mod disc_rebuild;
+mod dolphin_version;
 mod gdb;
 mod gecko_bridge;
 mod heap_observer;
@@ -67,6 +68,7 @@ fn run_inspect_memory(
         .map_err(|e| format!("cannot read development config: {e}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
+    require_2609a_dev_tools(&config, "stock Dolphin MEM1 inspection")?;
     let dol = fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
     let symbols =
         fs::read(&config.pal_symbols).map_err(|e| format!("cannot read Petari symbol map: {e}"))?;
@@ -195,6 +197,7 @@ fn run_observe_penguins(config_path: &std::path::Path, pid: u32) -> Result<(), S
         .map_err(|e| format!("cannot read development config: {e}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
+    require_2609a_dev_tools(&config, "Penguin memory observation")?;
     let dol = fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
     let symbols =
         fs::read(&config.pal_symbols).map_err(|e| format!("cannot read Petari symbol map: {e}"))?;
@@ -282,6 +285,7 @@ fn run_observe_mario_model(config_path: &std::path::Path, pid: u32) -> Result<()
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
+    require_2609a_dev_tools(&config, "Mario model memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -396,6 +400,7 @@ fn run_observe_resource_holder(config_path: &std::path::Path, pid: u32) -> Resul
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
+    require_2609a_dev_tools(&config, "resource-holder memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -511,6 +516,7 @@ fn run_observe_model_joints(config_path: &std::path::Path, pid: u32) -> Result<(
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
+    require_2609a_dev_tools(&config, "model-joint memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -625,6 +631,7 @@ fn run_verify_hook(config_path: &std::path::Path, pid: u32) -> Result<(), String
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
+    require_2609a_dev_tools(&config, "live hook inspection")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -874,6 +881,17 @@ fn run_validate_rebuilt_iso(
     Ok(())
 }
 
+fn run_discover_dolphin(install_path: &std::path::Path) -> Result<(), String> {
+    let executable = dolphin_version::discover_executable(install_path)?;
+    let version = dolphin_version::validate_installation(&executable)?;
+    println!(
+        "dolphin_install=valid version={} executable={}",
+        version.as_str(),
+        executable.canonicalize().unwrap_or(executable).display()
+    );
+    Ok(())
+}
+
 #[cfg(windows)]
 fn run_observe_heaps(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
     const EXPECTED_HANDLER_SHA256: &str =
@@ -882,6 +900,7 @@ fn run_observe_heaps(config_path: &std::path::Path, pid: u32) -> Result<(), Stri
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
+    require_2609a_dev_tools(&config, "heap memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -969,6 +988,7 @@ fn run_observe_scheduler(config_path: &std::path::Path, pid: u32) -> Result<(), 
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
+    require_2609a_dev_tools(&config, "scheduler memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -1061,6 +1081,7 @@ fn run_observe_callback_lists(config_path: &std::path::Path, pid: u32) -> Result
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
+    require_2609a_dev_tools(&config, "callback-list memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -1274,6 +1295,14 @@ fn validate_rebuilt_iso_options(
     }
 }
 
+fn require_2609a_dev_tools(
+    config: &dev_config::DevelopmentConfig,
+    feature: &str,
+) -> Result<(), String> {
+    let version = dolphin_version::validate_installation(&config.dolphin)?;
+    dolphin_version::require_2609a(version, feature)
+}
+
 fn parse_dolphintool_header(output: &str) -> Result<(), String> {
     let value = |label: &str| {
         output
@@ -1296,6 +1325,11 @@ fn verify_pal_game_image(dolphin: &std::path::Path, game: &std::path::Path) -> R
     let dolphin = dolphin
         .canonicalize()
         .map_err(|e| format!("cannot resolve Dolphin executable path: {e}"))?;
+    let dolphin_version = dolphin_version::validate_installation(&dolphin)?;
+    println!(
+        "Official Dolphin {} executable pair validated.",
+        dolphin_version.as_str()
+    );
     let game = game
         .canonicalize()
         .map_err(|e| format!("cannot resolve game image path: {e}"))?;
@@ -2231,6 +2265,7 @@ fn run_sync_client(
         .map_err(|e| format!("cannot read development config: {e}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
+    require_2609a_dev_tools(&config, "M4 mailbox position relay")?;
     let pal_dol = fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL DOL: {e}"))?;
     let pal_symbols =
         fs::read(&config.pal_symbols).map_err(|e| format!("cannot read PAL symbols: {e}"))?;
@@ -2707,6 +2742,9 @@ fn run() -> Result<(), String> {
             std::path::Path::new(&args[6]),
         );
     }
+    if args.len() == 2 && args[0] == "discover-dolphin" {
+        return run_discover_dolphin(std::path::Path::new(&args[1]));
+    }
     if args.len() == 3 && args[0] == "observe-scheduler" {
         let pid = args[2]
             .to_str()
@@ -3033,6 +3071,9 @@ fn run() -> Result<(), String> {
             return Err(
                 "--bridge-startup-timeout-secs is only valid with --gecko-bridge-probe".into(),
             );
+        }
+        if gecko_bridge_probe || trampoline_dry_run {
+            require_2609a_dev_tools(&config, "Gecko mailbox and trampoline experiments")?;
         }
         let gdb_enabled = debug || gdb_unattached;
         if gdb_enabled && (port == 0 || !port_is_available(port)) {
@@ -3656,7 +3697,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy patch-image <development.local.toml> <source-image> <output-image> [legacy plaintext-only experiment] | multigalaxy rebuild-iso <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> | multigalaxy rebuild-iso-dol <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> <target-main.dol> <target-sha256> <AllStars-patch-folder> | multigalaxy validate-rebuilt-iso <DolphinTool.exe> <wit.exe> <source.iso> <rebuilt.iso> <PAL-main.dol> <AllStars-patch-folder> | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <output.iso> --source-iso <source.iso> --wit <wit.exe>] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy discover-dolphin <install-directory-or-Dolphin.exe> | multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy patch-image <development.local.toml> <source-image> <output-image> [legacy plaintext-only experiment] | multigalaxy rebuild-iso <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> | multigalaxy rebuild-iso-dol <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> <target-main.dol> <target-sha256> <AllStars-patch-folder> | multigalaxy validate-rebuilt-iso <DolphinTool.exe> <wit.exe> <source.iso> <rebuilt.iso> <PAL-main.dol> <AllStars-patch-folder> | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <output.iso> --source-iso <source.iso> --wit <wit.exe>] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;

@@ -9,6 +9,7 @@ Rust-first, online-only multiplayer modification research for PAL Super Mario Ga
 - PAL game-side state extraction remains unverified; the stock Dolphin Gecko mailbox has user-observed live bidirectional operation at approximately 60 Hz.
 - Russian, French, and English client-local localization is a required acceptance case, not a tested feature.
 - The PAL AllStars controller patch with both shoulder swaps is mandatory on every launcher path; source fingerprints and PAL Rev 0 compatibility are checked before Dolphin starts.
+- The development launcher validates official Dolphin 2609a and 2609b installations. The 2609a PAL memory/M4 bridge remains version-gated pending revalidation on 2609b; the changed-byte ISO boot is user-confirmed on 2609a only.
 - See [milestones](docs/milestones.md), [testing evidence](docs/testing.md), and [online architecture](docs/networking.md).
 
 ## Development
