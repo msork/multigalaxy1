@@ -476,6 +476,19 @@ fn tool_output(tool: &Path, args: &[OsString], cwd: Option<&Path>) -> Result<Str
                 }
                 let mut output = String::from_utf8_lossy(&stdout).into_owned();
                 output.push_str(&String::from_utf8_lossy(&stderr));
+                if std::env::var_os("MG1_REBUILD_VERBOSE").is_some() {
+                    let command = args
+                        .iter()
+                        .map(|arg| arg.to_string_lossy())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    eprintln!(
+                        "external_tool={} status=success args={} output_begin\n{}\nexternal_tool_output_end",
+                        tool.display(),
+                        command,
+                        output
+                    );
+                }
                 return Ok(output);
             }
             Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(50)),
@@ -622,6 +635,20 @@ mod tests {
             u32::from_be_bytes(source[0x110..0x114].try_into().unwrap()),
             expected
         );
+    }
+
+    #[test]
+    fn ori_register_with_zero_immediate_is_architecturally_neutral() {
+        // PAL test candidate at 0x80078A5C: `ori r7,r7,0` replaces the
+        // canonical `ori r0,r0,0` NOP. PPC ORI has no record-form variant.
+        for word in [0x6000_0000u32, 0x60E7_0000u32] {
+            assert_eq!(word >> 26, 24, "expected primary opcode ORI");
+            let source = (word >> 21) & 0x1f;
+            let destination = (word >> 16) & 0x1f;
+            let immediate = word & 0xffff;
+            assert_eq!(source, destination);
+            assert_eq!(immediate, 0);
+        }
     }
 
     #[test]

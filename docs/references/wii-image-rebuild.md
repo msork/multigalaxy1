@@ -1,6 +1,6 @@
 # Partition-aware Wii ISO rebuild
 
-Status: **verified offline for an identity DOL target, PAL RMGP01 Rev 0**. This establishes extraction/recomposition and integrity checks, not a changed-code deployment or successful Dolphin boot.
+Status: **verified offline for identity and one changed-byte DOL replacement, PAL RMGP01 Rev 0**. This establishes partition-aware extraction/recomposition and DOL integrity, not a Dolphin boot or executable-hook correctness.
 
 ## Tool capability findings
 
@@ -53,16 +53,40 @@ The supplied PAL RVZ was converted to a separate ISO through official DolphinToo
 
 For source ISO SHA-256 `ce0bf021b21767c19a5077506ec8bd7e7ef67c3b53e04726ce792e05b52689bb`, the Rust pipeline produced separate output SHA-256 `6c18a566cdb2c7f7467c4eb9371101474fb23e12fdf293eb5702b4e142256d3c`. The manifest recorded source and target DOL SHA-256 `8200fb72b3170069bb71c8b3dc21b49e429977ce8ae5159bb95ea6a19de0fbee`; these are equal because the current Stage 1 VCDIFF is an identity operation. WIT reported the rebuilt DATA partition as encrypted, fake-signed its ticket/TMD as needed, and verified the partition successfully. DolphinTool reported `RMGP01`, PAL, revision 0. Re-extracted game DATA files matched all source file paths, sizes, and SHA-256 values. An independent second WIT composition from the same extracted FST produced the same output-image SHA-256.
 
-This is a successful partition-aware **identity rebuild**. It does not prove a changed DOL patch, hook correctness, AllStars hook compatibility, or Dolphin bootability. No Dolphin instance was launched. The changed-DOL path is implemented and has synthetic changed-byte, exact-target-hash, DOL-layout, non-text-write, AllStars-overlap, and byte-verification tests; it has not yet been exercised through WIT against a changed target. The output ISO and extraction artifacts are local ignored files under `target/` and are not committed.
+This is a successful partition-aware **identity rebuild**. A separate changed-byte reconstruction was subsequently completed; its evidence is recorded below. No Dolphin instance was launched.
+
+## Changed-byte round trip (2026-11-09)
+
+The disposable candidate was made from the hash-pinned PAL DOL in ignored `target/` output. It changes one existing text word only:
+
+| Field | Value |
+|---|---|
+| Guest address / file offset | `0x80078A5C` / `0x73F9C` |
+| Function context | `exeDemoWait__16SkeletalFishBossFv`, symbol `0x80078A2C`, size `0x74` |
+| Original / candidate words | `0x60000000` (`ori r0,r0,0`) / `0x60E70000` (`ori r7,r7,0`) |
+| Source DOL SHA-256 | `8200fb72b3170069bb71c8b3dc21b49e429977ce8ae5159bb95ea6a19de0fbee` |
+| Candidate DOL SHA-256 | `f055603eaf19baf1a78029df3f0b81359aecee37fe02efe1616fe169ddf9026e` |
+| Source ISO SHA-256 (before and after) | `ce0bf021b21767c19a5077506ec8bd7e7ef67c3b53e04726ce792e05b52689bb` |
+| Rebuilt output SHA-256, run 1 and run 2 | `aa5630857139c63f48ad9fa4e1941188ffc3bf367d73cd68dfde9aaefc35f765` |
+| VCDIFF SHA-256 | `03d994bcab7da5e4262b7c427d45f5abe3412f25af26a4c787c90c71820b7d66` |
+| DolphinTool / WIT SHA-256 | `63dd9bad68996f4c75302fde1a2374ebecfa767df6780619d658f41684f97e8a` / `8538c86e743b4d35c37da64a4ca8ee79b13cab0ad2cb4b0ba16ab97b72ed7753` |
+
+The original instruction is a canonical `ori` no-op. The candidate is also `ori` with identical source/destination register and zero immediate, so it leaves that register unchanged and does not update condition flags. At `0x80078A58`, a linked branch returns to `0x80078A5C`; thus the site is an instruction in the named routine, not presumed unused padding. This is a static semantic equivalence argument, not a runtime proof. The candidate is outside the protected draw hook/signature region. `rebuild-iso-dol` also parsed the required AllStars writes and passed its byte-level non-overlap check.
+
+Both real WIT runs extracted the exact pinned source DOL, built a separate ISO using WIT `COPY`, verified the partition, passed DolphinTool PAL `RMGP01` revision 0 header validation, re-extracted the output, and compared all DOL bytes to the candidate. The required AllStars set parsed as 419 writes (76 DOL text writes / 71 distinct changed words); the candidate address did not overlap those writes. A second independent WIT extraction at `target/mg1-disc-pipeline/changed-neutral-nop-independent-extract` independently yielded the candidate DOL hash and changed word. The repeated complete rebuild produced the same output image and manifest hashes. Complete phase/tool logs are retained as `target/mg1-disc-pipeline/changed-neutral-nop-build-1.log`, `changed-neutral-nop-build-2.log`, and `changed-neutral-nop-independent-extract.log`; manifests, candidate DOL, images, and extraction are also retained under ignored `target/mg1-disc-pipeline/`. No generated artifacts or game data are committed. The source DOL and ISO were not modified.
+
+The exact generated artifacts can be rolled back by deleting only `target/mg1-disc-pipeline/changed-neutral-nop*` and `test-neutral-nop-main.dol`; this does not touch the source ISO, source DOL, Dolphin profile, or any installed game. They are retained now as test evidence.
+
+**Evidence level:** an actual changed-byte, partition-aware ISO reconstruction and byte-for-byte output-DOL verification passed twice offline. This is not a Dolphin boot, AllStars runtime, or trampoline test. The chosen edit is supported as behavior-neutral by PPC instruction semantics, but this experiment does not establish a generally safe executable code cave.
 
 ## Current gates
 
 - **Partition-aware ISO extraction/rebuild:** GO for the tested WIT/DolphinTool versions and PAL RMGP01 Rev 0 ISO path.
 - **RVZ ingestion:** not built into `rebuild-iso`. A separate DolphinTool conversion was observed for the supplied RVZ; its warning means general RVZ conversion support remains unclaimed.
-- **Changed DOL pipeline:** implementation and synthetic validation are present; no changed target has yet passed a real WIT rebuild. Not ready for controlled Dolphin boot.
+- **Changed DOL pipeline:** GO for this exact PAL source/target and installed WIT/DolphinTool versions; two real rebuilds, independent extraction, deterministic hashes, source immutability, and AllStars non-overlap passed offline. This does not establish a generic executable patch or runtime compatibility.
 - **Trampoline:** NO-GO. The original callsite ABI is understood, but a safe executable location for the out-of-line stub is not established.
 - **`dev-launch --patched-image` for this WIT manifest:** not integrated. The legacy option still expects its prior plaintext-scan manifest and must not be used for this rebuilt ISO.
-- **Dolphin boot / visible harmless trampoline:** unverified. No Dolphin was launched per instruction.
+- **Dolphin boot:** unverified. No Dolphin was launched per instruction. The neutral candidate is a possible controlled changed-image boot fixture, but the Rust launcher's `--patched-image` path does not accept this WIT manifest; there is no project-controlled isolated launch acceptance yet.
 - **Remote Mario rendering:** NO-GO. The exact callsite `0x802B62E4` keeps its original instruction in this image.
 
-The next deployment task is to define a versioned changed-DOL manifest and a PAL-verified patch target, then extend the partition-aware command and launcher validation to those manifest semantics. Only after static signatures, AllStars overlap checks, and output partition verification pass should the user run the harmless one-call trampoline test.
+The next deployment task is to define a versioned WIT manifest consumer for isolated launch, then conduct a user-controlled boot of the neutral candidate if desired. Do not use that result to infer trampoline correctness. The callsite trampoline remains NO-GO until a safe executable location and loader/heap collision analysis are proven.
