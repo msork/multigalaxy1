@@ -1,7 +1,7 @@
 //! Partition-aware ISO extraction and rebuild through user-supplied DolphinTool
 //! and Wiimms ISO Tool executables. The original image is opened read-only.
 
-use multigalaxy_patch::{sha256, sha256_reader};
+use multigalaxy_patch::{parse_dol, sha256, sha256_reader, vcdiff, PatchWrite, SectionKind};
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{self, Read};
@@ -69,6 +69,65 @@ pub fn rebuild_iso(
     output: &Path,
     expected_dol: &[u8],
 ) -> Result<RebuildManifest, String> {
+    rebuild_iso_target(
+        dolphintool,
+        wit,
+        source,
+        output,
+        expected_dol,
+        expected_dol,
+        &vcdiff::encode(expected_dol, expected_dol),
+        "stage1-trampoline-identity-wit-rebuild",
+    )
+}
+
+/// Rebuild from a caller-supplied, hash-pinned PAL DOL replacement. The
+/// replacement may change only bytes that map to existing DOL text sections,
+/// and no changed bytes may overlap a write in the mandatory AllStars patch.
+/// This validates transport and patch composition, not the semantics of a PPC
+/// hook; callers must separately validate any trampoline body and target.
+pub fn rebuild_iso_with_dol(
+    dolphintool: &Path,
+    wit: &Path,
+    source: &Path,
+    output: &Path,
+    expected_dol: &[u8],
+    target_dol: &[u8],
+    expected_target_sha256: &str,
+    allstars_writes: &[PatchWrite],
+) -> Result<RebuildManifest, String> {
+    validate_dol_replacement(
+        expected_dol,
+        target_dol,
+        expected_target_sha256,
+        allstars_writes,
+    )?;
+    let delta = vcdiff::encode(expected_dol, target_dol);
+    rebuild_iso_target(
+        dolphintool,
+        wit,
+        source,
+        output,
+        expected_dol,
+        target_dol,
+        &delta,
+        "stage1-hash-pinned-dol-replacement",
+    )
+}
+
+fn rebuild_iso_target(
+    dolphintool: &Path,
+    wit: &Path,
+    source: &Path,
+    output: &Path,
+    expected_dol: &[u8],
+    target_dol: &[u8],
+    delta: &[u8],
+    patch_id: &str,
+) -> Result<RebuildManifest, String> {
+    if vcdiff::decode(expected_dol, delta)? != target_dol {
+        return Err("encoded VCDIFF does not reconstruct the validated target DOL".into());
+    }
     if !dolphintool.is_file() || !wit.is_file() || !source.is_file() {
         return Err("DolphinTool, WIT, and source ISO must be existing regular files".into());
     }
@@ -143,11 +202,10 @@ pub fn rebuild_iso(
             "partition-extracted main.dol does not match the pinned PAL RMGP01 Rev 0 DOL".into(),
         );
     }
-    let (target_dol, delta) = crate::image_patch::stage1_patch(&extracted_dol)?;
     if target_dol.len() != extracted_dol.len() {
         return Err("Stage 1 DOL patch changed file size".into());
     }
-    fs::write(&dol_path, &target_dol)
+    fs::write(&dol_path, target_dol)
         .map_err(|e| format!("cannot write isolated extracted DOL: {e}"))?;
 
     let staged_iso = stage.0.join("rebuilt.iso");
@@ -184,9 +242,7 @@ pub fn rebuild_iso(
     )?;
     let rebuilt_dol = fs::read(rebuilt_extract.join(DOL_RELATIVE))
         .map_err(|e| format!("rebuilt ISO did not re-extract {DOL_RELATIVE}: {e}"))?;
-    if sha256(&rebuilt_dol) != sha256(&target_dol) {
-        return Err("rebuilt ISO main.dol hash differs from the VCDIFF target".into());
-    }
+    verify_rebuilt_dol(&rebuilt_dol, target_dol)?;
     verify_game_files_unchanged(&extracted, &rebuilt_extract)?;
 
     let source_hash_after = hash_file(&source_abs)?;
@@ -196,15 +252,15 @@ pub fn rebuild_iso(
     let output_hash = hash_file(&staged_iso)?;
     let manifest = RebuildManifest {
         schema_version: 1,
-        patch_id: "stage1-trampoline-identity-wit-rebuild".into(),
+        patch_id: patch_id.into(),
         game_id: "RMGP01".into(),
         revision: 0,
         input_format: "ISO".into(),
         source_image_sha256: hex(&source_hash_before),
         output_image_sha256: hex(&output_hash),
         source_dol_sha256: hex(&sha256(expected_dol)),
-        target_dol_sha256: hex(&sha256(&target_dol)),
-        delta_sha256: hex(&sha256(&delta)),
+        target_dol_sha256: hex(&sha256(target_dol)),
+        delta_sha256: hex(&sha256(delta)),
         dolphintool_sha256: hex(&hash_file(dolphintool)?),
         wit_sha256: hex(&hash_file(wit)?),
         wit_version: one_line(&wit_version),
@@ -222,6 +278,88 @@ pub fn rebuild_iso(
         ));
     }
     Ok(manifest)
+}
+
+fn verify_rebuilt_dol(actual: &[u8], expected: &[u8]) -> Result<(), String> {
+    if actual != expected {
+        return Err("rebuilt ISO main.dol bytes differ from the validated target DOL".into());
+    }
+    Ok(())
+}
+
+/// Validate a complete target DOL before any image extraction or output work.
+/// DOL header/layout must remain identical, all changed bytes must map to
+/// existing text, and no changed instruction may overlap a supplied AllStars
+/// write. The exact target digest is mandatory.
+pub fn validate_dol_replacement(
+    source_dol: &[u8],
+    target_dol: &[u8],
+    expected_target_sha256: &str,
+    allstars_writes: &[PatchWrite],
+) -> Result<(), String> {
+    if target_dol.len() != source_dol.len() {
+        return Err("replacement DOL size differs from the pinned source DOL".into());
+    }
+    let expected_hash = parse_sha256(expected_target_sha256)?;
+    if sha256(target_dol) != expected_hash {
+        return Err("replacement DOL SHA-256 does not match the declared target hash".into());
+    }
+    let source = parse_dol(source_dol).map_err(|e| format!("invalid source DOL: {e}"))?;
+    let target = parse_dol(target_dol).map_err(|e| format!("invalid replacement DOL: {e}"))?;
+    if source.sections != target.sections
+        || source.bss_address != target.bss_address
+        || source.bss_size != target.bss_size
+        || source.entry_point != target.entry_point
+        || source_dol.get(..0x100) != target_dol.get(..0x100)
+    {
+        return Err(
+            "replacement DOL changes its header, section layout, BSS, or entry point".into(),
+        );
+    }
+    if source_dol == target_dol {
+        return Err("replacement DOL has no changed bytes".into());
+    }
+
+    for (offset, (source_byte, target_byte)) in source_dol.iter().zip(target_dol).enumerate() {
+        if source_byte == target_byte {
+            continue;
+        }
+        let offset = u64::try_from(offset).map_err(|_| "DOL file offset overflow")?;
+        let section = source
+            .sections
+            .iter()
+            .find(|section| {
+                section.kind == SectionKind::Text
+                    && offset >= u64::from(section.file_offset)
+                    && offset < u64::from(section.file_offset) + u64::from(section.size)
+            })
+            .ok_or("replacement changes a byte outside a loaded DOL text section")?;
+        let guest = u64::from(section.address) + (offset - u64::from(section.file_offset));
+        let guest_end = guest + 1;
+        if allstars_writes.iter().any(|write| {
+            let write_start = u64::from(write.address);
+            guest < write_start + 4 && write_start < guest_end
+        }) {
+            return Err(format!(
+                "replacement DOL change at guest address 0x{guest:08x} overlaps a mandatory AllStars write"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn parse_sha256(input: &str) -> Result<[u8; 32], String> {
+    if input.len() != 64 || !input.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(
+            "expected target SHA-256 must contain exactly 64 hexadecimal characters".into(),
+        );
+    }
+    let mut digest = [0u8; 32];
+    for (index, byte) in digest.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&input[index * 2..index * 2 + 2], 16)
+            .map_err(|_| "invalid target SHA-256")?;
+    }
+    Ok(digest)
 }
 
 fn verify_game_files_unchanged(source: &Path, rebuilt: &Path) -> Result<(), String> {
@@ -439,6 +577,114 @@ fn wit_path(path: &Path) -> Result<OsString, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn put_be(bytes: &mut [u8], offset: usize, value: u32) {
+        bytes[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+    }
+
+    fn synthetic_dol() -> Vec<u8> {
+        let mut dol = vec![0; 0x124];
+        put_be(&mut dol, 0x00, 0x100); // text section 0 file offset
+        put_be(&mut dol, 0x1c, 0x120); // data section 0 file offset
+        put_be(&mut dol, 0x48, 0x8000_4000); // text section 0 guest address
+        put_be(&mut dol, 0x64, 0x8000_4020); // data section 0 guest address
+        put_be(&mut dol, 0x90, 0x20); // text section 0 size
+        put_be(&mut dol, 0xac, 4); // data section 0 size
+        for word in dol[0x100..0x120].chunks_exact_mut(4) {
+            word.copy_from_slice(&0x6000_0000u32.to_be_bytes()); // PPC nop
+        }
+        dol
+    }
+
+    fn sha256_hex(bytes: &[u8]) -> String {
+        hex(&sha256(bytes))
+    }
+
+    #[test]
+    fn accepts_hash_pinned_changed_text_dol_and_checks_expected_bytes() {
+        let source = synthetic_dol();
+        let mut target = source.clone();
+        let expected = 0x6000_0000u32;
+        let replacement = 0x7c84_2278u32; // synthetic changed instruction
+        target[0x110..0x114].copy_from_slice(&replacement.to_be_bytes());
+        let digest = sha256_hex(&target);
+
+        validate_dol_replacement(&source, &target, &digest, &[]).unwrap();
+        assert_eq!(
+            u32::from_be_bytes(target[0x110..0x114].try_into().unwrap()),
+            replacement
+        );
+        verify_rebuilt_dol(&target, &target).unwrap();
+        let mut wrong_output = target.clone();
+        wrong_output[0x110] ^= 1;
+        assert!(verify_rebuilt_dol(&wrong_output, &target).is_err());
+        assert_eq!(
+            u32::from_be_bytes(source[0x110..0x114].try_into().unwrap()),
+            expected
+        );
+    }
+
+    #[test]
+    fn replacement_rejects_wrong_hash_header_changes_and_data_changes() {
+        let source = synthetic_dol();
+        let mut target = source.clone();
+        target[0x110] ^= 1;
+        assert!(
+            validate_dol_replacement(&source, &target, &"0".repeat(63), &[])
+                .unwrap_err()
+                .contains("64 hexadecimal")
+        );
+        assert!(
+            validate_dol_replacement(&source, &target, &"0".repeat(64), &[])
+                .unwrap_err()
+                .contains("SHA-256")
+        );
+
+        let mut header_changed = target.clone();
+        header_changed[0xe0] ^= 1;
+        assert!(validate_dol_replacement(
+            &source,
+            &header_changed,
+            &sha256_hex(&header_changed),
+            &[]
+        )
+        .unwrap_err()
+        .contains("header"));
+
+        let mut data_changed = source.clone();
+        data_changed[0x120] ^= 1;
+        assert!(
+            validate_dol_replacement(&source, &data_changed, &sha256_hex(&data_changed), &[])
+                .unwrap_err()
+                .contains("outside a loaded DOL text section")
+        );
+    }
+
+    #[test]
+    fn replacement_rejects_allstars_overlap_and_layout_changes() {
+        let source = synthetic_dol();
+        let mut target = source.clone();
+        target[0x110] ^= 1;
+        let digest = sha256_hex(&target);
+        let writes = [PatchWrite {
+            address: 0x8000_4010,
+            value: 0x6000_0000,
+        }];
+        assert!(validate_dol_replacement(&source, &target, &digest, &writes)
+            .unwrap_err()
+            .contains("overlaps a mandatory AllStars write"));
+
+        let mut layout_changed = target.clone();
+        put_be(&mut layout_changed, 0x90, 0x1c);
+        assert!(validate_dol_replacement(
+            &source,
+            &layout_changed,
+            &sha256_hex(&layout_changed),
+            &[]
+        )
+        .unwrap_err()
+        .contains("section layout"));
+    }
 
     #[test]
     fn manifest_serialization_is_stable_and_has_no_machine_paths_or_timestamps() {

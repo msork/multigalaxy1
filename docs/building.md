@@ -30,6 +30,8 @@ cargo run --release -p multigalaxy -- rebuild-iso `
 
 The completed local test verifies PAL RMGP01 revision 0, the pinned extracted DOL, WIT partition integrity before/after, output DOL and game-file hashes, source immutability, and deterministic recomposition. It has **not** been launched in Dolphin. The manifest is not currently understood by `dev-launch --patched-image`; do not use that flag for this output. See [Wii image rebuild evidence](references/wii-image-rebuild.md).
 
+For a separately built and hash-pinned candidate DOL, use `rebuild-iso-dol` with the exact PAL source DOL, symbol map, candidate DOL, candidate SHA-256, and external AllStars folder. It rejects changes outside DOL text or overlapping AllStars writes and verifies the re-extracted target bytes. This is not a trampoline generator and is not ready for Dolphin boot until the changed output has passed an offline WIT round trip and the hook's code location is verified. The exact candidate command is recorded in [Wii image rebuild evidence](references/wii-image-rebuild.md).
+
 ## Local Windows development profile
 
 Copy `development.local.example.toml` to the git-ignored `development.local.toml` and set local paths. Development-only D3D12, controller profile, save import, and mute configuration are written to a fresh isolated Dolphin user directory. The regular profile, save source, and original game image are not modified. `dev-setup` uses Dolphin's supported UI for save import.

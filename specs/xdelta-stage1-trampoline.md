@@ -50,3 +50,28 @@ The historical audit above correctly describes the legacy `patch-image` implemen
 This path has been run against the local PAL ISO and independently recomposed to the same deterministic output hash. The current VCDIFF is an identity operation, so the test proves disc-aware extraction/recomposition and validation, not changed code delivery. The local RVZ-to-ISO conversion emitted a key warning and RVZ is not accepted by `rebuild-iso`. No Dolphin was launched. `dev-launch --patched-image` is not integrated with the WIT manifest and must not be used with this output. Detailed tool versions, hashes, evidence, and commands are in [`docs/references/wii-image-rebuild.md`](../docs/references/wii-image-rebuild.md).
 
 Disposition: **GO** for offline PAL ISO identity rebuild with the tested tool versions; **NO-GO** for changed DOL deployment, launcher consumption, RVZ input, and live boot. The next code milestone is a versioned changed-DOL manifest and explicit trampoline patch target with AllStars overlap checks, followed by a user-run boot test only after offline checks pass.
+
+## Follow-up: hash-pinned DOL replacement and trampoline ABI (2026-11-09)
+
+`rebuild-iso-dol` now accepts a caller-built replacement DOL and a declared target SHA-256, alongside the exact PAL source DOL/symbol map and required AllStars patch directory. It refuses changed size/header/section layout/BSS/entry point, requires every changed byte to map to existing DOL text, rejects overlap with any parsed AllStars word write, round-trips the generated VCDIFF, and verifies the output ISO's extracted DOL byte-for-byte. Synthetic changed-text, expected-byte, wrong-hash, data/header mutation, layout, and AllStars-overlap tests cover the validator. The identity command remains available separately.
+
+The exact source instruction window is five words / 20 bytes: `0x802B62D8: 4BFF0289` (`bl 0x802A6560`), `0x802B62DC: 7FA3EB78` (`mr r3,r29`), `0x802B62E0: 38800000` (`li r4,0`), `0x802B62E4: 4BFF083D` (`bl 0x802A6B20`), `0x802B62E8: 38000000` (`li r0,0`); `0x802B62EC` is exclusive. The continuation at `0x802B62EC` stores the zero to `0x1B0(r29)`. Only the single `bl` at `0x802B62E4` needs interposition; the other four words are context and must remain unchanged. The original branch displacement sign-extends to `-0xF7C4`, returning to the verified `directDraw` entry at `0x802A6B20` with LK=1. At entry, `r3=r29` (J3DModelX), `r4=0`; the enclosing frame and nonvolatile `r29/r30/r31` remain owned by `drawMarioModel`.
+
+Candidate behavior-preserving tail trampoline, expressed as instructions rather than an installed patch:
+
+```text
+at 0x802B62E4: b <verified_stub>     ; LK=0; no register or stack change
+stub:          lis r12,0x802B
+               ori r12,r12,0x62E8
+               mtlr r12               ; restore the original call's LR value
+               lis r12,0x802A
+               ori r12,r12,0x6B20
+               mtctr r12
+               bctr                   ; tail-enter directDraw with r3/r4 intact
+```
+
+This preserves the original `directDraw` entry, argument registers, and return continuation/LR while leaving `r1`, `r0`, CR, and nonvolatile registers unchanged in the stub. It uses ABI-volatile `r12` and CTR. The callee returns through LR to the exact original continuation at `0x802B62E8`, where the original cleanup executes. It does not replace or omit either draw call. The five-word caller window must hash exactly apart from the one hook word. This is a static ABI design, not an installed or runtime-verified trampoline.
+
+**Trampoline GO/NO-GO:** NO-GO. No verified unused executable address exists for the seven-word stub. The original DOL has unused DOL text-section header slots, but that does not prove any address range is free of the game heap, loader/runtime data, or AllStars' dynamically used Gecko cave. The previous Gecko attempts ended with an invalid instruction caused by an `ori`/`oris` installer bug (fixed in source) and did not prove safe stub placement. Therefore no changed trampoline DOL was generated and no Dolphin boot test is ready. The replacement command is a transport primitive, not an authorization to patch a guessed cave.
+
+**Changed-image gate:** not ready for controlled Dolphin boot. Synthetic target validation passes, but no changed DOL has passed an actual WIT composition/re-extraction round trip, and no trampoline target has passed code-location, AllStars, or runtime gates. Next: establish one non-overlapping executable placement from PAL loader/heap evidence (or design a verified section-extension loader path), build a DOL transformer that changes only the hook word and that stub, inspect the resulting disassembly and manifest, then run `rebuild-iso-dol` offline. Dolphin testing remains a separate user-controlled step after those gates.
