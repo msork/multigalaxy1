@@ -2,7 +2,7 @@
 
 ## Scope and status
 
-This phase adds a Rust command for reading one caller-selected range from the Windows shared memory section used by official Dolphin 2609a. It is deliberately read-only, is not an actor scanner, and does not follow pointers. No actor addresses or structures were inspected while validating this reader. M4 networking, the existing Gecko mailbox, mandatory AllStars, and isolated profiles are unchanged.
+This phase adds a Rust command for reading one caller-selected range from Dolphin's Windows shared memory section. It is deliberately read-only, is not an actor scanner, and does not follow pointers. No actor addresses or structures were inspected while validating this reader. The mapping source reference is Dolphin 2609a; the executable has no release allowlist. Every invocation validates the mapping extent, live PAL identity, and PAL signatures. M4 networking, mandatory AllStars, and isolated profiles are unchanged.
 
 Evidence is separated below:
 
@@ -20,7 +20,7 @@ The relevant files in the local checkout are `Source/Core/Common/MemArenaWin.cpp
 - The minimum retail range `[0x80000000, 0x81800000)` is therefore a conservative window that does not cross the following shared-memory regions. This tool intentionally refuses addresses above that lower-bound window even if Dolphin allocated more RAM for a specific configuration.
 - Windows view offsets must be aligned to the system allocation granularity (64 KiB on the supported Windows setup). The reader aligns the section offset down, adds the small prefix to the requested bytes, and maps only that bounded window.
 
-This is an implementation detail of Dolphin 2609a, not a supported external-memory API. A future Dolphin release or alternate memory layout must fail validation until source and runtime compatibility are rechecked.
+This is an undocumented implementation detail, not a supported external-memory API. The 2609a source checkout is the current static reference, not a release restriction. A target's mapping is usable only when the runtime extent, live `RMGP01` ID, PAL code signatures, PID/executable association, and range checks pass; a changed layout fails closed. These checks do not establish that all future/alternate builds are compatible before those builds are actually observed.
 
 ## Reader safety
 
@@ -28,10 +28,9 @@ This is an implementation detail of Dolphin 2609a, not a supported external-memo
 
 1. Development inputs validate against PAL RMGP01 Rev 0 using the configured DolphinTool/game inputs, DOL fingerprint, and Petari symbol file.
 2. The configured executable is `Dolphin.exe`, the requested PID resolves to that exact canonical executable path, and it shares the current Windows session.
-3. The adjacent codehandler has the expected 2609a size and SHA-256.
-4. The prepared mandatory AllStars patch remains valid and has no writes overlapping the three known runtime code signatures.
-5. The read-only named mapping opens and can map the final 64 KiB block of the minimum 24 MiB MEM1 region. This validates accessible mapping extent; it does not claim to discover or verify the section's full allocation size.
-6. The live game ID is `RMGP01`; three known PAL Rev 0 code byte signatures match the configured DOL. Identity and signatures are checked again after the explicit read.
+3. The prepared mandatory AllStars patch remains valid and has no writes overlapping the three known runtime code signatures.
+4. The named mapping opens and can map the final 64 KiB block of the minimum 24 MiB MEM1 region. This validates accessible mapping extent; it does not claim to discover or verify the section's full allocation size.
+5. The live game ID is `RMGP01`; three known PAL Rev 0 code byte signatures match the configured DOL. Identity and signatures are checked again after the explicit read.
 
 Each request must be nonempty, at most 8 KiB, and wholly within minimum retail MEM1. Arithmetic is checked, the Windows mapping offset is aligned, and an unexpected or short mapping fails closed. `u32`, `pointer`, and `f32` are 4-byte aligned, exactly four-byte, big-endian reads. Floats must be finite. A decoded non-null pointer must be aligned and point into the bounded MEM1 range; it is only reported and is never dereferenced. The `bytes` format returns only the exact requested bytes.
 

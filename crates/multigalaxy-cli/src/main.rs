@@ -3,7 +3,7 @@ mod callback_observer;
 mod controller_patch;
 mod dev_config;
 mod disc_rebuild;
-mod dolphin_version;
+mod dolphin_capabilities;
 mod gdb;
 mod gecko_bridge;
 mod heap_observer;
@@ -60,15 +60,11 @@ fn run_inspect_memory(
     length: usize,
     format: memory_inspection::ValueFormat,
 ) -> Result<(), String> {
-    const EXPECTED_HANDLER_SHA256: &str =
-        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
-
     memory_inspection::validate_typed_request(guest_address, length, format)?;
     let config_text = fs::read_to_string(config_path)
         .map_err(|e| format!("cannot read development config: {e}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
-    require_2609a_dev_tools(&config, "stock Dolphin MEM1 inspection")?;
     let dol = fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
     let symbols =
         fs::read(&config.pal_symbols).map_err(|e| format!("cannot read Petari symbol map: {e}"))?;
@@ -125,24 +121,6 @@ fn run_inspect_memory(
         ));
     }
 
-    let handler_path = dolphin
-        .parent()
-        .ok_or("configured Dolphin executable has no parent directory")?
-        .join("Sys")
-        .join("codehandler.bin");
-    let handler = fs::read(&handler_path)
-        .map_err(|e| format!("cannot read Dolphin's 2609a codehandler: {e}"))?;
-    let handler_hash = sha256(&handler)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
-        return Err(format!(
-            "Dolphin 2609a codehandler validation failed (size={}, sha256={handler_hash})",
-            handler.len()
-        ));
-    }
-
     let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid)
         .map_err(|e| format!("cannot open compatible Dolphin MEM1 mapping read-only: {e:?}"))?;
     let game_id = memory.read_guest(memory_inspection::GUEST_MEM1_BASE, 6)?;
@@ -191,13 +169,10 @@ fn run_inspect_memory(
 
 #[cfg(windows)]
 fn run_observe_penguins(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
-    const EXPECTED_HANDLER_SHA256: &str =
-        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
     let config_text = fs::read_to_string(config_path)
         .map_err(|e| format!("cannot read development config: {e}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
-    require_2609a_dev_tools(&config, "Penguin memory observation")?;
     let dol = fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL main.dol: {e}"))?;
     let symbols =
         fs::read(&config.pal_symbols).map_err(|e| format!("cannot read Petari symbol map: {e}"))?;
@@ -238,23 +213,6 @@ fn run_observe_penguins(config_path: &std::path::Path, pid: u32) -> Result<(), S
     if current_session != process_session {
         return Err(format!("Dolphin PID {pid} is in session {process_session}, current session is {current_session}"));
     }
-    let handler_path = dolphin
-        .parent()
-        .ok_or("configured Dolphin executable has no parent directory")?
-        .join("Sys")
-        .join("codehandler.bin");
-    let handler = fs::read(&handler_path)
-        .map_err(|e| format!("cannot read Dolphin's 2609a codehandler: {e}"))?;
-    let handler_hash = sha256(&handler)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect::<String>();
-    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
-        return Err(format!(
-            "Dolphin 2609a codehandler validation failed (size={}, sha256={handler_hash})",
-            handler.len()
-        ));
-    }
     let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid)
         .map_err(|e| format!("cannot open compatible Dolphin MEM1 mapping read-only: {e:?}"))?;
     if memory.read_guest(memory_inspection::GUEST_MEM1_BASE, 6)? != b"RMGP01" {
@@ -279,13 +237,10 @@ fn run_observe_penguins(config_path: &std::path::Path, pid: u32) -> Result<(), S
 
 #[cfg(windows)]
 fn run_observe_mario_model(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
-    const EXPECTED_HANDLER_SHA256: &str =
-        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
     let config_text = fs::read_to_string(config_path)
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
-    require_2609a_dev_tools(&config, "Mario model memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -328,24 +283,6 @@ fn run_observe_mario_model(config_path: &std::path::Path, pid: u32) -> Result<()
             "Dolphin PID {pid} is in session {process_session}, current session is {current_session}"
         ));
     }
-    let handler_path = dolphin
-        .parent()
-        .ok_or("configured Dolphin executable has no parent directory")?
-        .join("Sys")
-        .join("codehandler.bin");
-    let handler = fs::read(&handler_path)
-        .map_err(|error| format!("cannot read Dolphin's 2609a codehandler: {error}"))?;
-    let handler_hash = sha256(&handler)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
-        return Err(format!(
-            "Dolphin 2609a codehandler validation failed (size={}, sha256={handler_hash})",
-            handler.len()
-        ));
-    }
-
     let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid).map_err(|error| {
         format!("cannot open compatible Dolphin MEM1 mapping read-only: {error:?}")
     })?;
@@ -389,18 +326,15 @@ fn run_observe_mario_model(config_path: &std::path::Path, pid: u32) -> Result<()
 
 #[cfg(not(windows))]
 fn run_observe_mario_model(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
-    Err("observe-mario-model requires official stock Dolphin 2609a on Windows".into())
+    Err("observe-mario-model requires Windows stock-Dolphin MEM1 access".into())
 }
 
 #[cfg(windows)]
 fn run_observe_resource_holder(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
-    const EXPECTED_HANDLER_SHA256: &str =
-        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
     let config_text = fs::read_to_string(config_path)
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
-    require_2609a_dev_tools(&config, "resource-holder memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -445,24 +379,6 @@ fn run_observe_resource_holder(config_path: &std::path::Path, pid: u32) -> Resul
             "Dolphin PID {pid} is in session {process_session}, current session is {current_session}"
         ));
     }
-    let handler_path = dolphin
-        .parent()
-        .ok_or("configured Dolphin executable has no parent directory")?
-        .join("Sys")
-        .join("codehandler.bin");
-    let handler = fs::read(&handler_path)
-        .map_err(|error| format!("cannot read Dolphin's 2609a codehandler: {error}"))?;
-    let handler_hash = sha256(&handler)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
-        return Err(format!(
-            "Dolphin 2609a codehandler validation failed (size={}, sha256={handler_hash})",
-            handler.len()
-        ));
-    }
-
     let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid).map_err(|error| {
         format!("cannot open compatible Dolphin MEM1 mapping read-only: {error:?}")
     })?;
@@ -505,18 +421,15 @@ fn run_observe_resource_holder(config_path: &std::path::Path, pid: u32) -> Resul
 
 #[cfg(not(windows))]
 fn run_observe_resource_holder(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
-    Err("observe-resource-holder requires official stock Dolphin 2609a on Windows".into())
+    Err("observe-resource-holder requires Windows stock-Dolphin MEM1 access".into())
 }
 
 #[cfg(windows)]
 fn run_observe_model_joints(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
-    const EXPECTED_HANDLER_SHA256: &str =
-        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
     let config_text = fs::read_to_string(config_path)
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
-    require_2609a_dev_tools(&config, "model-joint memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -561,24 +474,6 @@ fn run_observe_model_joints(config_path: &std::path::Path, pid: u32) -> Result<(
             "Dolphin PID {pid} is in session {process_session}, current session is {current_session}"
         ));
     }
-    let handler_path = dolphin
-        .parent()
-        .ok_or("configured Dolphin executable has no parent directory")?
-        .join("Sys")
-        .join("codehandler.bin");
-    let handler = fs::read(&handler_path)
-        .map_err(|error| format!("cannot read Dolphin's 2609a codehandler: {error}"))?;
-    let handler_hash = sha256(&handler)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
-        return Err(format!(
-            "Dolphin 2609a codehandler validation failed (size={}, sha256={handler_hash})",
-            handler.len()
-        ));
-    }
-
     let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid).map_err(|error| {
         format!("cannot open compatible Dolphin MEM1 mapping read-only: {error:?}")
     })?;
@@ -620,18 +515,15 @@ fn run_observe_model_joints(config_path: &std::path::Path, pid: u32) -> Result<(
 
 #[cfg(not(windows))]
 fn run_observe_model_joints(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
-    Err("observe-model-joints requires official stock Dolphin 2609a on Windows".into())
+    Err("observe-model-joints requires Windows stock-Dolphin MEM1 access".into())
 }
 
 #[cfg(windows)]
 fn run_verify_hook(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
-    const EXPECTED_HANDLER_SHA256: &str =
-        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
     let config_text = fs::read_to_string(config_path)
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
-    require_2609a_dev_tools(&config, "live hook inspection")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -667,23 +559,6 @@ fn run_verify_hook(config_path: &std::path::Path, pid: u32) -> Result<(), String
     if process_session != current_session {
         return Err(format!(
             "Dolphin PID {pid} is in session {process_session}, current session is {current_session}"
-        ));
-    }
-    let handler_path = dolphin
-        .parent()
-        .ok_or("configured Dolphin executable has no parent directory")?
-        .join("Sys")
-        .join("codehandler.bin");
-    let handler = fs::read(&handler_path)
-        .map_err(|error| format!("cannot read Dolphin's 2609a codehandler: {error}"))?;
-    let handler_hash = sha256(&handler)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
-        return Err(format!(
-            "Dolphin 2609a codehandler validation failed (size={}, sha256={handler_hash})",
-            handler.len()
         ));
     }
     let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid).map_err(|error| {
@@ -736,7 +611,7 @@ fn run_verify_hook(config_path: &std::path::Path, pid: u32) -> Result<(), String
 
 #[cfg(not(windows))]
 fn run_verify_hook(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
-    Err("verify-hook requires official stock Dolphin 2609a on Windows".into())
+    Err("verify-hook requires Windows stock-Dolphin MEM1 access".into())
 }
 
 fn run_patch_image(
@@ -882,25 +757,23 @@ fn run_validate_rebuilt_iso(
 }
 
 fn run_discover_dolphin(install_path: &std::path::Path) -> Result<(), String> {
-    let executable = dolphin_version::discover_executable(install_path)?;
-    let version = dolphin_version::validate_installation(&executable)?;
+    let executable = dolphin_capabilities::discover_executable(install_path)?;
+    let capabilities = dolphin_capabilities::inspect_installation(&executable)?;
     println!(
-        "dolphin_install=valid version={} executable={}",
-        version.as_str(),
-        executable.canonicalize().unwrap_or(executable).display()
+        "dolphin_install=candidate executable={} dolphin_tool={} gecko_handler_file={} gdb=runtime-checked-if-requested mem1_bridge=feature-gated-runtime-validation",
+        capabilities.executable.display(),
+        if capabilities.has_iso_header_tool() { "present" } else { "missing" },
+        if capabilities.has_gecko_handler_file() { "present" } else { "missing" },
     );
     Ok(())
 }
 
 #[cfg(windows)]
 fn run_observe_heaps(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
-    const EXPECTED_HANDLER_SHA256: &str =
-        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
     let config_text = fs::read_to_string(config_path)
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
-    require_2609a_dev_tools(&config, "heap memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -941,23 +814,6 @@ fn run_observe_heaps(config_path: &std::path::Path, pid: u32) -> Result<(), Stri
     if current_session != process_session {
         return Err(format!("Dolphin PID {pid} is in session {process_session}, current session is {current_session}"));
     }
-    let handler_path = dolphin
-        .parent()
-        .ok_or("configured Dolphin executable has no parent directory")?
-        .join("Sys")
-        .join("codehandler.bin");
-    let handler = fs::read(&handler_path)
-        .map_err(|error| format!("cannot read Dolphin's 2609a codehandler: {error}"))?;
-    let handler_hash = sha256(&handler)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
-        return Err(format!(
-            "Dolphin 2609a codehandler validation failed (size={}, sha256={handler_hash})",
-            handler.len()
-        ));
-    }
     let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid).map_err(|error| {
         format!("cannot open compatible Dolphin MEM1 mapping read-only: {error:?}")
     })?;
@@ -982,13 +838,10 @@ fn run_observe_heaps(config_path: &std::path::Path, pid: u32) -> Result<(), Stri
 
 #[cfg(windows)]
 fn run_observe_scheduler(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
-    const EXPECTED_HANDLER_SHA256: &str =
-        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
     let config_text = fs::read_to_string(config_path)
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
-    require_2609a_dev_tools(&config, "scheduler memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -1029,23 +882,6 @@ fn run_observe_scheduler(config_path: &std::path::Path, pid: u32) -> Result<(), 
     if current_session != process_session {
         return Err(format!("Dolphin PID {pid} is in session {process_session}, current session is {current_session}"));
     }
-    let handler_path = dolphin
-        .parent()
-        .ok_or("configured Dolphin executable has no parent directory")?
-        .join("Sys")
-        .join("codehandler.bin");
-    let handler = fs::read(&handler_path)
-        .map_err(|error| format!("cannot read Dolphin's 2609a codehandler: {error}"))?;
-    let handler_hash = sha256(&handler)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
-        return Err(format!(
-            "Dolphin 2609a codehandler validation failed (size={}, sha256={handler_hash})",
-            handler.len()
-        ));
-    }
     let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid).map_err(|error| {
         format!("cannot open compatible Dolphin MEM1 mapping read-only: {error:?}")
     })?;
@@ -1075,13 +911,10 @@ fn run_observe_scheduler(config_path: &std::path::Path, pid: u32) -> Result<(), 
 
 #[cfg(windows)]
 fn run_observe_callback_lists(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
-    const EXPECTED_HANDLER_SHA256: &str =
-        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
     let config_text = fs::read_to_string(config_path)
         .map_err(|error| format!("cannot read development config: {error}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
-    require_2609a_dev_tools(&config, "callback-list memory observation")?;
     let dol =
         fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
     let symbols = fs::read(&config.pal_symbols)
@@ -1121,23 +954,6 @@ fn run_observe_callback_lists(config_path: &std::path::Path, pid: u32) -> Result
         .ok_or_else(|| format!("cannot determine Windows session for Dolphin PID {pid}"))?;
     if current_session != process_session {
         return Err(format!("Dolphin PID {pid} is in session {process_session}, current session is {current_session}"));
-    }
-    let handler_path = dolphin
-        .parent()
-        .ok_or("configured Dolphin executable has no parent directory")?
-        .join("Sys")
-        .join("codehandler.bin");
-    let handler = fs::read(&handler_path)
-        .map_err(|error| format!("cannot read Dolphin's 2609a codehandler: {error}"))?;
-    let handler_hash = sha256(&handler)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
-        return Err(format!(
-            "Dolphin 2609a codehandler validation failed (size={}, sha256={handler_hash})",
-            handler.len()
-        ));
     }
     let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid).map_err(|error| {
         format!("cannot open compatible Dolphin MEM1 mapping read-only: {error:?}")
@@ -1197,22 +1013,22 @@ fn run_observe_callback_lists(config_path: &std::path::Path, pid: u32) -> Result
 
 #[cfg(not(windows))]
 fn run_observe_heaps(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
-    Err("observe-heaps requires official stock Dolphin 2609a on Windows".into())
+    Err("observe-heaps requires Windows stock-Dolphin MEM1 access".into())
 }
 
 #[cfg(not(windows))]
 fn run_observe_scheduler(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
-    Err("observe-scheduler requires official stock Dolphin 2609a on Windows".into())
+    Err("observe-scheduler requires Windows stock-Dolphin MEM1 access".into())
 }
 
 #[cfg(not(windows))]
 fn run_observe_callback_lists(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
-    Err("observe-callback-lists requires official stock Dolphin 2609a on Windows".into())
+    Err("observe-callback-lists requires Windows stock-Dolphin MEM1 access".into())
 }
 
 #[cfg(not(windows))]
 fn run_observe_penguins(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
-    Err("observe-penguins requires official stock Dolphin 2609a on Windows".into())
+    Err("observe-penguins requires Windows stock-Dolphin MEM1 access".into())
 }
 
 #[cfg(not(windows))]
@@ -1223,7 +1039,7 @@ fn run_inspect_memory(
     _length: usize,
     _format: memory_inspection::ValueFormat,
 ) -> Result<(), String> {
-    Err("inspect-memory currently requires official stock Dolphin 2609a on Windows".into())
+    Err("inspect-memory currently requires Windows stock-Dolphin MEM1 access".into())
 }
 
 fn dolphin_config(port: Option<u16>, mute: bool, enable_cheats: bool, development: bool) -> String {
@@ -1275,6 +1091,13 @@ fn validate_dev_inputs(config: &dev_config::DevelopmentConfig) -> Result<(), Str
     if !config.patch_folder.is_dir() {
         return Err("development AllStars patch path is not a directory".into());
     }
+    let install = dolphin_capabilities::inspect_installation(&config.dolphin)?;
+    if !install.has_gecko_handler_file() {
+        return Err(format!(
+            "Dolphin Gecko patch capability is unavailable: codehandler.bin is missing beside {}",
+            install.executable.display()
+        ));
+    }
     verify_pal_game_image(&config.dolphin, &config.game)?;
     Ok(())
 }
@@ -1295,12 +1118,8 @@ fn validate_rebuilt_iso_options(
     }
 }
 
-fn require_2609a_dev_tools(
-    config: &dev_config::DevelopmentConfig,
-    feature: &str,
-) -> Result<(), String> {
-    let version = dolphin_version::validate_installation(&config.dolphin)?;
-    dolphin_version::require_2609a(version, feature)
+fn validate_mailbox_capability(config: &dev_config::DevelopmentConfig) -> Result<(), String> {
+    dolphin_capabilities::validate_mailbox_codehandler(&config.dolphin)
 }
 
 fn parse_dolphintool_header(output: &str) -> Result<(), String> {
@@ -1322,14 +1141,8 @@ fn parse_dolphintool_header(output: &str) -> Result<(), String> {
 }
 
 fn verify_pal_game_image(dolphin: &std::path::Path, game: &std::path::Path) -> Result<(), String> {
-    let dolphin = dolphin
-        .canonicalize()
-        .map_err(|e| format!("cannot resolve Dolphin executable path: {e}"))?;
-    let dolphin_version = dolphin_version::validate_installation(&dolphin)?;
-    println!(
-        "Official Dolphin {} executable pair validated.",
-        dolphin_version.as_str()
-    );
+    let dolphin = dolphin_capabilities::validate_executable(dolphin)?;
+    println!("Dolphin executable candidate validated without release pinning.");
     let game = game
         .canonicalize()
         .map_err(|e| format!("cannot resolve game image path: {e}"))?;
@@ -1816,31 +1629,10 @@ fn run_interactive_gecko_bridge_probe(
     dolphin: &std::path::Path,
     identity_timeout: Duration,
 ) -> Result<(), String> {
-    const EXPECTED_HANDLER_SHA256: &str =
-        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
     let pid = child.id();
-    let sys_handler = dolphin
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("."))
-        .join("Sys")
-        .join("codehandler.bin");
-    let handler_bytes = fs::read(&sys_handler).map_err(|error| {
-        format!(
-            "cannot inspect stock Dolphin Gecko codehandler {}: {error}",
-            sys_handler.display()
-        )
-    })?;
-    let handler_size = handler_bytes.len();
-    let handler_sha256 = sha256(&handler_bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    if handler_size != 2880 || handler_sha256 != EXPECTED_HANDLER_SHA256 {
-        return Err(format!(
-            "Dolphin codehandler.bin did not match the verified 2609a input (size={handler_size}, sha256={handler_sha256}); refusing to guess a Gecko RAM layout"
-        ));
-    }
-    println!("Stock Dolphin 2609a PAL mailbox probe; PID={pid}; handler_bytes={handler_size}; handler_sha256={handler_sha256}. Counter/ACK is active; timestamped Mario X/Y/Z is printed only for a stable validated snapshot. No GDB server is enabled. Type Q to stop.");
+    dolphin_capabilities::validate_mailbox_codehandler(dolphin)?;
+    let handler_size = (gecko_bridge::HANDLER_END - gecko_bridge::HANDLER_BASE) as usize;
+    println!("Dolphin Gecko mailbox capability precheck passed; PID={pid}. Runtime mapping size, PAL identity, handler region, unique mailbox signature, and bounded ACK checks remain mandatory. No GDB server is enabled. Type Q to stop.");
     println!("Waiting for Dolphin's named MEM1 mapping and the isolated-profile Gecko probe...");
     let (tx, rx) = std::sync::mpsc::channel::<String>();
     std::thread::spawn(move || {
@@ -2259,13 +2051,11 @@ fn run_sync_client(
     address: std::net::SocketAddr,
     player: sync_net::PlayerId,
 ) -> Result<(), String> {
-    const EXPECTED_HANDLER_SHA256: &str =
-        "2b2ff0716aeb9b806cc61181e559041312957f25f04c435bd7da80a78917b33b";
     let config_text = fs::read_to_string(config_path)
         .map_err(|e| format!("cannot read development config: {e}"))?;
     let config = dev_config::parse(&config_text)?;
     validate_dev_inputs(&config)?;
-    require_2609a_dev_tools(&config, "M4 mailbox position relay")?;
+    validate_mailbox_capability(&config)?;
     let pal_dol = fs::read(&config.pal_dol).map_err(|e| format!("cannot read PAL DOL: {e}"))?;
     let pal_symbols =
         fs::read(&config.pal_symbols).map_err(|e| format!("cannot read PAL symbols: {e}"))?;
@@ -2286,24 +2076,6 @@ fn run_sync_client(
             process_image.display(),
             dolphin.display()
         ));
-    }
-    let handler_path = dolphin
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("."))
-        .join("Sys")
-        .join("codehandler.bin");
-    let handler = fs::read(&handler_path).map_err(|e| {
-        format!(
-            "cannot read Dolphin Gecko handler {}: {e}",
-            handler_path.display()
-        )
-    })?;
-    let handler_hash = sha256(&handler)
-        .iter()
-        .map(|v| format!("{v:02x}"))
-        .collect::<String>();
-    if handler.len() != 2880 || handler_hash != EXPECTED_HANDLER_SHA256 {
-        return Err(format!("Dolphin handler does not match the validated 2609a fingerprint (size={}, sha256={handler_hash})", handler.len()));
     }
     let view = stock_memory::StockMem1::open_dolphin_read_only(pid)
         .map_err(|e| format!("cannot open Dolphin PID {pid} MEM1 read-only: {e:?}"))?;
@@ -2330,10 +2102,11 @@ fn run_sync_client(
         thread::sleep(Duration::from_millis(100));
     }
     let handler_addr_len = (gecko_bridge::HANDLER_END - gecko_bridge::HANDLER_BASE) as usize;
+    let handler_size = handler_addr_len;
     let mailbox_deadline = Instant::now() + Duration::from_secs(60);
     let mailbox = loop {
         let bytes = view.read_guest(gecko_bridge::HANDLER_BASE, handler_addr_len)?;
-        match gecko_bridge::locate_mailbox(gecko_bridge::HANDLER_BASE, handler.len(), &bytes)? {
+        match gecko_bridge::locate_mailbox(gecko_bridge::HANDLER_BASE, handler_size, &bytes)? {
             Some(mailbox) => break mailbox,
             None if Instant::now() < mailbox_deadline => thread::sleep(Duration::from_millis(250)),
             None => {
@@ -2510,7 +2283,7 @@ fn run_sync_client(
                     let bytes = view.read_guest(gecko_bridge::HANDLER_BASE, handler_addr_len)?;
                     if !gecko_bridge::snapshot_matches_mailbox(
                         gecko_bridge::HANDLER_BASE,
-                        handler.len(),
+                        handler_size,
                         &bytes,
                         mailbox,
                     )? {
@@ -2628,7 +2401,7 @@ fn run_sync_client(
     _address: std::net::SocketAddr,
     _player: sync_net::PlayerId,
 ) -> Result<(), String> {
-    Err("sync-client requires official stock Dolphin 2609a on Windows".into())
+    Err("sync-client requires Windows and the validated Dolphin mailbox capability".into())
 }
 
 fn run() -> Result<(), String> {
@@ -3072,10 +2845,25 @@ fn run() -> Result<(), String> {
                 "--bridge-startup-timeout-secs is only valid with --gecko-bridge-probe".into(),
             );
         }
-        if gecko_bridge_probe || trampoline_dry_run {
-            require_2609a_dev_tools(&config, "Gecko mailbox and trampoline experiments")?;
-        }
         let gdb_enabled = debug || gdb_unattached;
+        let mailbox_capability = validate_mailbox_capability(&config);
+        match &mailbox_capability {
+            Ok(()) => println!(
+                "optional_capability M4_mailbox=handler_precheck_passed live_mapping_not_probed"
+            ),
+            Err(error) => println!("optional_capability M4_mailbox=unavailable reason={error}"),
+        }
+        println!(
+            "optional_capability GDB={}",
+            if gdb_enabled {
+                "runtime_handshake_requested"
+            } else {
+                "not_requested"
+            }
+        );
+        if gecko_bridge_probe || trampoline_dry_run {
+            mailbox_capability?;
+        }
         if gdb_enabled && (port == 0 || !port_is_available(port)) {
             return Err(format!(
                 "debug GDB port {port} is invalid or already in use"
@@ -3277,7 +3065,7 @@ fn run() -> Result<(), String> {
             }
         }
         if gecko_bridge_probe {
-            println!("bridge stage=stock-mem1; Dolphin is running without GDB; opening a bounded read/write view of its 2609a MEM1 mapping");
+            println!("bridge stage=stock-mem1; Dolphin is running without GDB; opening a bounded view of the runtime-validated MEM1 mapping");
             log_process_windows(child.id());
             #[cfg(windows)]
             run_interactive_gecko_bridge_probe(
@@ -3286,7 +3074,7 @@ fn run() -> Result<(), String> {
                 bridge_startup_timeout,
             )?;
             #[cfg(not(windows))]
-            return Err("the stock Dolphin named-MEM1 bridge prototype currently supports Windows Dolphin 2609a only".into());
+            return Err("the stock Dolphin named-MEM1 bridge prototype currently requires Windows and passes only when the live mapping, game identity, codehandler, and mailbox checks validate".into());
         } else if debug {
             println!("debug stage=gdb-attach; opening the persistent Rust GDB session");
             let mut client =

@@ -1,4 +1,4 @@
-﻿# Architecture
+# Architecture
 
 ## Product shape
 
@@ -9,7 +9,7 @@ Rust launcher/client
   ├─ lobby, identity, game/revision/localization validation
   ├─ Rust transport, prediction, reconciliation, authority
   ├─ official Dolphin process lifecycle and isolated profiles
-  └─ experimental PAL Gecko + 2609a named-MEM1 bridge (user-observed live ACK/counter; perf gate pending)
+  └─ experimental PAL Gecko + capability-gated named-MEM1 bridge (static/live reference: 2609a) (user-observed live ACK/counter; perf gate pending)
        └─ verified PAL PPC hooks and remote actor presentation, if feasible
 
 Authoritative session server
@@ -29,7 +29,7 @@ Player slots are stable identities with transform, velocity, facing, animation, 
 
 ## Stock Dolphin boundary
 
-A launcher alone cannot expose or render game actors. A reversible Gecko mailbox against Dolphin 2609a's named Windows MEM1 mapping has user-observed live counter/ACK operation at ~60 Hz. The mapping is undocumented; paired performance, pause/scene recovery, and player-state payloads remain unverified. GDB remains development-only; MemoryWatcher is not compiled into Windows 2609a. Actor synchronization cannot begin until performance and Mario-state gates pass. See [stock bridge research](stock-dolphin-bridge.md).
+A launcher alone cannot expose or render game actors. A reversible Gecko mailbox using Dolphin's named Windows MEM1 mapping has user-observed live counter/ACK operation at ~60 Hz on Dolphin 2609a. No Dolphin release is locked for ordinary play. The optional mailbox uses a known handler capability and runtime mapping/game checks; other builds remain unverified until those checks and a live run pass. Paired performance, pause/scene recovery, and player-state payloads remain unverified. GDB remains development-only; MemoryWatcher is not compiled into Windows 2609a. Actor synchronization cannot begin until performance and Mario-state gates pass. See [stock bridge research](stock-dolphin-bridge.md).
 
 ## PAL and localization
 

@@ -1,10 +1,12 @@
-//! Read-only Windows views into Dolphin 2609a's named emulated-memory section.
+//! Bounded Windows views into Dolphin's named emulated-memory section.
 //!
 //! Dolphin's stock Windows MemArenaWin names the page-file mapping
-//! `dolphin-emu.<pid>`. Memmap.cpp assigns MEM1 the first shared-memory offset.
-//! The persistent 64 KiB view remains for the existing mailbox bridge. Explicit
-//! inspection requests use temporary, allocation-granularity-aligned read-only
-//! views, capped to canonical retail MEM1 and 8 KiB per request.
+//! `dolphin-emu.<pid>`. The first shared-memory offset was source-verified
+//! against a Dolphin 2609a checkout; every process use still validates mapping
+//! extent, live RMGP01 identity, and PAL signatures. The persistent 64 KiB view
+//! is retained for the mailbox bridge. Explicit inspection requests use
+//! temporary, allocation-granularity-aligned read-only views, capped to
+//! canonical retail MEM1 and 8 KiB per request.
 
 use crate::gecko_bridge::{Mailbox, HANDLER_BASE, HANDLER_END};
 use crate::memory_inspection::{
@@ -48,7 +50,11 @@ pub struct StockMem1 {
 
 impl StockMem1 {
     pub fn open_dolphin(pid: u32) -> Result<Self, MappingOpenError> {
-        Self::open_name_access(&format!("dolphin-emu.{pid}"), true)
+        let mapping = Self::open_name_access(&format!("dolphin-emu.{pid}"), true)?;
+        mapping
+            .validate_minimum_mem1()
+            .map_err(MappingOpenError::Invalid)?;
+        Ok(mapping)
     }
 
     #[cfg(test)]
@@ -87,8 +93,8 @@ impl StockMem1 {
         // A 64 KiB view covers the ID and Gecko handler region while remaining
         // far smaller than Dolphin's full shared memory mapping.
         // SAFETY: the section is Dolphin's MEM1-first mapping; `VIEW_BYTES` is
-        // aligned to the Windows allocation granularity and the Dolphin 2609a
-        // Wii section is substantially larger than this bounded view.
+        // aligned to the Windows allocation granularity. Actual section size is
+        // checked separately before accepting the mapping as a MEM1 capability.
         let raw_view = unsafe { MapViewOfFile(handle.as_ptr(), access, 0, 0, VIEW_BYTES) };
         let view = match NonNull::new(raw_view.cast::<u8>()) {
             Some(view) => view,

@@ -58,7 +58,7 @@ The paired bridge-on/off benchmark procedure and source-level GDB overhead inves
 
 Rust tests cover the generated Gecko counter/echo code, handler signature and bounds, AllStars cave overlap rejection, synthetic mapped-memory ACK isolation, delayed game identity, and latency statistics. The user separately verified live Gecko execution and bidirectional exchange interactively. The user-observed smoothness/100% speed result is not a controlled performance comparison.
 
-The opt-in `dev-launch ... 0 --gecko-bridge-probe` path enables the probe only in an isolated profile and uses no GDB. It requires official Dolphin 2609a on Windows, a visible interactive desktop, PAL RMGP01 Rev 0, and mandatory externally supplied AllStars files.
+The opt-in `dev-launch ... 0 --gecko-bridge-probe` path enables the probe only in an isolated profile and uses no GDB. It requires Windows, PAL RMGP01 Rev 0, mandatory externally supplied AllStars files, the currently validated mailbox codehandler capability, and a live named MEM1 mapping/PAL/mailbox validation. The implementation has user-observed live evidence on Dolphin 2609a; other builds are not claimed compatible unless the runtime capability checks succeed and a live test is completed.
 
 The user subsequently reported a live run with changing `state=live` counter, 59–60.5 game updates/s, 59–60 acknowledgements/s, ~16.7 ms mean ACK round trip, and ~2 μs shared-memory read/write duration. The user observed smooth gameplay at 100% speed. This is recorded as **verified user-observed live behavior**, not a controlled benchmark. Reported maximum ACK latencies were 30–47 ms; without raw samples no p95/p99/jitter distribution can be calculated. The probe now emits session jitter statistics on stop.
 

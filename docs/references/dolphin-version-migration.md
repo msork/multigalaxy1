@@ -1,37 +1,47 @@
-﻿# Dolphin 2609a → 2609b development migration
+# Dolphin capability compatibility and migration record
 
-## Supported binaries and validation
+## Policy
 
-The development launcher accepts official stock Dolphin 2609a and 2609b for ordinary launches. `discover-dolphin <install directory>` searches a bounded depth for exactly one `Dolphin.exe` and validates it without starting the emulator. Validation reads the executable and sibling `DolphinTool` build markers, requires the two to report the same supported release, and checks the known 2880-byte `Sys/codehandler.bin` hash. A mixed, incomplete, ambiguous, or unknown install fails closed. Configure the exact executable path reported by discovery.
+MultiGalaxy1 has no Dolphin release/build allowlist and does not pin Dolphin.exe SHA-256. `discover-dolphin` checks for one non-empty platform Dolphin executable and reports whether sibling DolphinTool and `Sys/codehandler.bin` files are present. Those are static prerequisites, not proof that the emulator can run a game.
 
-Observed installation check on 2026-11-09:
+Launch validation checks PAL `RMGP01` revision 0 by invoking the configured installation's DolphinTool `header` operation. The launch path then uses the configured executable with an isolated user directory and mandatory AllStars setup. Failure to spawn or complete the requested GUI/debug handshake is reported for that launch attempt; it does not block non-debug launches because GDB is optional.
 
-| Installation | Result | Dolphin.exe SHA-256 | DolphinTool SHA-256 |
-|---|---|---|---|
-| Official stable 2609b | Valid; both binaries report 2609b, matching codehandler present | `7d686bbe88539a0373ec2f0c29d6a810263ecd23a06ace89df9ed02101f3a2a2` | `e8df1901e6202a724bdfe71d95c7eed18c9e5f5c7e9e7861a8e8998a93a2cecd` |
-| Official 2609a rollback | Valid; both binaries report 2609a, matching codehandler present | `17b01a8629d865378a45e58d5fcebf9dcc3f7919c719130a4ffdd1ca2b27b635` | `63dd9bad68996f4c75302fde1a2374ebecfa767df6780619d658f41684f97e8a` |
+AllStars is mandatory. Before launcher setup, the external PAL patch inputs are checked against the pinned PAL DOL and the installation must contain a non-empty Gecko codehandler file. This establishes static prerequisites, not that Gecko activation has been visually observed on every Dolphin build. Runtime AllStars remains a per-build gameplay check.
 
-Version identity came from embedded binary build markers and matched sibling tool markers; no emulator process was needed for validation. The 2609b installation was not launched as part of this migration. The official release channel lists 2609b as the current stable release: [Dolphin downloads](https://dolphin-emu.org/download/).
+## Optional capability gates
 
-## 2609a live baseline
+- **GDB:** no release lock. When requested, the launched process must accept the GDB RSP connection and pass the requested live identity/read checks. Unsupported GDB only prevents that debug request.
+- **Read-only MEM1 inspection:** no release lock or handler fingerprint. It verifies the target PID's executable path/session, opens only the named Windows mapping, validates the MEM1 span, reads live `RMGP01` and PAL runtime signatures, and uses bounded, explicit read ranges. The mapping is an undocumented implementation detail, not a supported Dolphin API.
+- **M4 Gecko mailbox:** separate fail-closed capability. It requires the known 2880-byte Gecko codehandler fingerprint plus the runtime-validated MEM1 mapping, expected PAL identity/signatures, a unique in-bounds mailbox, stable sequence snapshots, and bounded ACK writes. No Dolphin version is accepted merely because its name or version string matches. The live bridge result is user-observed on 2609a; other builds remain unverified and can use M4 only if every capability check succeeds. A changed/unknown handler or mapping blocks M4 without blocking ordinary gameplay.
+- **Wii image validation/rebuild:** current DolphinTool must successfully report PAL RMGP01 revision 0 and pass the actual header operations. Current WIT must successfully pass its version command, partition verification, extraction, and comparison operations. No historical tool version or binary hash is required.
 
-The user confirmed that the disposable changed-byte PAL RMGP01 Rev 0 ISO (`aa5630857139c63f48ad9fa4e1941188ffc3bf367d73cd68dfde9aaefc35f765`) booted and behaved normally in official Dolphin 2609a: title screen, save load, Mario movement, AllStars Classic Controller, animations, rendering, and camera were all observed working. This is a user-reported live regression result, not a controlled benchmark and not Stage 1 trampoline validation. The changed word is a behavior-neutral `ori` identity variant; no remote-player hook was installed.
+## Historical DolphinTool/WIT manifest hashes
 
-## Feature gates and rollback
+Existing schema-v1 ISO manifests may retain `dolphintool_sha256`, `wit_sha256`, and `wit_version` as reconstruction provenance; these fields are optional. If hashes are present, they must be well-formed, but they are not compared with current binaries or the reported WIT version. Current validator tools are hashed at the start and end to detect replacement during one validation run. Source/output ISO hashes, source/target DOL hashes, recomputed VCDIFF, PAL identity, WIT partition integrity, AllStars non-overlap, and unchanged DATA files remain enforced.
 
-- Ordinary GUI launch, PAL image validation, mandatory external AllStars setup, and `--patched-image` accept validated 2609a or 2609b.
-- Dolphin MEM1 inspection, heap/actor/model/scheduler observers, Gecko mailbox and trampoline diagnostics, and the current M4 mailbox `sync-client` remain restricted to 2609a. Their Dolphin mapping and handler behavior have not been revalidated on 2609b.
-- AllStars files, game image, Rust protocol, and M4 implementation were not changed for this migration.
-- The prior local 2609a config/profile are retained separately from the new 2609b local config/profile. Local configs and profiles are ignored by Git; no personal paths or save/controller data are committed.
-- A 2609b launch is not yet live-verified. The user should run the controlled command below manually and report title/save/gameplay/controller results. Do not interpret a successful boot as trampoline or multiplayer validation.
+A schema-v1 manifest is not signed. A valid-format edit to a provenance-only tool hash cannot be authenticated and does not affect image authorization. Tampering with an image/DOL/delta identity or changing extracted DATA is detected by the integrity checks. Historical manifests are not rewritten.
 
-Read-only `validate-pal-game` using the 2609b DolphinTool accepted the disposable changed-byte ISO as PAL `RMGP01` revision 0. This validates DolphinTool/image identity handling only; it is not an emulator boot.
+## Live boot evidence
 
-## Manual 2609b changed-byte ISO regression
+The user confirmed that the disposable changed-byte PAL RMGP01 Rev 0 ISO (`aa5630857139c63f48ad9fa4e1941188ffc3bf367d73cd68dfde9aaefc35f765`) booted normally in Dolphin 2609a: title screen, save load, Mario movement, AllStars Classic Controller operation, animation, rendering, and camera all worked. This is a live changed-image regression report, not trampoline or multiplayer validation.
 
-From an interactive PowerShell at the repository root, after the launcher config and isolated 2609b profile are prepared, set `$Wit` to the locally installed Wiimms ISO Tool executable and run:
+The local development config currently points to Dolphin 2609b and its isolated profile. The 2609b DolphinTool successfully identified the disposable output as PAL RMGP01 Rev 0. A 2609b game boot has not been performed. The separate 2609a local config/profile remain available for rollback.
+
+## Commands
+
+From an interactive PowerShell at the repository root, these commands validate the existing rebuilt ISO without launching Dolphin, then (only when run) launch it for the controlled gameplay check. Set `$DolphinTool` and `$Wit` to the local tool paths; no original ISO is modified.
 
 ```powershell
+$DolphinTool = 'C:\path\to\Dolphin-2609b-x64\DolphinTool.exe'
+$Wit = 'C:\path\to\wit.exe'
+$AllStars = '<external AllStars PAL patch folder>'
+
+cargo run --release -p multigalaxy -- validate-rebuilt-iso `
+  $DolphinTool $Wit `
+  'target\mg1-disc-pipeline\source.iso' `
+  'target\mg1-disc-pipeline\changed-neutral-nop.iso' `
+  'reference\original\main.dol' $AllStars
+
 cargo run --release -p multigalaxy -- dev-launch development.local.toml `
   'target\mg1-dev-profile-2609b' 0 `
   --patched-image 'target\mg1-disc-pipeline\changed-neutral-nop.iso' `
@@ -39,4 +49,4 @@ cargo run --release -p multigalaxy -- dev-launch development.local.toml `
   --wit $Wit
 ```
 
-This is an interactive launch command and must be run by the user. It uses the isolated profile, leaves M4 mailbox probing off, and retains required AllStars setup. The launcher rechecks the rebuild manifest and hashes before launch.
+`validate-rebuilt-iso` is disk intensive because it re-hashes and re-extracts both images. `dev-launch` visibly starts Dolphin and is intentionally left as a user-run command.
