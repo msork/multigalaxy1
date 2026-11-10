@@ -1,6 +1,6 @@
 # Stage 1 image pipeline audit: PAL RMGP01 Rev 0
 
-Status: **NO-GO for live testing.** The current Stage 1 result is an identity/no-op copy, and the image code is not a Wii partition-aware patcher. No source image was modified and Dolphin was not launched during this audit.
+Status at original audit: **NO-GO for live testing.** Follow-up status (2026-11-09): the partition-aware identity ISO extraction/rebuild path is now implemented and verified offline; a changed DOL patch and Dolphin boot remain **NO-GO**. See [partition-aware rebuild evidence](../docs/references/wii-image-rebuild.md).
 
 ## Audit findings
 
@@ -37,8 +37,16 @@ The M4 mailbox Gecko payload is opt-in through `--gecko-bridge-probe`; `--patche
 
 Do not run live testing with the current patch-image output as evidence of a patched Wii image. Mark the image pipeline **NO-GO** for live testing. Keep the original RVZ untouched and keep stock Dolphin, AllStars, and M4 paths unchanged.
 
-Before any future live image test, implement or adopt a verified, reversible path that accepts the user's actual PAL source (including RVZ if supported), validates the source image via DolphinTool, extracts/decrypts the data partition, locates DOL using partition metadata, applies a non-identity synthetic/test delta to extracted DOL bytes, rebuilds/re-encrypts the partition and all integrity hashes correctly, emits a distinct image, then validates its full hash and DolphinTool ID/revision. Only after offline rebuild tests pass should an interactive boot be attempted. Preserve locale assets by changing only the intended DOL; do not require one fixed whole-image hash for all translated images, but always record and verify the actual source hash when applying a real delta.
+At the time of the original audit, a partition-aware rebuild was required before any live image test. That requirement is now met for ISO identity extraction/recomposition only; see the follow-up section. A non-identity synthetic/test delta and changed DOL target remain prerequisites before a live patched-image test. Preserve locale assets by changing only the intended DOL; do not require one fixed whole-image hash for all translated images, but always record and verify the actual source hash when applying a real delta.
 
 ## Validation evidence
 
-Static review and synthetic tests only. No real RVZ/ISO was read or written by this audit, no Dolphin process was launched, and no live hook/window was tested. `--patched-image` must remain **NO-GO for live testing** until the image format/rebuild blocker is resolved.
+At the original audit: static review and synthetic tests only; no real RVZ/ISO was read or written, no Dolphin process was launched, and no live hook/window was tested. `--patched-image` was **NO-GO** until the partition rebuild blocker was resolved. That historical evidence is supplemented by the offline follow-up below; `--patched-image` remains unintegrated with the new manifest.
+
+## Follow-up: partition-aware ISO rebuild (2026-11-09)
+
+The historical audit above correctly describes the legacy `patch-image` implementation, which remains a plaintext byte scanner and is not suitable for encrypted Wii images. A separate Rust `rebuild-iso` command now uses externally supplied Wiimms ISO Tool (WIT) to extract and recompose a fresh ISO. DolphinTool 2609a validates PAL `RMGP01`, revision 0 on both input and output; WIT verifies partitions before and after; the extracted `sys/main.dol` is pinned to the verified PAL DOL and symbol map. Output is re-extracted and checked, source file hashes are compared, and the original source image hash is rechecked before publishing.
+
+This path has been run against the local PAL ISO and independently recomposed to the same deterministic output hash. The current VCDIFF is an identity operation, so the test proves disc-aware extraction/recomposition and validation, not changed code delivery. The local RVZ-to-ISO conversion emitted a key warning and RVZ is not accepted by `rebuild-iso`. No Dolphin was launched. `dev-launch --patched-image` is not integrated with the WIT manifest and must not be used with this output. Detailed tool versions, hashes, evidence, and commands are in [`docs/references/wii-image-rebuild.md`](../docs/references/wii-image-rebuild.md).
+
+Disposition: **GO** for offline PAL ISO identity rebuild with the tested tool versions; **NO-GO** for changed DOL deployment, launcher consumption, RVZ input, and live boot. The next code milestone is a versioned changed-DOL manifest and explicit trampoline patch target with AllStars overlap checks, followed by a user-run boot test only after offline checks pass.

@@ -2,6 +2,7 @@ mod bridge_identity;
 mod callback_observer;
 mod controller_patch;
 mod dev_config;
+mod disc_rebuild;
 mod gdb;
 mod gecko_bridge;
 mod heap_observer;
@@ -757,6 +758,34 @@ fn run_patch_image(
         manifest.window_len
     );
     println!("manifest written next to the output image; original image untouched");
+    Ok(())
+}
+
+fn run_rebuild_iso(
+    dolphintool: &std::path::Path,
+    wit: &std::path::Path,
+    source: &std::path::Path,
+    output: &std::path::Path,
+    dol_path: &std::path::Path,
+    symbols_path: &std::path::Path,
+) -> Result<(), String> {
+    let dol = fs::read(dol_path).map_err(|e| format!("cannot read pinned PAL main.dol: {e}"))?;
+    let symbols =
+        fs::read(symbols_path).map_err(|e| format!("cannot read Petari PAL symbol map: {e}"))?;
+    player_probe::verify_pal_inputs(&dol, &symbols)?;
+    hook_trampoline::verify_hook_layout(&dol, &symbols)?;
+    let manifest = disc_rebuild::rebuild_iso(dolphintool, wit, source, output, &dol)?;
+    println!(
+        "rebuild_iso=ok patch_id={} source_image_sha256={} output_image_sha256={} source_dol_sha256={} target_dol_sha256={} delta_sha256={} wit_version={}",
+        manifest.patch_id,
+        manifest.source_image_sha256,
+        manifest.output_image_sha256,
+        manifest.source_dol_sha256,
+        manifest.target_dol_sha256,
+        manifest.delta_sha256,
+        manifest.wit_version
+    );
+    println!("partition-aware ISO rebuild verified; original input unchanged; manifest written beside output");
     Ok(())
 }
 
@@ -2541,6 +2570,16 @@ fn run() -> Result<(), String> {
             std::path::Path::new(&args[3]),
         );
     }
+    if args.len() == 7 && args[0] == "rebuild-iso" {
+        return run_rebuild_iso(
+            std::path::Path::new(&args[1]),
+            std::path::Path::new(&args[2]),
+            std::path::Path::new(&args[3]),
+            std::path::Path::new(&args[4]),
+            std::path::Path::new(&args[5]),
+            std::path::Path::new(&args[6]),
+        );
+    }
     if args.len() == 3 && args[0] == "observe-scheduler" {
         let pid = args[2]
             .to_str()
@@ -3440,7 +3479,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy patch-image <development.local.toml> <source-image> <output-image> | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <path>] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy patch-image <development.local.toml> <source-image> <output-image> [legacy plaintext-only experiment] | multigalaxy rebuild-iso <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <path>] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;

@@ -1,8 +1,10 @@
-//! Stage 1 experimental image pipeline: locate a plaintext PAL `main.dol`
-//! byte-for-byte inside a user-owned image copy, apply a size-preserving
-//! identity VCDIFF result, and record a manifest. This does not decrypt Wii
-//! partitions, verify/rebuild cluster hashes, or support RVZ/raw encrypted
-//! Wii images. It is not approved for live testing.
+//! Legacy Stage 1 plaintext fixture experiment. It locates a plaintext PAL
+//! `main.dol` byte-for-byte inside a user-owned image copy, applies a
+//! size-preserving identity VCDIFF result, and records a manifest. This does
+//! not decrypt Wii partitions, verify/rebuild cluster hashes, or support RVZ;
+//! it is not suitable for real encrypted Wii images. The separate
+//! `disc_rebuild` module uses partition-aware WIT extraction/recomposition for
+//! ISO inputs.
 //!
 //! Stage 1 proves the pipeline, not hook semantics: the patched window
 //! reproduces the original bytes exactly (identity patch).

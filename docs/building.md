@@ -4,7 +4,7 @@ Host tooling is a Cargo workspace. Run `cargo fmt --all -- --check`, `cargo test
 
 ## Official Dolphin only
 
-Use an official, unmodified Dolphin installation and a game image you are entitled to use. MultiGalaxy does not build or alter Dolphin, DolphinTool, or game images. The launcher takes explicit paths and writes emulator settings only under the selected isolated user directory.
+Use an official, unmodified Dolphin installation and a game image you are entitled to use. MultiGalaxy does not build or alter Dolphin or DolphinTool and never edits the supplied game image in place. The separate ISO rebuild command below can create a new user-owned output image. The launcher takes explicit paths and writes emulator settings only under the selected isolated user directory.
 
 Validate the PAL image read-only with the matching official DolphinTool:
 
@@ -13,6 +13,22 @@ cargo run -p multigalaxy -- validate-pal-game '<official Dolphin.exe>' '<PAL gam
 ```
 
 Expected identity is PAL `RMGP01`, revision `0`. The launcher requires the third-party AllStars PAL patch files (including both shoulder swaps) and validates fingerprints before launch; those files are supplied externally and not bundled.
+
+## Partition-aware PAL ISO rebuild (offline identity validation)
+
+The legacy `patch-image` command scans plaintext and is not for Wii ISO/RVZ deployment. For an ISO, `rebuild-iso` uses official DolphinTool for identity validation and a separately installed Wiimms ISO Tool (`wit`) for partition-aware extraction and composition. WIT is GPL-2.0-or-later and is not bundled. This command currently applies only the five-word Stage 1 identity VCDIFF; it does not install the trampoline or change any game bytes. RVZ is not accepted by this command. It writes a new ISO and adjacent manifest, refuses existing outputs, and keeps temporary extraction files separate.
+
+```powershell
+cargo run --release -p multigalaxy -- rebuild-iso `
+  '<official Dolphin install>\DolphinTool.exe' `
+  '<Wiimms ISO Tools>\wit.exe' `
+  '<user-owned PAL source.iso>' `
+  '<new output path\MultiGalaxy1.iso>' `
+  '<verified PAL main.dol>' `
+  '<matching Petari PAL symbols.txt>'
+```
+
+The completed local test verifies PAL RMGP01 revision 0, the pinned extracted DOL, WIT partition integrity before/after, output DOL and game-file hashes, source immutability, and deterministic recomposition. It has **not** been launched in Dolphin. The manifest is not currently understood by `dev-launch --patched-image`; do not use that flag for this output. See [Wii image rebuild evidence](references/wii-image-rebuild.md).
 
 ## Local Windows development profile
 
