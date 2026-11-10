@@ -1,6 +1,6 @@
 # M4 bridge compatibility on Dolphin 2609b
 
-## Read-only preflight — user verified
+## Read-only preflight â€” user verified
 
 The user reported a successful `validate-m4-read-only` result on Dolphin 2609b:
 
@@ -24,7 +24,7 @@ This verifies the running process identity/session, compatible MEM1 mapping exte
 
 ## Controlled ACK-only experiment
 
-`test-m4-ack` is separate and is never run by `dev-launch` or the read-only preflight. It requires the explicit `--confirm-single-ack-write` flag and an already-running Dolphin instance with the mailbox code active. Stop any `sync-client` or other bridge process attached to that Dolphin before running it.
+`test-m4-ack` is separate and is never run by `dev-launch` or the read-only preflight. It requires the explicit `--confirm-single-ack-write` flag and an already-running Dolphin instance with the mailbox code active. Stop the `dev-launch --gecko-bridge-probe` host writer and any other process that writes this mailbox before running it. The Rust `sync-client` opens the mapping read-only and is not itself an ACK writer.
 
 ```powershell
 Get-Process -Name Dolphin | Format-Table Id, Path, Responding
@@ -36,17 +36,48 @@ Before writing, the command repeats read-only process/session, PAL DOL signature
 
 ### Pre-write rejection diagnosis
 
-An initial Dolphin 2609b attempt failed with \`M4 mailbox or ACK changed during final pre-write check\`; no write occurred. The previous implementation collapsed three comparisons into one error: validated mailbox location, ACK word, and game echo word. It did not compare the frame counter, so the normal heartbeat advancing during the 100 ms handler revalidation could not itself cause this failure. The captured error did not identify which comparison differed, so a competing \`sync-client\`/bridge writer or mailbox relocation is plausible but not established as the cause.
+An initial Dolphin 2609b attempt failed with `M4 mailbox or ACK changed during final pre-write check`; no write occurred. The previous implementation collapsed three comparisons into one error: validated mailbox location, ACK word, and game echo word. It did not compare the frame counter, so the normal heartbeat advancing during the 100 ms handler revalidation could not itself cause this failure. The captured error did not identify which comparison differed; host ACK activity or mailbox relocation were the remaining possibilities. A `sync-client` cannot cause ACK mutations because its mapping is read-only.
 
 The command now reports only those mailbox fields before and after final read-only validation: mailbox base, frame counter, ACK, echo, elapsed validation milliseconds, and the exact changed field names. The counter is diagnostic and allowed to advance; mailbox identity, ACK, and echo must remain unchanged. A failed mailbox/signature revalidation reports its error and does not inspect another address. It never retries the write, and every changed/unknown state still rejects before writing. Synthetic tests cover stable control words with an advancing counter, ACK changes, echo changes, and mailbox relocation.
 
-For the next attempt, ensure no \`sync-client\` or other bridge writer targets this Dolphin. A read-only preflight can be repeated without changing memory:
+For the next attempt, ensure no ACK-writing bridge process targets this Dolphin. A read-only preflight can be repeated without changing memory:
 
-\`\`\`powershell
+```powershell
 cargo run --release -p multigalaxy -- validate-m4-read-only development.local.toml 26952
-\`\`\`
+```
 
-Only after that passes and all other writers are stopped, invoke the explicit ACK test once using the command above. Preserve its complete \`before\`, \`after\`, \`changed_fields\`, and \`elapsed_ms\` output. Do not loop/retry automatically. If it still rejects, the changed-field report will distinguish mailbox relocation from ACK/echo mutation without making another write.
+Only after that passes and all other writers are stopped, invoke the explicit ACK test once using the command above. Preserve its complete `before`, `after`, `changed_fields`, and `elapsed_ms` output. Do not loop/retry automatically. If it still rejects, the changed-field report will distinguish mailbox relocation from ACK/echo mutation without making another write.
+
+### ACK and echo ownership; 2609b quiescence sample
+
+The PAL Gecko payload's generated PPC instructions establish the word ownership:
+
+- `counter` is incremented by the game-side OnFrame Gecko routine.
+- `ack` is read by that routine and is the host-writable word.
+- `echo` is written by the game-side routine as a copy of the ACK value it read on that OnFrame.
+- Rust's ordinary M4 writer computes `ack = counter.rotate_left(7) ^ 0x4d473141` and writes it after observing the counter. Therefore ACK and echo can differ between the host store and the next game-side copy. An instantaneous equality check is not a protocol invariant during active ACK traffic; it is only a quiet-state gate for the destructive test.
+
+The user supplied this read-only sample on Dolphin 2609b, PID 4712, mailbox `0x800025A0`:
+
+```text
+counter=0x00001044 ack=0x4d4f1341 echo=0x4d4f10c1
+```
+
+The ACK token decodes exactly to counter candidate `0x1044`; the echo token decodes to `0x1043`, exactly one frame behind. This is the protocol's expected direction and is consistent with the ordinary interval after a host writes the ACK for the current frame and before the next Gecko OnFrame copies it to echo. It is not evidence of stale/corrupt data by itself. The single sample cannot establish which host process wrote ACK or whether the game-side copy caught up on a subsequent frame. It does not prove a competing writer or a Dolphin 2609b memory fault.
+
+The new diagnostic was then run read-only against PID 4712. Across six samples at 50 ms intervals, counter advanced from `0xA8FE` to `0xA90D`; ACK changed in every interval and encoded the current or adjacent frame; echo also advanced and usually encoded the preceding frame. Equality was observed in two samples. Summary: `counter_advanced=true ack_changed=true echo_changed=true ack_echo_equal_in_any_sample=true ack_echo_transition_observed=false writes=0`. This establishes active external ACK-writer activity while the game-side echo was tracking it. The values are consistent with the ordinary bridge writer and the observed one-frame lag; they do not show whether one or multiple host processes were writing. The one-shot test correctly did not write while this writer was active.
+
+The ACK test remains fail-closed unless its quiet-state checks pass. A new `diagnose-m4-ack` command opens only a read-only MEM1 view, validates the same process/game/handler/mailbox prerequisites, and samples only counter/ACK/echo six times at 50 ms intervals, with a validated mailbox check before and after. It reports token-derived counter candidates, sample times, whether the counter/ACK/echo changed, and whether an ACK-to-echo transition was observed. Because this diagnostic itself performs no writes, ACK changes during its sample window prove that some external host-side writer is active; the tool cannot identify that process from the mailbox. Such activity is unsafe to overlap with the one-shot ACK test, even if the echo follows normally. A stable ACK followed by the game echo catching up is consistent with the ordinary one-frame protocol transition. Stable divergence while the counter advances means the echo did not catch up in the sample window; a stalled counter makes the sample inconclusive about game-side echo behavior. No ACK test write or network action occurs.
+
+Run this read-only diagnostic against the already-running instance before any further ACK test:
+
+```powershell
+cargo run --release -p multigalaxy -- diagnose-m4-ack development.local.toml 4712
+```
+
+If ACK changes in the window, stop every ACK-writing bridge process and repeat the diagnostic. If the counter advances but echo remains divergent and stable, do not run the write test; retain the bounded output for protocol/runtime investigation. Only an observed stable ACK/echo state with no other ACK writer justifies a later, separately confirmed one-shot ACK test.
+
+The interactive `dev-launch --gecko-bridge-probe` host process itself writes ACKs. In the PowerShell window running that probe, type `Q` to stop/unmap the host writer; the launcher drops its child handle without killing Dolphin. Then run `diagnose-m4-ack` again. Proceed to the explicitly confirmed ACK test only if the diagnostic shows no ACK changes and the echo has caught up, with the counter still advancing. If another ACK writer remains, do not run the ACK test.
 
 ## Two-client movement regression after ACK passes
 

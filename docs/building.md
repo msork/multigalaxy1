@@ -107,6 +107,14 @@ The probe polls for the game ID for 60 seconds by default. Adjust this with `--b
 
 The user has also reported a successful read-only M4 preflight on Dolphin 2609b. This did not test writable ACK feedback. The separate ACK-only command is explicitly opted into and must be run with no other bridge writers attached:
 
+If ACK and echo differ, first run `diagnose-m4-ack`; it samples the three validated mailbox words through a read-only mapping and never writes:
+
+```powershell
+cargo run --release -p multigalaxy -- diagnose-m4-ack development.local.toml <DOLPHIN_PID>
+```
+
+The normal writer can update ACK after the game copied its previous value to echo, so one read can legitimately show adjacent-frame tokens. Stop the interactive bridge writer with `Q` in its own console, then verify that ACK is stable, echo has caught up, and the game counter still advances before running the ACK-only command. A changing ACK in the read-only diagnostic proves some host writer remains active; do not run the one-shot test in that state.
+
 ```powershell
 $DolphinPid = [uint32](Read-Host 'Enter the running Dolphin PID')
 cargo run --release -p multigalaxy -- test-m4-ack development.local.toml $DolphinPid --confirm-single-ack-write

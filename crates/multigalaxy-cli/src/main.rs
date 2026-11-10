@@ -284,12 +284,75 @@ fn read_ack_prewrite_sample(
 #[cfg(windows)]
 fn format_ack_prewrite_sample(sample: gecko_bridge::AckPrewriteSample) -> String {
     format!(
-        "mailbox=0x{:08x},counter=0x{:08x},ack=0x{:08x},echo=0x{:08x}",
+        "mailbox=0x{:08x},counter=0x{:08x},ack=0x{:08x},ack_counter_candidate=0x{:08x},echo=0x{:08x},echo_counter_candidate=0x{:08x}",
         sample.mailbox.snapshot_address(),
         sample.counter,
         sample.acknowledgement,
-        sample.echo
+        gecko_bridge::ack_token_counter_candidate(sample.acknowledgement),
+        sample.echo,
+        gecko_bridge::ack_token_counter_candidate(sample.echo)
     )
+}
+
+#[cfg(windows)]
+fn run_diagnose_m4_ack(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
+    // Deliberately opens a read-only view and samples only the validated
+    // mailbox's counter, ACK, and echo words.
+    run_validate_m4_read_only(config_path, pid)?;
+    let config_text = fs::read_to_string(config_path)
+        .map_err(|error| format!("cannot read development config: {error}"))?;
+    let config = dev_config::parse(&config_text)?;
+    validate_dev_inputs(&config)?;
+    validate_mailbox_capability(&config)?;
+    let dol =
+        fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
+    let symbols = fs::read(&config.pal_symbols)
+        .map_err(|error| format!("cannot read PAL symbols: {error}"))?;
+    player_probe::verify_pal_inputs(&dol, &symbols)?;
+    let mut memory = stock_memory::StockMem1::open_dolphin_read_only(pid)
+        .map_err(|error| format!("cannot open Dolphin PID {pid} read-only MEM1: {error:?}"))?;
+    let mailbox = verify_live_m4_mailbox(&mut memory, &dol, pid)?;
+    let started = Instant::now();
+    let mut samples = Vec::with_capacity(6);
+    for index in 0..6 {
+        if index != 0 {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let sample = read_ack_prewrite_sample(&memory, mailbox)?;
+        println!(
+            "m4_ack_diagnostic=sample index={} elapsed_ms={} {}",
+            index,
+            started.elapsed().as_millis(),
+            format_ack_prewrite_sample(sample)
+        );
+        samples.push(sample);
+    }
+    let end_mailbox = verify_live_m4_mailbox(&mut memory, &dol, pid)?;
+    if end_mailbox != mailbox {
+        return Err(format!(
+            "m4_ack_diagnostic=invalidated reason=mailbox_moved before=0x{:08x} after=0x{:08x}; read-only samples only",
+            mailbox.snapshot_address(),
+            end_mailbox.snapshot_address()
+        ));
+    }
+    let summary =
+        gecko_bridge::summarize_ack_window(&samples).ok_or("ACK diagnostic produced no samples")?;
+    println!(
+        "m4_ack_diagnostic=summary duration_ms={} counter_advanced={} ack_changed={} echo_changed={} ack_echo_equal_in_any_sample={} ack_echo_transition_observed={} interpretation={} writes=0 network=not_started",
+        started.elapsed().as_millis(),
+        summary.counter_advanced,
+        summary.ack_changed,
+        summary.echo_changed,
+        summary.ack_echo_equal,
+        summary.echo_caught_transition,
+        summary.interpretation()
+    );
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn run_diagnose_m4_ack(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
+    Err("diagnose-m4-ack requires the Windows stock-Dolphin MEM1 mapping".into())
 }
 
 #[cfg(windows)]
@@ -407,7 +470,7 @@ fn run_test_m4_ack(config_path: &std::path::Path, pid: u32) -> Result<(), String
     let before_final = read_ack_prewrite_sample(&memory, mailbox)?;
     let previous_ack = before_final.acknowledgement;
     if previous_ack != before_final.echo {
-        return Err(format!("M4 ACK is not quiescent before test ({}); stop other bridge clients and retry; no write attempted", format_ack_prewrite_sample(before_final)));
+        return Err(format!("M4 ACK test not started: ACK has not been observed in the game echo ({}); this may be an ordinary frame transition or a host writer, so inspect with diagnose-m4-ack; no write attempted", format_ack_prewrite_sample(before_final)));
     }
     let final_check_started = Instant::now();
     let final_mailbox_result = verify_live_m4_mailbox(&mut memory, &dol, pid);
@@ -2297,7 +2360,7 @@ fn run_interactive_gecko_bridge_probe(
                 }
             }
             if pending_ack.is_none() && counter_changed && last_ack_counter != Some(counter) {
-                let acknowledgement = counter.rotate_left(7) ^ 0x4d47_3141;
+                let acknowledgement = gecko_bridge::ack_token_for_counter(counter);
                 let live_id: [u8; 6] = view
                     .read_guest(0x8000_0000, 6)?
                     .try_into()
@@ -2790,6 +2853,17 @@ fn run() -> Result<(), String> {
             return Err("Dolphin PID must be positive".into());
         }
         return run_validate_m4_read_only(std::path::Path::new(&args[1]), pid);
+    }
+    if args.len() == 3 && args[0] == "diagnose-m4-ack" {
+        let pid = args[2]
+            .to_str()
+            .ok_or("Dolphin PID must be valid UTF-8")?
+            .parse::<u32>()
+            .map_err(|_| "Dolphin PID must be a positive integer")?;
+        if pid == 0 {
+            return Err("Dolphin PID must be positive".into());
+        }
+        return run_diagnose_m4_ack(std::path::Path::new(&args[1]), pid);
     }
     if args.len() == 3 && args[0] == "observe-penguins" {
         let pid = args[2]
@@ -3895,7 +3969,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy discover-dolphin <install-directory-or-Dolphin.exe> | multigalaxy validate-m4-read-only <development.local.toml> <Dolphin-pid> | multigalaxy test-m4-ack <development.local.toml> <Dolphin-pid> --confirm-single-ack-write | multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy patch-image <development.local.toml> <source-image> <output-image> [legacy plaintext-only experiment] | multigalaxy rebuild-iso <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> | multigalaxy rebuild-iso-dol <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> <target-main.dol> <target-sha256> <AllStars-patch-folder> | multigalaxy validate-rebuilt-iso <DolphinTool.exe> <wit.exe> <source.iso> <rebuilt.iso> <PAL-main.dol> <AllStars-patch-folder> | multigalaxy validate-rebuilt-iso-cached <DolphinTool.exe> <wit.exe> <source.iso> <rebuilt.iso> <PAL-main.dol> <AllStars-patch-folder> [--force-revalidate] | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <output.iso> --source-iso <source.iso> --wit <wit.exe> [--force-revalidate]] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy discover-dolphin <install-directory-or-Dolphin.exe> | multigalaxy validate-m4-read-only <development.local.toml> <Dolphin-pid> | multigalaxy diagnose-m4-ack <development.local.toml> <Dolphin-pid> | multigalaxy test-m4-ack <development.local.toml> <Dolphin-pid> --confirm-single-ack-write | multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy patch-image <development.local.toml> <source-image> <output-image> [legacy plaintext-only experiment] | multigalaxy rebuild-iso <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> | multigalaxy rebuild-iso-dol <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> <target-main.dol> <target-sha256> <AllStars-patch-folder> | multigalaxy validate-rebuilt-iso <DolphinTool.exe> <wit.exe> <source.iso> <rebuilt.iso> <PAL-main.dol> <AllStars-patch-folder> | multigalaxy validate-rebuilt-iso-cached <DolphinTool.exe> <wit.exe> <source.iso> <rebuilt.iso> <PAL-main.dol> <AllStars-patch-folder> [--force-revalidate] | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <output.iso> --source-iso <source.iso> --wit <wit.exe> [--force-revalidate]] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;

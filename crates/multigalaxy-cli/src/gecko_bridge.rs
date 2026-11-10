@@ -38,6 +38,18 @@ const X: usize = 8;
 const Y: usize = 9;
 const Z: usize = 10;
 const SAVED_LR: usize = 12;
+const ACK_TOKEN_SALT: u32 = 0x4d47_3141;
+
+/// Deterministic host ACK used by the current Rust bridge: the token encodes
+/// the Gecko frame counter so readers can correlate an ACK with its source
+/// frame without treating it as a cryptographic/authentication value.
+pub fn ack_token_for_counter(counter: u32) -> u32 {
+    counter.rotate_left(7) ^ ACK_TOKEN_SALT
+}
+
+pub fn ack_token_counter_candidate(token: u32) -> u32 {
+    (token ^ ACK_TOKEN_SALT).rotate_right(7)
+}
 
 const GAME_SYSTEM_SINGLETON: u32 = 0x806a_1228;
 
@@ -415,6 +427,52 @@ pub struct AckPrewriteSample {
     pub echo: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AckWindowSummary {
+    pub counter_advanced: bool,
+    pub ack_changed: bool,
+    pub echo_changed: bool,
+    pub ack_echo_equal: bool,
+    pub echo_caught_transition: bool,
+}
+
+pub fn summarize_ack_window(samples: &[AckPrewriteSample]) -> Option<AckWindowSummary> {
+    let first = samples.first()?;
+    Some(AckWindowSummary {
+        counter_advanced: samples.iter().any(|sample| sample.counter != first.counter),
+        ack_changed: samples
+            .windows(2)
+            .any(|pair| pair[0].acknowledgement != pair[1].acknowledgement),
+        echo_changed: samples.windows(2).any(|pair| pair[0].echo != pair[1].echo),
+        ack_echo_equal: samples
+            .iter()
+            .any(|sample| sample.acknowledgement == sample.echo),
+        echo_caught_transition: samples.windows(2).any(|pair| {
+            pair[0].acknowledgement != pair[0].echo
+                && pair[0].acknowledgement == pair[1].acknowledgement
+                && pair[1].acknowledgement == pair[1].echo
+        }),
+    })
+}
+
+impl AckWindowSummary {
+    pub fn interpretation(self) -> &'static str {
+        if self.echo_caught_transition {
+            "ack_echo_transition_observed"
+        } else if self.ack_changed && self.ack_echo_equal {
+            "ack_writer_activity_and_echo_match_observed"
+        } else if self.ack_changed {
+            "ack_writer_activity_echo_catchup_not_observed"
+        } else if self.ack_echo_equal {
+            "ack_echo_equal_in_window"
+        } else if self.counter_advanced {
+            "counter_advancing_ack_echo_diverged"
+        } else {
+            "counter_stalled_ack_echo_diverged"
+        }
+    }
+}
+
 /// Return only the conditions that must remain stable between the final
 /// read-only preflight snapshots. Counter changes are intentionally excluded:
 /// the game increments it while running.
@@ -774,6 +832,68 @@ mod tests {
         assert_eq!(
             ack_prewrite_changed_fields(mailbox, before, moved),
             vec!["mailbox_identity"]
+        );
+    }
+
+    #[test]
+    fn observed_2609b_ack_words_decode_to_bridge_frame_candidates() {
+        // User-reported read-only sample: counter 0x1044, ACK 0x4d4f1341,
+        // echo 0x4d4f10c1. These values correlate exactly with consecutive
+        // Rust tokens for frames 0x1044 and 0x1043 respectively.
+        assert_eq!(ack_token_for_counter(0x1044), 0x4d4f_1341);
+        assert_eq!(ack_token_counter_candidate(0x4d4f_1341), 0x1044);
+        assert_eq!(ack_token_counter_candidate(0x4d4f_10c1), 0x1043);
+    }
+
+    #[test]
+    fn ack_window_distinguishes_echo_catchup_writer_activity_and_stalled_divergence() {
+        let mailbox = Mailbox { base: 0x8000_25a0 };
+        let old_ack = ack_token_for_counter(0x40);
+        let new_ack = ack_token_for_counter(0x41);
+        let samples = [
+            AckPrewriteSample {
+                mailbox,
+                counter: 0x41,
+                acknowledgement: new_ack,
+                echo: old_ack,
+            },
+            AckPrewriteSample {
+                mailbox,
+                counter: 0x42,
+                acknowledgement: new_ack,
+                echo: new_ack,
+            },
+        ];
+        let summary = summarize_ack_window(&samples).unwrap();
+        assert_eq!(summary.interpretation(), "ack_echo_transition_observed");
+        assert!(summary.counter_advanced);
+        assert!(!summary.ack_changed);
+
+        let writer_activity = [
+            samples[0],
+            AckPrewriteSample {
+                counter: 0x43,
+                acknowledgement: ack_token_for_counter(0x42),
+                ..samples[0]
+            },
+        ];
+        let summary = summarize_ack_window(&writer_activity).unwrap();
+        assert_eq!(
+            summary.interpretation(),
+            "ack_writer_activity_echo_catchup_not_observed"
+        );
+        assert!(summary.ack_changed);
+        assert!(!summary.echo_caught_transition);
+
+        let stalled = [AckPrewriteSample {
+            counter: 0x44,
+            acknowledgement: new_ack,
+            echo: old_ack,
+            mailbox,
+        }; 2];
+        assert_eq!(
+            summarize_ack_window(&stalled).unwrap().interpretation(),
+            "counter_stalled_ack_echo_diverged"
         );
     }
 
