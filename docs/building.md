@@ -125,3 +125,14 @@ cargo run -p multigalaxy -- sync-client development.local.toml <LUIGI_DOLPHIN_PI
 ```
 
 The clients validate the Dolphin executable path, PAL inputs, handler fingerprint, live game ID, and mailbox. The server binds only to localhost. Each distinct profile keeps its own configuration. Full interactive two-instance verification has not yet been recorded; synthetic loopback integration tests pass. See [networking.md](networking.md) and [specs/M4-two-player-position-sync.md](../specs/M4-two-player-position-sync.md) for protocol and recovery details.
+
+### Read-only M4 capability preflight
+
+Before attempting M4 on a new Dolphin build, validate the already-running process without starting Dolphin or writing the ACK word. Find the intended PID in an interactive PowerShell:
+
+```powershell
+Get-Process -Name Dolphin | Select-Object Id, Path, Responding
+cargo run --release -p multigalaxy -- validate-m4-read-only development.local.toml <DOLPHIN_PID>
+```
+
+The command checks the PID's configured executable and Windows session, the required MEM1 mapping extent, live PAL DOL signatures, the known Gecko handler resource, and the same unique versioned mailbox in two read-only handler samples. It distinguishes the 2,880-byte verified `codehandler.bin` from the 6,144-byte mapped Gecko window; mailbox discovery is bounded to the bytes after the handler. It does not enable Gecko codes, write ACK, connect to the sync server, or prove that ACK writes/feedback work. A missing mailbox means the running profile does not currently expose the M4 payload; stop there. Do not treat a basic game boot as M4 capability evidence. Only after this preflight passes should a separately controlled bridge-on run test ACK behavior.

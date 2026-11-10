@@ -150,7 +150,8 @@ pub fn validate_mailbox_codehandler(executable: &Path) -> Result<(), String> {
         )
     })?;
     let digest = hex(&multigalaxy_patch::sha256(&bytes));
-    if bytes.len() != 2880 || digest != MAILBOX_CODEHANDLER_SHA256 {
+    if bytes.len() != crate::gecko_bridge::CODEHANDLER_BYTES || digest != MAILBOX_CODEHANDLER_SHA256
+    {
         return Err(format!(
             "mailbox bridge is unavailable for this Gecko codehandler (size={}, sha256={digest}); basic Dolphin launch remains available",
             bytes.len()

@@ -11,7 +11,9 @@ Allow players to use older, current, and future official Dolphin builds when the
 - WIT's current version, partition verification, extraction, and file comparison operations are executed. The current WIT executable hash is not compared to manifest provenance.
 - The mandatory AllStars inputs are checked against the exact PAL DOL, and the Dolphin installation must include a non-empty Gecko handler file. Presence is a prerequisite, not proof of runtime activation.
 - GDB is tested only when requested, using a real RSP connection and live game-memory checks.
+- A user-confirmed Dolphin 2609b changed-ISO boot and controllable-Mario test has passed; AllStars activation, scene transitions, and M4 are not part of that evidence.
 - The M4 bridge relies on Dolphin's undocumented Windows named MEM1 mapping. Its static source reference and live mailbox evidence are from Dolphin 2609a. A fixed Gecko handler fingerprint is retained as a bridge-specific capability guard; it is not an emulator release or Dolphin.exe identity requirement. Runtime mapping extent, PID/executable/session, PAL game ID/signatures, mailbox uniqueness, bounds, sequence stability, and limited ACK writes are all checked before use.
+- `validate-m4-read-only` is the non-mutating preflight for a currently running process. It opens only a read-only mapping, validates the handler/mailbox in two samples, and explicitly does not claim ACK feedback or networking compatibility.
 
 ## Functional requirements
 
@@ -54,4 +56,5 @@ The stock MEM1 bridge remains Windows-only because it uses an undocumented named
 - Static/live integration: DolphinTool returns PAL RMGP01 Rev 0; WIT verifies/extracts both images; original image remains unchanged; launch uses isolated user directory and mandatory AllStars.
 - GDB: test only when requested; connection failure is isolated to debug mode.
 - M4: no writes until handler resource, mapping extent, live identity/signatures, and unique mailbox validate; run live verification for each previously untested build before claiming bridge support.
+- M4 2609b: the changed-ISO boot is not bridge evidence. Run `validate-m4-read-only` against the exact running Dolphin PID; only a successful preflight permits a separately controlled ACK/bridge test.
 - No Dolphin launch is performed by unit or ISO validation commands.

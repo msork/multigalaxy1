@@ -6,6 +6,8 @@
 
 pub const HANDLER_BASE: u32 = 0x8000_1800;
 pub const HANDLER_END: u32 = 0x8000_3000;
+/// Verified Dolphin `Sys/codehandler.bin` size used by the Gecko payload layout.
+pub const CODEHANDLER_BYTES: usize = 2880;
 const ALLSTARS_CAVE_START: u32 = 0x8000_2790;
 
 // Stage 1 trampoline dry-run hook points (docs/references/draw-only-hook-contract.md).
@@ -495,8 +497,10 @@ pub fn locate_mailbox(
     if region_base != HANDLER_BASE || bytes.len() != (HANDLER_END - HANDLER_BASE) as usize {
         return Err("memory view does not cover the exact Gecko code-handler region".into());
     }
-    if handler_size % 4 != 0 || handler_size > bytes.len() {
-        return Err("Dolphin codehandler.bin has an invalid size".into());
+    if handler_size != CODEHANDLER_BYTES || handler_size > bytes.len() {
+        return Err(format!(
+            "Dolphin codehandler.bin size is unsupported for this mailbox layout: expected {CODEHANDLER_BYTES}, got {handler_size}"
+        ));
     }
     let (expected, _) = payload()?;
     let marker_index = mailbox_marker_index()?;
@@ -564,6 +568,24 @@ pub fn snapshot_matches_mailbox(
     Ok(locate_mailbox(region_base, handler_size, bytes)? == Some(expected))
 }
 
+/// Validate that two independently sampled, read-only handler snapshots expose
+/// the same unique mailbox. Mutable counter/position words may change between
+/// samples; the PPC routine signature and mailbox location may not.
+pub fn validate_read_only_mailbox_samples(
+    handler_size: usize,
+    first: &[u8],
+    second: &[u8],
+) -> Result<Mailbox, String> {
+    let first = locate_mailbox(HANDLER_BASE, handler_size, first)?
+        .ok_or("validated Gecko mailbox is absent from the live handler region")?;
+    let second = locate_mailbox(HANDLER_BASE, handler_size, second)?
+        .ok_or("Gecko mailbox disappeared from the second live handler sample")?;
+    if first != second {
+        return Err("Gecko mailbox moved between read-only samples".into());
+    }
+    Ok(first)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -597,22 +619,60 @@ mod tests {
     #[test]
     fn locates_unique_versioned_mailbox_and_rejects_signature_or_bounds_changes() {
         let bytes = fixture();
-        let mailbox = locate_mailbox(HANDLER_BASE, 2880, &bytes).unwrap().unwrap();
+        let mailbox = locate_mailbox(HANDLER_BASE, CODEHANDLER_BYTES, &bytes)
+            .unwrap()
+            .unwrap();
         let mailbox_word = mailbox_data_word();
         assert_eq!(
             mailbox.counter_address(),
             HANDLER_BASE + 2880 + 16 + mailbox_word as u32 * 4
         );
         assert!(mailbox.is_inside_handler());
-        assert!(locate_mailbox(HANDLER_BASE + 4, 2880, &bytes).is_err());
-        assert!(locate_mailbox(HANDLER_BASE, 2881, &bytes).is_err());
+        assert!(locate_mailbox(HANDLER_BASE + 4, CODEHANDLER_BYTES, &bytes).is_err());
+        assert!(locate_mailbox(HANDLER_BASE, CODEHANDLER_BYTES + 1, &bytes).is_err());
         assert_eq!(
-            locate_mailbox(HANDLER_BASE, 2880, &vec![0; bytes.len()]).unwrap(),
+            locate_mailbox(HANDLER_BASE, CODEHANDLER_BYTES, &vec![0; bytes.len()]).unwrap(),
             None
         );
         let mut corrupt = bytes;
         corrupt[2880 + 16] ^= 1;
-        assert!(locate_mailbox(HANDLER_BASE, 2880, &corrupt).is_err());
+        assert!(locate_mailbox(HANDLER_BASE, CODEHANDLER_BYTES, &corrupt).is_err());
+    }
+
+    #[test]
+    fn read_only_preflight_requires_same_unique_mailbox_in_both_samples() {
+        let first = fixture();
+        let mut second = first.clone();
+        // Counter and sampled position words are mutable and may advance.
+        second[2880 + 16 + mailbox_data_word() * 4] ^= 1;
+        assert_eq!(
+            validate_read_only_mailbox_samples(CODEHANDLER_BYTES, &first, &second).unwrap(),
+            locate_mailbox(HANDLER_BASE, CODEHANDLER_BYTES, &first)
+                .unwrap()
+                .unwrap()
+        );
+        assert!(validate_read_only_mailbox_samples(
+            CODEHANDLER_BYTES,
+            &first,
+            &vec![0; first.len()]
+        )
+        .unwrap_err()
+        .contains("disappeared"));
+        let mut moved = vec![0; first.len()];
+        let (words, _) = payload().unwrap();
+        let alternate = CODEHANDLER_BYTES + 20;
+        assert!(alternate + words.len() * 4 <= moved.len());
+        for (index, word) in words.iter().enumerate() {
+            moved[alternate + index * 4..alternate + index * 4 + 4]
+                .copy_from_slice(&word.to_be_bytes());
+        }
+        // A valid payload at another location is reported as moved, never
+        // accepted as the original mailbox location.
+        assert!(
+            validate_read_only_mailbox_samples(CODEHANDLER_BYTES, &first, &moved)
+                .unwrap_err()
+                .contains("moved between read-only samples")
+        );
     }
 
     #[test]

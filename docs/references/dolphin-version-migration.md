@@ -25,7 +25,13 @@ A schema-v1 manifest is not signed. A valid-format edit to a provenance-only too
 
 The user confirmed that the disposable changed-byte PAL RMGP01 Rev 0 ISO (`aa5630857139c63f48ad9fa4e1941188ffc3bf367d73cd68dfde9aaefc35f765`) booted normally in Dolphin 2609a: title screen, save load, Mario movement, AllStars Classic Controller operation, animation, rendering, and camera all worked. This is a live changed-image regression report, not trampoline or multiplayer validation.
 
-The local development config currently points to Dolphin 2609b and its isolated profile. The 2609b DolphinTool successfully identified the disposable output as PAL RMGP01 Rev 0. A 2609b game boot has not been performed. The separate 2609a local config/profile remain available for rollback.
+The local development config currently points to Dolphin 2609b and its isolated profile. The 2609b DolphinTool successfully identified the disposable output as PAL RMGP01 Rev 0. Dolphin 2609a configuration/profile remain available for rollback.
+
+## Dolphin 2609b user-confirmed boot evidence
+
+The user subsequently confirmed that `changed-neutral-nop.iso` launched through `dev-launch` on Dolphin 2609b, reached gameplay, and Mario was controllable. This establishes a basic modified-ISO boot and movement regression on 2609b. The observation did not separately validate AllStars, scene transitions, the M4 Gecko mailbox, ACK feedback, networking, or M5 rendering; those remain unverified on 2609b.
+
+M4 revalidation is deliberately separate. The existing bridge-on launcher path opens a writable MEM1 mapping and writes the mailbox ACK, so it is not suitable for a read-only compatibility check. The new `validate-m4-read-only` command checks the live process/session, read-only mapping extent, PAL runtime signatures, exact handler resource, and stable unique mailbox without writing. A source audit also corrected mailbox discovery to use the verified 2,880-byte codehandler length rather than the 6,144-byte mapped Gecko window; synthetic tests cover the mailbox's stable location across changing mailbox data. Its PowerShell invocation is documented in [building](../building.md#read-only-m4-capability-preflight). No 2609b live M4 result has been recorded yet.
 
 ## Commands
 
