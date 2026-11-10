@@ -12,7 +12,7 @@ The launcher has no Dolphin release-number or executable-hash allowlist. Discove
 cargo run -p multigalaxy -- discover-dolphin '<Dolphin installation directory>'
 ```
 
-The command reports a candidate executable and presence-only optional tool files, or fails on missing/ambiguous executables. Presence is not presented as runtime capability validation. Put the executable path in the local config. AllStars remains mandatory; setup verifies the patch data and the launcher requires a non-empty Dolphin Gecko handler file. A GDB request is validated by attempting the configured RSP handshake after launch. The M4 mailbox additionally requires its known codehandler fingerprint, a bounded MEM1 mapping of expected size, live PAL identity/signatures, and a unique mailbox signature; any failure disables/refuses that optional bridge without blocking ordinary launches. Its live layout evidence is from Dolphin 2609a, so compatibility on other builds is unclaimed unless these checks pass and is not yet live-tested. See [Dolphin capability compatibility](references/dolphin-version-migration.md).
+The command reports a candidate executable and presence-only optional tool files, or fails on missing/ambiguous executables. Presence is not presented as runtime capability validation. Put the executable path in the local config. AllStars remains mandatory; setup verifies the patch data and the launcher requires a non-empty Dolphin Gecko handler file. A GDB request is validated by attempting the configured RSP handshake after launch. The M4 mailbox additionally requires its known codehandler fingerprint, a bounded MEM1 mapping of expected size, live PAL identity/signatures, and a unique mailbox signature; any failure disables/refuses that optional bridge without blocking ordinary launches. Dolphin 2609b has passed live preflight and bounded ACK feedback; other builds require their own capability checks and live validation. See [Dolphin capability compatibility](references/dolphin-version-migration.md).
 
 Validate the PAL image read-only with the matching official DolphinTool:
 
@@ -105,7 +105,7 @@ cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-
 
 The probe polls for the game ID for 60 seconds by default. Adjust this with `--bridge-startup-timeout-secs=90`; the supported range is 5–300 seconds. It logs elapsed time, PID, mapped-view bytes, observed ID bytes, and validation state. The bridge command prints changing counters, acknowledgements, validated X/Y/Z, update frequency, and round-trip timing. Type `Q` to stop. See [performance.md](performance.md) for user-reported bridge-on/off measurements and [stock-dolphin-bridge.md](stock-dolphin-bridge.md) for safeguards.
 
-The user has also reported a successful read-only M4 preflight on Dolphin 2609b. This did not test writable ACK feedback. The separate ACK-only command is explicitly opted into and must be run with no other bridge writers attached:
+The user has reported successful read-only preflight and bounded ACK write/echo/rollback on Dolphin 2609b. This does not test networking. The ACK-only command is explicitly opted into and must be run with no other bridge writers attached:
 
 If ACK and echo differ, first run `diagnose-m4-ack`; it samples the three validated mailbox words through a read-only mapping and never writes:
 
@@ -124,34 +124,7 @@ It waits for a live mailbox heartbeat, writes one distinct ACK token, waits at m
 
 ## M4 localhost position relay
 
-M4 adds two-player TCP position relay but no remote actor spawning or gameplay writes. First prepare two profiles, each using the required external AllStars patch:
-
-```powershell
-cargo run -p multigalaxy -- dev-setup development.local.toml 'target\mg1-sync-mario'
-cargo run -p multigalaxy -- dev-setup development.local.toml 'target\mg1-sync-luigi'
-```
-
-Use five PowerShell windows. Start the server:
-
-```powershell
-cargo run -p multigalaxy -- sync-server 127.0.0.1:39845
-```
-
-In two windows, launch separate Dolphins and note their printed PIDs:
-
-```powershell
-cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-sync-mario' 0 --gecko-bridge-probe
-cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-sync-luigi' 0 --gecko-bridge-probe
-```
-
-In two other windows, attach a read-only network client to each matching PID:
-
-```powershell
-cargo run -p multigalaxy -- sync-client development.local.toml <MARIO_DOLPHIN_PID> 127.0.0.1:39845 Mario
-cargo run -p multigalaxy -- sync-client development.local.toml <LUIGI_DOLPHIN_PID> 127.0.0.1:39845 Luigi
-```
-
-The clients validate the Dolphin executable path, PAL inputs, handler fingerprint, live game ID, and mailbox. The server binds only to localhost. Each distinct profile keeps its own configuration. Full interactive two-instance verification has not yet been recorded; synthetic loopback integration tests pass. See [networking.md](networking.md) and [specs/M4-two-player-position-sync.md](../specs/M4-two-player-position-sync.md) for protocol and recovery details.
+M4 adds two-player TCP position relay but no remote actor spawning or gameplay writes. The validated 2609b read-only preflight and one ACK write/echo/rollback passed; no two-client session has been run. Use the exact controlled patched-ISO two-instance procedure in [networking.md](networking.md). It uses two prepared isolated profiles, the same manifest-validated patched ISO, one ACK-writing bridge probe per Dolphin, a loopback server, and read-only network clients. Do not reuse one profile/PID for both player identities.
 
 ### Read-only M4 capability preflight
 
@@ -162,4 +135,4 @@ Get-Process -Name Dolphin | Select-Object Id, Path, Responding
 cargo run --release -p multigalaxy -- validate-m4-read-only development.local.toml <DOLPHIN_PID>
 ```
 
-The command checks the PID's configured executable and Windows session, the required MEM1 mapping extent, live PAL DOL signatures, the known Gecko handler resource, and the same unique versioned mailbox in two read-only handler samples. It distinguishes the 2,880-byte verified `codehandler.bin` from the 6,144-byte mapped Gecko window; mailbox discovery is bounded to the bytes after the handler. It does not enable Gecko codes, write ACK, connect to the sync server, or prove that ACK writes/feedback work. A missing mailbox means the running profile does not currently expose the M4 payload; stop there. Do not treat a basic game boot as M4 capability evidence. Only after this preflight passes should a separately controlled bridge-on run test ACK behavior.
+The command checks the PID's configured executable and Windows session, the required MEM1 mapping extent, live PAL DOL signatures, the known Gecko handler resource, and the same unique versioned mailbox in two read-only handler samples. It distinguishes the 2,880-byte verified `codehandler.bin` from the 6,144-byte mapped Gecko window; mailbox discovery is bounded to the bytes after the handler. It does not enable Gecko codes, write ACK, connect to the sync server, or prove that ACK feedback works. Dolphin 2609b has separate user-confirmed ACK feedback evidence as recorded in [M4 2609b validation](references/m4-2609b-validation.md). A missing mailbox means the running profile does not expose the M4 payload; stop there. Do not treat a basic game boot as M4 capability evidence.

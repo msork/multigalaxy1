@@ -13,8 +13,8 @@ Allow players to use older, current, and future official Dolphin builds when the
 - GDB is tested only when requested, using a real RSP connection and live game-memory checks.
 - A user-confirmed Dolphin 2609b changed-ISO boot and controllable-Mario test has passed; AllStars activation, scene transitions, and M4 are not part of that evidence.
 - The M4 bridge relies on Dolphin's undocumented Windows named MEM1 mapping. Its static source reference and live mailbox evidence are from Dolphin 2609a. A fixed Gecko handler fingerprint is retained as a bridge-specific capability guard; it is not an emulator release or Dolphin.exe identity requirement. Runtime mapping extent, PID/executable/session, PAL game ID/signatures, mailbox uniqueness, bounds, sequence stability, and limited ACK writes are all checked before use.
-- A user-confirmed `validate-m4-read-only` preflight passed on Dolphin 2609b (PID 8024, session 1, PAL RMGP01, read-only mapping, verified handler region, stable mailbox `0x800025A0`). It explicitly does not claim ACK feedback or networking compatibility.
-- `test-m4-ack` is a separately invoked command requiring `--confirm-single-ack-write`. It waits for a live heartbeat and quiescent ACK/echo, performs one bounded ACK test write, and restores only while the same mailbox remains valid and the ACK still contains its token. A Drop guard attempts rollback on ordinary error/unwind; process loss or competing writers can prevent confirmed rollback. It was not executed in this milestone.
+- A user-confirmed `validate-m4-read-only` preflight passed on Dolphin 2609b (PID 8024, session 1, PAL RMGP01, read-only mapping, verified handler region, stable mailbox `0x800025A0`).
+- The user-confirmed `test-m4-ack --confirm-single-ack-write` passed on Dolphin 2609b PID 4712: one bounded ACK write, game echo, one rollback write, and prior ACK restored to `0x4dd6ed41`. No networking started. Two-client synchronization remains unverified.
 
 ## Functional requirements
 

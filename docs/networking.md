@@ -4,7 +4,7 @@ MultiGalaxy1 is online-only. Each participant runs their own official, unmodifie
 
 ## M4 two-player position relay
 
-The implemented M4 prototype has one Rust loopback server and two independent Rust clients. Each client attaches to an explicit Dolphin PID, verifies the configured executable path, PAL RMGP01 identity, Dolphin 2609a Gecko handler fingerprint, unique mailbox signature, and consistent coordinate snapshot. The network client opens the MEM1 view read-only; a separate `dev-launch --gecko-bridge-probe` process owns the existing bounded ACK write. Each participant must use a different isolated Dolphin profile.
+The implemented M4 prototype has one Rust loopback server and two independent Rust clients. Each client attaches to an explicit Dolphin PID, verifies the configured executable path, PAL RMGP01 identity, known Gecko handler capability fingerprint, unique mailbox signature, and consistent coordinate snapshot. The network client opens the MEM1 view read-only; a separate `dev-launch --gecko-bridge-probe` process owns the bounded ACK write for its Dolphin. Each instance needs its own bridge-probe console, process, and isolated profile. Read-only preflight plus one ACK write/echo/rollback are user-confirmed on Dolphin 2609b; the two-client session remains unverified.
 
 The server accepts one Mario ID and one Luigi ID. It authoritatively binds each TCP session to its Hello ID, validates PAL game ID/revision, protocol version, bounded frame shape, timestamp freshness, sequence order, and finite/range-bounded coordinates, then relays approved presence/position snapshots. It does not simulate the game or synchronize progression, health, input, interactions, or actors. The clients print remote identity, XYZ, sequence, receive age, and approximate update rate. No position is written into game memory and no remote actor is spawned.
 
@@ -23,27 +23,46 @@ cargo run -p multigalaxy -- dev-setup development.local.toml 'target\mg1-sync-ma
 cargo run -p multigalaxy -- dev-setup development.local.toml 'target\mg1-sync-luigi'
 ```
 
-Use separate interactive PowerShell windows. Start the local server in the first:
+Use five separate interactive PowerShell windows on the same Windows desktop. The existing `target\mg1-sync-mario` and `target\mg1-sync-luigi` development profiles are distinct and marked prepared. Stop any old bridge probe with `Q`, then close its Dolphin through the GUI before this run; do not reuse one Dolphin PID for both player identities. Start the local server in window 1:
 
 ```powershell
 cargo run -p multigalaxy -- sync-server 127.0.0.1:39845
 ```
 
-In the second and third windows, launch one PAL game per distinct isolated profile with the required bridge and AllStars configuration. Record the PID printed by each launcher:
+Both launchers should select the same validated, manifest-backed patched PAL ISO and source ISO. From the repository root, set the local WIT executable path in each launcher window:
 
 ```powershell
-cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-sync-mario' 0 --gecko-bridge-probe
-cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-sync-luigi' 0 --gecko-bridge-probe
+$Wit = (Resolve-Path (Read-Host 'Full path to installed wit.exe')).Path
+$SourceIso = (Resolve-Path 'target\mg1-disc-pipeline\source.iso').Path
+$PatchedIso = (Resolve-Path 'target\mg1-disc-pipeline\changed-neutral-nop.iso').Path
 ```
 
-In two more PowerShell windows, attach the network clients to the matching PIDs:
+In windows 2 and 3, set those three variables separately in each PowerShell window, then run only the matching launch command. Each launcher validates the rebuilt image and mandatory AllStars inputs, starts a separate Dolphin, and owns the ACK writer only for that instance. Record the printed Dolphin PIDs:
 
 ```powershell
-cargo run -p multigalaxy -- sync-client development.local.toml <MARIO_DOLPHIN_PID> 127.0.0.1:39845 Mario
-cargo run -p multigalaxy -- sync-client development.local.toml <LUIGI_DOLPHIN_PID> 127.0.0.1:39845 Luigi
+cargo run --release -p multigalaxy -- dev-launch development.local.toml 'target\mg1-sync-mario' 0 --gecko-bridge-probe --patched-image $PatchedIso --source-iso $SourceIso --wit $Wit
+cargo run --release -p multigalaxy -- dev-launch development.local.toml 'target\mg1-sync-luigi' 0 --gecko-bridge-probe --patched-image $PatchedIso --source-iso $SourceIso --wit $Wit
 ```
 
-Enter playable scenes in both Dolphins. Each sync-client console should print the other player's positions and update rate. Move/jump each Mario independently, pause one game, transition scenes, and close one client to verify the remote entry expires or disappears. This workflow has not yet been run by the project maintainer. Stop sync clients with Ctrl+C, stop the bridge consoles with `Q`, close both Dolphin windows, then stop the server with Ctrl+C.
+In window 4, set Mario's PID, run its non-mutating preflight, then attach the read-only network client:
+
+```powershell
+$MarioPid = [uint32](Read-Host 'Mario Dolphin PID')
+cargo run --release -p multigalaxy -- validate-m4-read-only development.local.toml $MarioPid
+cargo run --release -p multigalaxy -- sync-client development.local.toml $MarioPid 127.0.0.1:39845 Mario
+```
+
+In window 5, set Luigi's PID, run its non-mutating preflight, then attach the read-only network client:
+
+```powershell
+$LuigiPid = [uint32](Read-Host 'Luigi Dolphin PID')
+cargo run --release -p multigalaxy -- validate-m4-read-only development.local.toml $LuigiPid
+cargo run --release -p multigalaxy -- sync-client development.local.toml $LuigiPid 127.0.0.1:39845 Luigi
+```
+
+Enter the same playable scene in both Dolphins. Each client should report `sync_network=connected` and fresh local positions. Move and jump Mario in the Mario instance for about 10 seconds; the Luigi client should print changing `sync_remote=position player=Mario` coordinates and update rate. Then stop Mario and move/jump Luigi for about 10 seconds; the Mario client should print changing Luigi coordinates. Record both PIDs, scene, position changes, update rates, and Dolphin speed/FPS/VPS. Pause/resume or transition one game and verify stale peer state expires; Ctrl+C one client and confirm the other reports peer removal within the freshness timeout. This is a manual regression plan, not a claim that live two-instance synchronization has passed.
+
+Cleanup order: Ctrl+C both sync-client consoles; type `Q` in each bridge-probe console (this stops/unmaps its ACK writer but leaves that Dolphin running); close each Dolphin using its GUI; then Ctrl+C the localhost server. Confirm both Dolphin processes have exited. Do not terminate the wrong process or share either isolated profile.
 
 The isolated profiles are separate, but both test users may import the same user-owned save as input. Nothing here copies a profile into the other or alters the regular Dolphin profile or original RVZ.
 

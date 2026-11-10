@@ -2,7 +2,7 @@
 
 ## Decision and current evidence
 
-MultiGalaxy1 uses official, unmodified Dolphin only. No Dolphin fork or custom Dolphin binary is built or distributed. The mailbox is a small PAL Gecko PPC routine plus a Rust host reader for Dolphin's Windows named memory mapping. This is an **experimental, undocumented Dolphin implementation detail**, not a supported Dolphin API. The general launcher has no release or executable-hash lock. Mailbox use requires the known handler capability, live mapping extent, `RMGP01` identity, exact PPC signature, address bounds, and AllStars overlap checks. Static source and live mailbox evidence are from 2609a; other builds are not claimed compatible and must fail closed when a capability check differs.
+MultiGalaxy1 uses official, unmodified Dolphin only. No Dolphin fork or custom Dolphin binary is built or distributed. The mailbox is a small PAL Gecko PPC routine plus a Rust host reader for Dolphin's Windows named memory mapping. This is an **experimental, undocumented Dolphin implementation detail**, not a supported Dolphin API. The general launcher has no release or executable-hash lock. Mailbox use requires the known handler capability, live mapping extent, `RMGP01` identity, exact PPC signature, address bounds, and AllStars overlap checks. Static source investigation was against 2609a. Dolphin 2609b has user-confirmed read-only preflight and one bounded ACK write/echo/rollback; other builds remain unverified unless their capability checks and live tests pass.
 
 Implemented locally:
 

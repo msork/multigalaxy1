@@ -22,6 +22,16 @@ network=not_started
 
 This verifies the running process identity/session, compatible MEM1 mapping extent, live PAL signatures, expected Gecko handler resource, and unique stable mailbox. It does **not** verify writable mapping access, ACK echo, two-client relay, AllStars activation, or M5 rendering.
 
+## Writable ACK feedback passed
+
+The user subsequently confirmed that the explicit ACK-only test passed on Dolphin 2609b, PID 4712, with the same PAL mailbox. It performed one test write, received the game-side echo, performed one rollback write, and restored the prior ACK:
+
+```text
+m4_ack_test=passed pid=4712 mailbox=0x800025a0 test_write=1 rollback_write=1 ack_restored=0x4dd6ed41 network=not_started
+```
+
+This is verified writable mailbox feedback and rollback for this process/build. It does not validate the two-client relay, AllStars runtime behavior, progression, or multiplayer.
+
 ## Controlled ACK-only experiment
 
 `test-m4-ack` is separate and is never run by `dev-launch` or the read-only preflight. It requires the explicit `--confirm-single-ack-write` flag and an already-running Dolphin instance with the mailbox code active. Stop the `dev-launch --gecko-bridge-probe` host writer and any other process that writes this mailbox before running it. The Rust `sync-client` opens the mapping read-only and is not itself an ACK writer.

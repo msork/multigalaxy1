@@ -2,19 +2,19 @@
 
 ## Objective
 
-Exchange fresh PAL Mario position snapshots between two independent Rust clients, each attached read-only to its own official Dolphin 2609a process. Use a localhost TCP server as the authoritative admission, freshness, sequence, and presence relay. This milestone does not create remote in-game actors.
+Exchange fresh PAL Mario position snapshots between two independent Rust clients, each attached read-only to its own official Dolphin process when the feature-specific mapping and mailbox checks pass. Use a localhost TCP server as the authoritative admission, freshness, sequence, and presence relay. Dolphin 2609b has passed live preflight and one ACK write/echo/rollback; two-instance movement relay remains unverified. This milestone does not create remote in-game actors.
 
 ## Verified research and starting evidence
 
 - The stock-Dolphin Gecko mailbox provides a validated counter/ACK and versioned PAL position snapshot. The user reports live Mario X/Y/Z updates near 60 Hz. Its pointer path is statically bound to the RMGP01 Rev 0 DOL and Petari symbols.
-- The named Windows MEM1 map is an undocumented Dolphin 2609a detail. This milestone remains Windows/2609a-specific; it does not claim a stable Dolphin API.
+- The named Windows MEM1 map is an undocumented Dolphin implementation detail, not a stable API. Static source review was against 2609a; runtime mapping, PAL identity, handler, and mailbox checks are required on every process. Dolphin 2609b has passed these checks and one controlled ACK write/echo/rollback.
 - The previously validated AllStars patch and per-instance isolated profiles remain required. Each participant owns a separate Dolphin process and profile.
 - Counter/ACK bridge performance was user-reported at 100% and 59.94 FPS/VPS both off and on; the expanded position publisher/network path has not been benchmarked.
 
 ## Functional requirements
 
 1. Two independent local clients identify as Mario or Luigi and bind to separate Dolphin PIDs.
-2. Each client validates live RMGP01 identity, the exact 2609a Gecko handler fingerprint, unique mailbox signature/version, seqlock, freshness counter, actor range, and finite coordinates before sending a position.
+2. Each client validates live RMGP01 identity, the known Gecko handler capability fingerprint, unique mailbox signature/version, seqlock, freshness counter, actor range, and finite coordinates before sending a position.
 3. The TCP server admits at most one client per player ID and two total clients. It validates protocol version, bounded frame length, identity/revision, timestamps, finite/range-bounded position, and strictly increasing per-session sequence numbers.
 4. The server relays snapshots as server-approved peer state and sends explicit peer-presence removal on disconnect or stale data. No progression, event, health, input, or actor state is exchanged.
 5. Clients reject malformed, stale, future, duplicate, or out-of-order peer snapshots, expire remote state after a bounded timeout, and print remote ID, XYZ, age, and approximate update rate.
@@ -29,7 +29,7 @@ The server validates and relays snapshots but does not simulate gameplay. Per-co
 
 ## Dependencies
 
-No new external crates. Standard-library TCP, threads, channels, mutexes, monotonic timers, and existing `StockMem1`/Gecko validation are sufficient. Client attachment is presently supported only for Windows stock Dolphin 2609a and PAL RMGP01 Rev 0.
+No new external crates. Standard-library TCP, threads, channels, mutexes, monotonic timers, and existing `StockMem1`/Gecko validation are sufficient. Client attachment uses a Windows stock Dolphin named-memory mapping and PAL RMGP01 Rev 0; 2609b has read-only and ACK feedback evidence, but the live network relay remains to be tested.
 
 ## Risks and failure handling
 

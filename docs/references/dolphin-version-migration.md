@@ -12,7 +12,7 @@ AllStars is mandatory. Before launcher setup, the external PAL patch inputs are 
 
 - **GDB:** no release lock. When requested, the launched process must accept the GDB RSP connection and pass the requested live identity/read checks. Unsupported GDB only prevents that debug request.
 - **Read-only MEM1 inspection:** no release lock or handler fingerprint. It verifies the target PID's executable path/session, opens only the named Windows mapping, validates the MEM1 span, reads live `RMGP01` and PAL runtime signatures, and uses bounded, explicit read ranges. The mapping is an undocumented implementation detail, not a supported Dolphin API.
-- **M4 Gecko mailbox:** separate fail-closed capability. It requires the known 2880-byte Gecko codehandler fingerprint plus the runtime-validated MEM1 mapping, expected PAL identity/signatures, a unique in-bounds mailbox, stable sequence snapshots, and bounded ACK writes. No Dolphin version is accepted merely because its name or version string matches. The live bridge result is user-observed on 2609a; other builds remain unverified and can use M4 only if every capability check succeeds. A changed/unknown handler or mapping blocks M4 without blocking ordinary gameplay.
+- **M4 Gecko mailbox:** separate fail-closed capability. It requires the known 2880-byte Gecko codehandler fingerprint plus the runtime-validated MEM1 mapping, expected PAL identity/signatures, a unique in-bounds mailbox, stable sequence snapshots, and bounded ACK writes. No Dolphin version is accepted merely because its name or version string matches. Live bridge behavior is user-observed on 2609a; read-only preflight and one bounded ACK write/echo/rollback passed on 2609b. Other builds remain unverified unless every capability check and live test passes. A changed/unknown handler or mapping blocks M4 without blocking ordinary gameplay.
 - **Wii image validation/rebuild:** current DolphinTool must successfully report PAL RMGP01 revision 0 and pass the actual header operations. Current WIT must successfully pass its version command, partition verification, extraction, and comparison operations. No historical tool version or binary hash is required.
 
 ## Historical DolphinTool/WIT manifest hashes
@@ -31,7 +31,7 @@ The local development config currently points to Dolphin 2609b and its isolated 
 
 The user subsequently confirmed that `changed-neutral-nop.iso` launched through `dev-launch` on Dolphin 2609b, reached gameplay, and Mario was controllable. This establishes a basic modified-ISO boot and movement regression on 2609b. The observation did not separately validate AllStars, scene transitions, the M4 Gecko mailbox, ACK feedback, networking, or M5 rendering; those remain unverified on 2609b.
 
-M4 read-only compatibility has since passed on Dolphin 2609b as recorded in [M4 2609b validation](m4-2609b-validation.md). The read-only preflight does not validate ACK feedback or networking. The explicit ACK-only test command is documented there; it was not run in this milestone.
+M4 read-only compatibility and one bounded ACK write/echo/rollback have since passed on Dolphin 2609b as recorded in [M4 2609b validation](m4-2609b-validation.md). Two-client networking remains unverified.
 
 ## Commands
 
