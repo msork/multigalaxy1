@@ -238,6 +238,203 @@ fn run_validate_m4_read_only(config_path: &std::path::Path, pid: u32) -> Result<
     Ok(())
 }
 
+#[cfg(windows)]
+fn verify_live_m4_mailbox(
+    memory: &mut stock_memory::StockMem1,
+    dol: &[u8],
+    pid: u32,
+) -> Result<gecko_bridge::Mailbox, String> {
+    let game_id = memory.read_guest(0x8000_0000, 6)?;
+    if game_id != b"RMGP01" {
+        return Err(format!(
+            "Dolphin PID {pid} is not running PAL RMGP01: {}",
+            bridge_identity::describe_game_id(game_id.try_into().unwrap_or([0; 6]))
+        ));
+    }
+    player_probe::verify_live_pal_signatures(memory, dol)?;
+    let region_bytes = (gecko_bridge::HANDLER_END - gecko_bridge::HANDLER_BASE) as usize;
+    let first = memory.read_guest(gecko_bridge::HANDLER_BASE, region_bytes)?;
+    std::thread::sleep(Duration::from_millis(100));
+    let second = memory.read_guest(gecko_bridge::HANDLER_BASE, region_bytes)?;
+    let mailbox = gecko_bridge::validate_read_only_mailbox_samples(
+        gecko_bridge::CODEHANDLER_BYTES,
+        &first,
+        &second,
+    )?;
+    player_probe::verify_live_pal_signatures(memory, dol)?;
+    if memory.read_guest(0x8000_0000, 6)? != b"RMGP01" {
+        return Err("PAL identity changed during mailbox validation".into());
+    }
+    Ok(mailbox)
+}
+
+#[cfg(windows)]
+struct AckRollbackGuard {
+    memory: stock_memory::StockMem1,
+    dol: Vec<u8>,
+    pid: u32,
+    mailbox: gecko_bridge::Mailbox,
+    previous_ack: u32,
+    test_value: u32,
+    armed: bool,
+}
+
+#[cfg(windows)]
+impl AckRollbackGuard {
+    fn restore(&mut self) -> Result<(), String> {
+        if !self.armed {
+            return Ok(());
+        }
+        let live_mailbox = match verify_live_m4_mailbox(&mut self.memory, &self.dol, self.pid) {
+            Ok(mailbox) => mailbox,
+            Err(error) => {
+                self.armed = false;
+                return Err(format!(
+                    "mailbox revalidation failed; refusing rollback write: {error}"
+                ));
+            }
+        };
+        let current_ack = self
+            .memory
+            .read_guest_word(self.mailbox.acknowledgement_address())?;
+        if live_mailbox != self.mailbox
+            || !gecko_bridge::may_restore_probe_ack(current_ack, self.test_value, true)
+        {
+            self.armed = false;
+            return Err("ACK no longer contains this test's token or mailbox identity changed; refusing to overwrite another writer".into());
+        }
+        self.memory.acknowledge(self.mailbox, self.previous_ack)?;
+        self.armed = false;
+        Ok(())
+    }
+}
+
+#[cfg(windows)]
+impl Drop for AckRollbackGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            if let Err(error) = self.restore() {
+                eprintln!("m4_ack_test=rollback_failed reason={error}; probe ACK may remain in mapped memory");
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+fn run_test_m4_ack(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
+    // The separate command and required CLI confirmation flag make this the
+    // only path that opts into a bounded mailbox ACK write.
+    run_validate_m4_read_only(config_path, pid)?;
+    let config_text = fs::read_to_string(config_path)
+        .map_err(|error| format!("cannot read development config: {error}"))?;
+    let config = dev_config::parse(&config_text)?;
+    validate_dev_inputs(&config)?;
+    validate_mailbox_capability(&config)?;
+    let dol =
+        fs::read(&config.pal_dol).map_err(|error| format!("cannot read PAL main.dol: {error}"))?;
+    let symbols = fs::read(&config.pal_symbols)
+        .map_err(|error| format!("cannot read PAL symbols: {error}"))?;
+    player_probe::verify_pal_inputs(&dol, &symbols)?;
+
+    let dolphin = config
+        .dolphin
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve configured Dolphin executable: {error}"))?;
+    let image = startup::process_image_path(pid)?
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve Dolphin PID {pid} executable: {error}"))?;
+    if !image
+        .to_string_lossy()
+        .eq_ignore_ascii_case(&dolphin.to_string_lossy())
+    {
+        return Err("Dolphin process identity changed since the read-only preflight".into());
+    }
+    let current_session = startup::desktop_context()
+        .ok_or("cannot determine current Windows session")?
+        .session_id;
+    if startup::process_session_id(pid) != Some(current_session) {
+        return Err("Dolphin process session changed since the read-only preflight".into());
+    }
+
+    // Writable mapping is opened only after explicit command-line opt-in and
+    // a fresh read-only preflight. The address comes from the validated mailbox.
+    let mut memory = stock_memory::StockMem1::open_dolphin(pid).map_err(|error| {
+        format!("cannot open Dolphin PID {pid} MEM1 for the explicit ACK test: {error:?}")
+    })?;
+    let mailbox = verify_live_m4_mailbox(&mut memory, &dol, pid)?;
+    let initial_counter = memory.read_guest_word(mailbox.counter_address())?;
+    let heartbeat_deadline = Instant::now() + Duration::from_secs(3);
+    let mut heartbeat = false;
+    while Instant::now() < heartbeat_deadline {
+        std::thread::sleep(Duration::from_millis(50));
+        let current = memory.read_guest_word(mailbox.counter_address())?;
+        if current != initial_counter {
+            heartbeat = true;
+            break;
+        }
+    }
+    if !heartbeat {
+        return Err("M4 payload mailbox is present but its frame counter did not advance; no ACK write was attempted".into());
+    }
+    let mailbox_rechecked = verify_live_m4_mailbox(&mut memory, &dol, pid)?;
+    if mailbox_rechecked != mailbox {
+        return Err("M4 mailbox identity changed before ACK; no write attempted".into());
+    }
+    let previous_ack = memory.read_guest_word(mailbox.acknowledgement_address())?;
+    let previous_echo = memory.read_guest_word(mailbox.echo_address())?;
+    if previous_ack != previous_echo {
+        return Err(format!("M4 ACK is not quiescent before test (ack=0x{previous_ack:08x}, echo=0x{previous_echo:08x}); stop other bridge clients and retry; no write attempted"));
+    }
+    if verify_live_m4_mailbox(&mut memory, &dol, pid)? != mailbox
+        || memory.read_guest_word(mailbox.acknowledgement_address())? != previous_ack
+        || memory.read_guest_word(mailbox.echo_address())? != previous_echo
+    {
+        return Err(
+            "M4 mailbox or ACK changed during final pre-write check; no write attempted".into(),
+        );
+    }
+
+    let test_value = gecko_bridge::ack_probe_value(previous_ack);
+    // Exactly one test write. All exits after this point pass through rollback.
+    memory.acknowledge(mailbox, test_value)?;
+    let mut rollback = AckRollbackGuard {
+        memory,
+        dol,
+        pid,
+        mailbox,
+        previous_ack,
+        test_value,
+        armed: true,
+    };
+    let test_result: Result<(), String> = (|| {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+            let live_mailbox = verify_live_m4_mailbox(&mut rollback.memory, &rollback.dol, pid)?;
+            if live_mailbox != mailbox {
+                return Err("mailbox identity changed while waiting for ACK echo".into());
+            }
+            if rollback.memory.read_guest_word(mailbox.echo_address())? == test_value {
+                return Ok(());
+            }
+        }
+        Err("timed out after 3 seconds waiting for game-side ACK echo".into())
+    })();
+
+    let restore_result = rollback.restore();
+    if let Err(restore_error) = restore_result {
+        return Err(format!("ACK test result={test_result:?}; rollback failed safely: {restore_error}; Dolphin memory may still contain the probe ACK 0x{test_value:08x}"));
+    }
+    test_result?;
+    println!("m4_ack_test=passed pid={pid} mailbox=0x{:08x} test_write=1 rollback_write=1 ack_restored=0x{previous_ack:08x} network=not_started", mailbox.snapshot_address());
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn run_test_m4_ack(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
+    Err("test-m4-ack requires the Windows stock-Dolphin MEM1 mapping".into())
+}
+
 #[cfg(not(windows))]
 fn run_validate_m4_read_only(_config_path: &std::path::Path, _pid: u32) -> Result<(), String> {
     Err("validate-m4-read-only requires the Windows stock-Dolphin MEM1 mapping".into())
@@ -832,6 +1029,43 @@ fn run_validate_rebuilt_iso(
     Ok(())
 }
 
+fn run_validate_rebuilt_iso_cached(
+    dolphintool: &std::path::Path,
+    wit: &std::path::Path,
+    source: &std::path::Path,
+    output: &std::path::Path,
+    dol_path: &std::path::Path,
+    allstars_dir: &std::path::Path,
+    force_revalidate: bool,
+) -> Result<(), String> {
+    let dol = fs::read(dol_path).map_err(|e| format!("cannot read pinned PAL main.dol: {e}"))?;
+    let allstars = controller_patch::prepare_allstars(allstars_dir, &dol)?;
+    let writes = parse_onframe_patch(&allstars.settings)
+        .map_err(|e| format!("cannot parse required AllStars writes: {e}"))?;
+    let outcome = disc_rebuild::validate_rebuilt_iso_for_launch_cached(
+        dolphintool,
+        wit,
+        source,
+        output,
+        &dol,
+        &writes,
+        allstars.settings.as_bytes(),
+        force_revalidate,
+    )?;
+    let manifest = outcome.manifest;
+    println!(
+        "rebuilt_iso=valid mode={} elapsed_ms={} patch_id={} source_image_sha256={} source_dol_sha256={} target_dol_sha256={} output_image_sha256={}",
+        if outcome.cache_hit { "cache" } else { "full" },
+        outcome.elapsed.as_millis(),
+        manifest.patch_id,
+        manifest.source_image_sha256,
+        manifest.source_dol_sha256,
+        manifest.target_dol_sha256,
+        manifest.output_image_sha256,
+    );
+    Ok(())
+}
+
 fn run_discover_dolphin(install_path: &std::path::Path) -> Result<(), String> {
     let executable = dolphin_capabilities::discover_executable(install_path)?;
     let capabilities = dolphin_capabilities::inspect_installation(&executable)?;
@@ -1192,6 +1426,16 @@ fn validate_rebuilt_iso_options(
         ),
         (None, _, _) => Err("--source-iso and --wit are only valid with --patched-image".into()),
     }
+}
+
+fn validate_force_revalidate_option(
+    force_revalidate: bool,
+    patched_image: Option<&str>,
+) -> Result<(), String> {
+    if force_revalidate && patched_image.is_none() {
+        return Err("--force-revalidate is only valid with --patched-image".into());
+    }
+    Ok(())
 }
 
 fn validate_mailbox_capability(config: &dev_config::DevelopmentConfig) -> Result<(), String> {
@@ -2482,6 +2726,20 @@ fn run_sync_client(
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    if args.len() == 4 && args[0] == "test-m4-ack" {
+        if args[3].to_str() != Some("--confirm-single-ack-write") {
+            return Err("test-m4-ack requires the explicit --confirm-single-ack-write flag".into());
+        }
+        let pid = args[2]
+            .to_str()
+            .ok_or("Dolphin PID must be valid UTF-8")?
+            .parse::<u32>()
+            .map_err(|_| "Dolphin PID must be a positive integer")?;
+        if pid == 0 {
+            return Err("Dolphin PID must be positive".into());
+        }
+        return run_test_m4_ack(std::path::Path::new(&args[1]), pid);
+    }
     if args.len() == 3 && args[0] == "validate-m4-read-only" {
         let pid = args[2]
             .to_str()
@@ -2600,6 +2858,23 @@ fn run() -> Result<(), String> {
             std::path::Path::new(&args[4]),
             std::path::Path::new(&args[5]),
             std::path::Path::new(&args[6]),
+        );
+    }
+    if (args.len() == 7 || args.len() == 8) && args[0] == "validate-rebuilt-iso-cached" {
+        let force_revalidate = args.len() == 8;
+        if force_revalidate && args[7].to_str() != Some("--force-revalidate") {
+            return Err(
+                "only --force-revalidate is accepted after cached ISO validation arguments".into(),
+            );
+        }
+        return run_validate_rebuilt_iso_cached(
+            std::path::Path::new(&args[1]),
+            std::path::Path::new(&args[2]),
+            std::path::Path::new(&args[3]),
+            std::path::Path::new(&args[4]),
+            std::path::Path::new(&args[5]),
+            std::path::Path::new(&args[6]),
+            force_revalidate,
         );
     }
     if args.len() == 2 && args[0] == "discover-dolphin" {
@@ -2848,6 +3123,7 @@ fn run() -> Result<(), String> {
         let mut patched_image: Option<String> = None;
         let mut source_iso: Option<String> = None;
         let mut wit_executable: Option<String> = None;
+        let mut force_revalidate = false;
         let mut bridge_startup_timeout = Duration::from_secs(60);
         let mut custom_bridge_timeout = false;
         let mut option_index = 4usize;
@@ -2870,6 +3146,7 @@ fn run() -> Result<(), String> {
                 "--unmute" if mute => mute = false,
                 "--gecko-bridge-probe" if !gecko_bridge_probe => gecko_bridge_probe = true,
                 "--trampoline-dry-run" if !trampoline_dry_run => trampoline_dry_run = true,
+                "--force-revalidate" if !force_revalidate => force_revalidate = true,
                 "--patched-image" => {
                     let Some(value) = args.get(option_index + 1) else {
                         return Err("--patched-image requires a path".into());
@@ -2902,7 +3179,7 @@ fn run() -> Result<(), String> {
                 }
                 _ => {
                     return Err(
-                        "dev-launch options: [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <output.iso> --source-iso <source.iso> --wit <wit.exe>] [--bridge-startup-timeout-secs=5..300]".into(),
+                        "dev-launch options: [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <output.iso> --source-iso <source.iso> --wit <wit.exe> [--force-revalidate]] [--bridge-startup-timeout-secs=5..300]".into(),
                     )
                 }
             }
@@ -2913,6 +3190,7 @@ fn run() -> Result<(), String> {
             source_iso.as_deref(),
             wit_executable.as_deref(),
         )?;
+        validate_force_revalidate_option(force_revalidate, patched_image.as_deref())?;
         if gecko_bridge_probe && (debug || gdb_unattached) {
             return Err("--gecko-bridge-probe uses stock Dolphin's named MEM1 mapping and must run without --debug or --debug-unattached".into());
         }
@@ -2995,21 +3273,26 @@ fn run() -> Result<(), String> {
                 });
             let allstars_writes = parse_onframe_patch(&patch.settings)
                 .map_err(|e| format!("invalid prepared AllStars patch: {e}"))?;
-            let manifest = disc_rebuild::validate_rebuilt_iso_for_launch(
+            let outcome = disc_rebuild::validate_rebuilt_iso_for_launch_cached(
                 &dolphin_tool,
                 std::path::Path::new(wit),
                 std::path::Path::new(source),
                 std::path::Path::new(patched),
                 &dol,
                 &allstars_writes,
+                patch.settings.as_bytes(),
+                force_revalidate,
             )?;
+            let manifest = outcome.manifest;
             println!(
-                "WIT-rebuilt image validated: patch_id={} source_image_sha256={} source_dol_sha256={} target_dol_sha256={} output_image_sha256={}",
+                "WIT-rebuilt image validated: mode={} patch_id={} source_image_sha256={} source_dol_sha256={} target_dol_sha256={} output_image_sha256={} elapsed_ms={}",
+                if outcome.cache_hit { "cache" } else { "full" },
                 manifest.patch_id,
                 manifest.source_image_sha256,
                 manifest.source_dol_sha256,
                 manifest.target_dol_sha256,
-                manifest.output_image_sha256
+                manifest.output_image_sha256,
+                outcome.elapsed.as_millis()
             );
             std::path::PathBuf::from(patched)
         } else {
@@ -3572,7 +3855,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy discover-dolphin <install-directory-or-Dolphin.exe> | multigalaxy validate-m4-read-only <development.local.toml> <Dolphin-pid> | multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy patch-image <development.local.toml> <source-image> <output-image> [legacy plaintext-only experiment] | multigalaxy rebuild-iso <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> | multigalaxy rebuild-iso-dol <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> <target-main.dol> <target-sha256> <AllStars-patch-folder> | multigalaxy validate-rebuilt-iso <DolphinTool.exe> <wit.exe> <source.iso> <rebuilt.iso> <PAL-main.dol> <AllStars-patch-folder> | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <output.iso> --source-iso <source.iso> --wit <wit.exe>] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy discover-dolphin <install-directory-or-Dolphin.exe> | multigalaxy validate-m4-read-only <development.local.toml> <Dolphin-pid> | multigalaxy test-m4-ack <development.local.toml> <Dolphin-pid> --confirm-single-ack-write | multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy patch-image <development.local.toml> <source-image> <output-image> [legacy plaintext-only experiment] | multigalaxy rebuild-iso <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> | multigalaxy rebuild-iso-dol <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> <target-main.dol> <target-sha256> <AllStars-patch-folder> | multigalaxy validate-rebuilt-iso <DolphinTool.exe> <wit.exe> <source.iso> <rebuilt.iso> <PAL-main.dol> <AllStars-patch-folder> | multigalaxy validate-rebuilt-iso-cached <DolphinTool.exe> <wit.exe> <source.iso> <rebuilt.iso> <PAL-main.dol> <AllStars-patch-folder> [--force-revalidate] | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <output.iso> --source-iso <source.iso> --wit <wit.exe> [--force-revalidate]] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
@@ -3699,6 +3982,11 @@ mod tests {
                 .contains("--source-iso")
         );
         assert!(validate_rebuilt_iso_options(None, Some("src.iso"), Some("wit.exe")).is_err());
+        assert!(validate_force_revalidate_option(false, None).is_ok());
+        assert!(validate_force_revalidate_option(true, Some("out.iso")).is_ok());
+        assert!(validate_force_revalidate_option(true, None)
+            .unwrap_err()
+            .contains("only valid with --patched-image"));
 
         let isolated = dolphin_config(None, false, true, true);
         assert!(isolated.contains("EnableCheats = True"));

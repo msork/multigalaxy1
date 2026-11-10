@@ -31,7 +31,7 @@ The local development config currently points to Dolphin 2609b and its isolated 
 
 The user subsequently confirmed that `changed-neutral-nop.iso` launched through `dev-launch` on Dolphin 2609b, reached gameplay, and Mario was controllable. This establishes a basic modified-ISO boot and movement regression on 2609b. The observation did not separately validate AllStars, scene transitions, the M4 Gecko mailbox, ACK feedback, networking, or M5 rendering; those remain unverified on 2609b.
 
-M4 revalidation is deliberately separate. The existing bridge-on launcher path opens a writable MEM1 mapping and writes the mailbox ACK, so it is not suitable for a read-only compatibility check. The new `validate-m4-read-only` command checks the live process/session, read-only mapping extent, PAL runtime signatures, exact handler resource, and stable unique mailbox without writing. A source audit also corrected mailbox discovery to use the verified 2,880-byte codehandler length rather than the 6,144-byte mapped Gecko window; synthetic tests cover the mailbox's stable location across changing mailbox data. Its PowerShell invocation is documented in [building](../building.md#read-only-m4-capability-preflight). No 2609b live M4 result has been recorded yet.
+M4 read-only compatibility has since passed on Dolphin 2609b as recorded in [M4 2609b validation](m4-2609b-validation.md). The read-only preflight does not validate ACK feedback or networking. The explicit ACK-only test command is documented there; it was not run in this milestone.
 
 ## Commands
 

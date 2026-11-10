@@ -404,6 +404,14 @@ pub struct Mailbox {
     base: u32,
 }
 
+pub(crate) fn ack_probe_value(previous: u32) -> u32 {
+    previous.wrapping_add(0x1357_9bdf)
+}
+
+pub(crate) fn may_restore_probe_ack(current: u32, probe_value: u32, mailbox_stable: bool) -> bool {
+    mailbox_stable && current == probe_value
+}
+
 impl Mailbox {
     pub fn counter_address(self) -> u32 {
         self.base
@@ -673,6 +681,16 @@ mod tests {
                 .unwrap_err()
                 .contains("moved between read-only samples")
         );
+    }
+
+    #[test]
+    fn ack_probe_uses_a_distinct_value_and_restores_only_its_own_write() {
+        let previous = 0x1020_3040;
+        let probe = ack_probe_value(previous);
+        assert_ne!(probe, previous);
+        assert!(may_restore_probe_ack(probe, probe, true));
+        assert!(!may_restore_probe_ack(previous, probe, true));
+        assert!(!may_restore_probe_ack(probe, probe, false));
     }
 
     #[test]

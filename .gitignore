@@ -9,6 +9,8 @@ dist/
 *.elf
 *.dol
 *.iso
+*.mg1validation-cache
+.mg1validation-*.tmp
 *.wbfs
 *.gcm
 *.map

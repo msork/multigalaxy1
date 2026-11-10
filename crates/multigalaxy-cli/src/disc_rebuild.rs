@@ -12,6 +12,174 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const TOOL_TIMEOUT: Duration = Duration::from_secs(300);
 const DOL_RELATIVE: &str = "sys/main.dol";
+const VALIDATION_CACHE_SCHEMA: u32 = 1;
+/// Bump this whenever the security or interpretation of rebuilt ISO evidence changes.
+pub const VALIDATION_POLICY_ID: &str = "mg1-wit-rebuilt-iso-validation-v1";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ValidationCacheStamp {
+    policy_id: String,
+    game_id: String,
+    revision: u16,
+    source_image_sha256: String,
+    output_image_sha256: String,
+    source_dol_sha256: String,
+    target_dol_sha256: String,
+    delta_sha256: String,
+    manifest_sha256: String,
+    allstars_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ValidationCacheRecord {
+    stamp: ValidationCacheStamp,
+    record_sha256: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct CachedValidationOutcome {
+    pub manifest: RebuildManifest,
+    pub cache_hit: bool,
+    pub elapsed: Duration,
+}
+
+impl ValidationCacheRecord {
+    fn new(stamp: ValidationCacheStamp) -> Self {
+        let body = stamp.to_text();
+        Self {
+            stamp,
+            record_sha256: hex(&sha256(body.as_bytes())),
+        }
+    }
+
+    fn to_text(&self) -> String {
+        format!(
+            "{}record_sha256={}\n",
+            self.stamp.to_text(),
+            self.record_sha256
+        )
+    }
+
+    fn parse_text(text: &str) -> Result<Self, String> {
+        const FIELDS: [&str; 12] = [
+            "cache_schema",
+            "policy_id",
+            "game_id",
+            "revision",
+            "source_image_sha256",
+            "output_image_sha256",
+            "source_dol_sha256",
+            "target_dol_sha256",
+            "delta_sha256",
+            "manifest_sha256",
+            "allstars_sha256",
+            "record_sha256",
+        ];
+        if text.len() > 4096 {
+            return Err("validation cache exceeds its size bound".into());
+        }
+        let mut values = std::collections::BTreeMap::new();
+        for (line_number, line) in text.lines().enumerate() {
+            let (key, value) = line
+                .split_once('=')
+                .ok_or_else(|| format!("validation cache line {} is malformed", line_number + 1))?;
+            if !FIELDS.contains(&key) {
+                return Err(format!("validation cache has unknown field {key:?}"));
+            }
+            if values.insert(key, value).is_some() {
+                return Err(format!("validation cache repeats field {key:?}"));
+            }
+        }
+        if values.len() != FIELDS.len() {
+            let missing = FIELDS
+                .iter()
+                .find(|field| !values.contains_key(**field))
+                .copied()
+                .unwrap_or("unknown");
+            return Err(format!("validation cache is missing field {missing:?}"));
+        }
+        let take = |key: &'static str| values.get(key).copied().unwrap_or_default();
+        let schema = take("cache_schema")
+            .parse::<u32>()
+            .map_err(|_| "validation cache schema is malformed")?;
+        if schema != VALIDATION_CACHE_SCHEMA {
+            return Err(format!("unsupported validation cache schema {schema}"));
+        }
+        let revision = take("revision")
+            .parse::<u16>()
+            .map_err(|_| "validation cache revision is malformed")?;
+        let stamp = ValidationCacheStamp {
+            policy_id: take("policy_id").to_owned(),
+            game_id: take("game_id").to_owned(),
+            revision,
+            source_image_sha256: take("source_image_sha256").to_owned(),
+            output_image_sha256: take("output_image_sha256").to_owned(),
+            source_dol_sha256: take("source_dol_sha256").to_owned(),
+            target_dol_sha256: take("target_dol_sha256").to_owned(),
+            delta_sha256: take("delta_sha256").to_owned(),
+            manifest_sha256: take("manifest_sha256").to_owned(),
+            allstars_sha256: take("allstars_sha256").to_owned(),
+        };
+        validate_cache_stamp(&stamp)?;
+        let record = Self {
+            stamp,
+            record_sha256: take("record_sha256").to_owned(),
+        };
+        parse_sha256(&record.record_sha256)
+            .map_err(|_| "validation cache record digest is malformed")?;
+        if hex(&sha256(record.stamp.to_text().as_bytes())) != record.record_sha256 {
+            return Err("validation cache record digest does not match its contents".into());
+        }
+        Ok(record)
+    }
+}
+
+impl ValidationCacheStamp {
+    fn to_text(&self) -> String {
+        format!(
+            "cache_schema={VALIDATION_CACHE_SCHEMA}\npolicy_id={}\ngame_id={}\nrevision={}\nsource_image_sha256={}\noutput_image_sha256={}\nsource_dol_sha256={}\ntarget_dol_sha256={}\ndelta_sha256={}\nmanifest_sha256={}\nallstars_sha256={}\n",
+            self.policy_id,
+            self.game_id,
+            self.revision,
+            self.source_image_sha256,
+            self.output_image_sha256,
+            self.source_dol_sha256,
+            self.target_dol_sha256,
+            self.delta_sha256,
+            self.manifest_sha256,
+            self.allstars_sha256,
+        )
+    }
+}
+
+fn validate_cache_stamp(stamp: &ValidationCacheStamp) -> Result<(), String> {
+    if stamp.policy_id != VALIDATION_POLICY_ID || stamp.game_id != "RMGP01" || stamp.revision != 0 {
+        return Err("validation cache policy or PAL identity is unsupported".into());
+    }
+    for (name, value) in [
+        ("source_image_sha256", &stamp.source_image_sha256),
+        ("output_image_sha256", &stamp.output_image_sha256),
+        ("source_dol_sha256", &stamp.source_dol_sha256),
+        ("target_dol_sha256", &stamp.target_dol_sha256),
+        ("delta_sha256", &stamp.delta_sha256),
+        ("manifest_sha256", &stamp.manifest_sha256),
+        ("allstars_sha256", &stamp.allstars_sha256),
+    ] {
+        parse_sha256(value).map_err(|_| format!("validation cache {name} is malformed"))?;
+    }
+    Ok(())
+}
+
+fn should_lookup_validation_cache(force_revalidate: bool) -> bool {
+    !force_revalidate
+}
+
+fn validation_cache_matches(
+    record: &ValidationCacheRecord,
+    expected: &ValidationCacheStamp,
+) -> bool {
+    record.stamp == *expected
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RebuildManifest {
@@ -220,6 +388,7 @@ pub fn validate_rebuilt_iso_for_launch(
     }
     let manifest_text = fs::read_to_string(manifest_path(&output_abs))
         .map_err(|e| format!("rebuilt ISO has no readable adjacent WIT manifest: {e}"))?;
+    let manifest_sha256 = hex(&sha256(manifest_text.as_bytes()));
     let manifest = RebuildManifest::parse_text(&manifest_text)?;
     eprintln!("rebuilt ISO validation phase=hash-images-and-provenance");
     let source_hash = hex(&hash_file(&source_abs)?);
@@ -281,11 +450,239 @@ pub fn validate_rebuilt_iso_for_launch(
         || hex(&hash_file(&output_abs)?) != manifest.output_image_sha256
         || hex(&hash_file(dolphintool)?) != dolphin_tool_hash_before
         || hex(&hash_file(wit)?) != wit_hash_before
+        || hex(&hash_file(&manifest_path(&output_abs))?) != manifest_sha256
     {
-        return Err("an image changed or a validation tool was replaced during validation".into());
+        return Err(
+            "an image/manifest changed or a validation tool was replaced during validation".into(),
+        );
     }
     eprintln!("validation tools: DolphinTool sha256={dolphin_tool_hash_before}; WIT sha256={wit_hash_before}; WIT reported={wit_version}");
     Ok(manifest)
+}
+
+/// Validate a rebuilt ISO using a persistent content-addressed local cache.
+/// Cache hits still hash current image/manifest/DOL/AllStars contents and ask
+/// the current DolphinTool to identify both images; only the expensive WIT
+/// verification/extraction comparison is reused from the previous full run.
+pub fn validate_rebuilt_iso_for_launch_cached(
+    dolphintool: &Path,
+    wit: &Path,
+    source: &Path,
+    output: &Path,
+    expected_dol: &[u8],
+    allstars_writes: &[PatchWrite],
+    allstars_settings: &[u8],
+    force_revalidate: bool,
+) -> Result<CachedValidationOutcome, String> {
+    let started = Instant::now();
+    if !should_lookup_validation_cache(force_revalidate) {
+        eprintln!("rebuilt ISO validation cache=bypassed reason=force_revalidate");
+    } else {
+        match try_cached_validation(
+            dolphintool,
+            wit,
+            source,
+            output,
+            expected_dol,
+            allstars_settings,
+        ) {
+            Ok(Some(manifest)) => {
+                let elapsed = started.elapsed();
+                eprintln!(
+                    "rebuilt ISO validation cache=hit elapsed_ms={}",
+                    elapsed.as_millis()
+                );
+                return Ok(CachedValidationOutcome {
+                    manifest,
+                    cache_hit: true,
+                    elapsed,
+                });
+            }
+            Ok(None) => {
+                eprintln!("rebuilt ISO validation cache=miss reason=not_found_or_identity_changed")
+            }
+            Err(reason) => eprintln!("rebuilt ISO validation cache=miss reason={reason}"),
+        }
+    }
+
+    let manifest = validate_rebuilt_iso_for_launch(
+        dolphintool,
+        wit,
+        source,
+        output,
+        expected_dol,
+        allstars_writes,
+    )?;
+    let output_abs = output
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve rebuilt ISO for cache write: {error}"))?;
+    let manifest_file = manifest_path(&output_abs);
+    let stamp = stamp_from_manifest(
+        &manifest,
+        hex(&hash_file(&manifest_file)?),
+        hex(&sha256(allstars_settings)),
+    );
+    validate_cache_stamp(&stamp)?;
+    match write_validation_cache(&output_abs, &ValidationCacheRecord::new(stamp)) {
+        Ok(()) => eprintln!("rebuilt ISO validation cache=written"),
+        Err(error) => eprintln!(
+            "rebuilt ISO validation cache=write_failed full_validation_passed reason={error}"
+        ),
+    }
+    let elapsed = started.elapsed();
+    eprintln!(
+        "rebuilt ISO validation mode=full elapsed_ms={}",
+        elapsed.as_millis()
+    );
+    Ok(CachedValidationOutcome {
+        manifest,
+        cache_hit: false,
+        elapsed,
+    })
+}
+
+fn try_cached_validation(
+    dolphintool: &Path,
+    wit: &Path,
+    source: &Path,
+    output: &Path,
+    expected_dol: &[u8],
+    allstars_settings: &[u8],
+) -> Result<Option<RebuildManifest>, String> {
+    require_iso_extension("source", source)?;
+    require_iso_extension("rebuilt output", output)?;
+    for (label, path) in [
+        ("DolphinTool", dolphintool),
+        ("WIT", wit),
+        ("source ISO", source),
+        ("rebuilt ISO", output),
+    ] {
+        if !path.is_file() {
+            return Err(format!("{label} is missing or not a regular file"));
+        }
+    }
+    let source_abs = source
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve source ISO: {error}"))?;
+    let output_abs = output
+        .canonicalize()
+        .map_err(|error| format!("cannot resolve rebuilt ISO: {error}"))?;
+    if source_abs == output_abs {
+        return Err("source and rebuilt ISO paths must be different".into());
+    }
+    let manifest_file = manifest_path(&output_abs);
+    let manifest_text = fs::read_to_string(&manifest_file)
+        .map_err(|error| format!("cannot read rebuild manifest: {error}"))?;
+    let manifest_sha256 = hex(&sha256(manifest_text.as_bytes()));
+    let manifest = RebuildManifest::parse_text(&manifest_text)?;
+    let source_hash = hex(&hash_file(&source_abs)?);
+    let output_hash = hex(&hash_file(&output_abs)?);
+    validate_rebuild_manifest_core(
+        &manifest,
+        &source_hash,
+        &output_hash,
+        &hex(&sha256(expected_dol)),
+        expected_dol,
+    )?;
+    let expected_stamp =
+        stamp_from_manifest(&manifest, manifest_sha256, hex(&sha256(allstars_settings)));
+    validate_cache_stamp(&expected_stamp)?;
+    let cache_file = validation_cache_path(&output_abs);
+    let cache_text = match fs::read_to_string(&cache_file) {
+        Ok(text) => text,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("cannot read validation cache: {error}")),
+    };
+    let cache = ValidationCacheRecord::parse_text(&cache_text)?;
+    if !validation_cache_matches(&cache, &expected_stamp) {
+        return Ok(None);
+    }
+
+    // Current DolphinTool versions are not cache identities, but the current
+    // tool still must perform its real PAL-header check on both cached images.
+    let tool_hash_before = hex(&hash_file(dolphintool)?);
+    verify_dolphintool_header(dolphintool, &source_abs)?;
+    verify_dolphintool_header(dolphintool, &output_abs)?;
+    if hex(&hash_file(&source_abs)?) != expected_stamp.source_image_sha256
+        || hex(&hash_file(&output_abs)?) != expected_stamp.output_image_sha256
+        || hex(&hash_file(&manifest_file)?) != expected_stamp.manifest_sha256
+        || hex(&hash_file(dolphintool)?) != tool_hash_before
+    {
+        return Err(
+            "image/manifest changed or DolphinTool was replaced during cached validation".into(),
+        );
+    }
+    Ok(Some(manifest))
+}
+
+fn stamp_from_manifest(
+    manifest: &RebuildManifest,
+    manifest_sha256: String,
+    allstars_sha256: String,
+) -> ValidationCacheStamp {
+    ValidationCacheStamp {
+        policy_id: VALIDATION_POLICY_ID.to_owned(),
+        game_id: manifest.game_id.clone(),
+        revision: manifest.revision,
+        source_image_sha256: manifest.source_image_sha256.clone(),
+        output_image_sha256: manifest.output_image_sha256.clone(),
+        source_dol_sha256: manifest.source_dol_sha256.clone(),
+        target_dol_sha256: manifest.target_dol_sha256.clone(),
+        delta_sha256: manifest.delta_sha256.clone(),
+        manifest_sha256,
+        allstars_sha256,
+    }
+}
+
+fn validation_cache_path(output: &Path) -> PathBuf {
+    let name = output.file_name().unwrap_or_default().to_string_lossy();
+    output.with_file_name(format!("{name}.mg1validation-cache"))
+}
+
+fn write_validation_cache(output: &Path, record: &ValidationCacheRecord) -> Result<(), String> {
+    use std::io::Write as _;
+    let destination = validation_cache_path(output);
+    let parent = destination.parent().unwrap_or_else(|| Path::new("."));
+    let mut temporary = None;
+    for attempt in 0..8u32 {
+        let candidate = parent.join(format!(
+            ".mg1validation-{}-{}-{attempt}.tmp",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(mut file) => {
+                if let Err(error) = file
+                    .write_all(record.to_text().as_bytes())
+                    .and_then(|()| file.sync_all())
+                {
+                    drop(file);
+                    let _ = fs::remove_file(&candidate);
+                    return Err(format!("cannot persist cache temporary file: {error}"));
+                }
+                temporary = Some(candidate);
+                break;
+            }
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(format!("cannot create cache temporary file: {error}")),
+        }
+    }
+    let temporary = temporary.ok_or("could not reserve a unique cache temporary file")?;
+    if destination.exists() {
+        fs::remove_file(&destination)
+            .map_err(|error| format!("cannot replace old validation cache: {error}"))?;
+    }
+    fs::rename(&temporary, &destination).map_err(|error| {
+        let _ = fs::remove_file(&temporary);
+        format!("cannot install validation cache: {error}")
+    })
 }
 
 fn validate_rebuild_manifest_evidence(
@@ -296,6 +693,31 @@ fn validate_rebuild_manifest_evidence(
     dolphintool_sha256: &str,
     wit_sha256: &str,
     wit_version: &str,
+    source_dol: &[u8],
+) -> Result<(), String> {
+    validate_rebuild_manifest_core(
+        manifest,
+        source_image_sha256,
+        output_image_sha256,
+        source_dol_sha256,
+        source_dol,
+    )?;
+    // Current tool hashes prove the inputs are hashable and are checked again
+    // after validation to prevent replacement during the run. They are not
+    // compared with historical provenance hashes stored in the manifest.
+    parse_sha256(dolphintool_sha256).map_err(|_| "current DolphinTool SHA-256 is invalid")?;
+    parse_sha256(wit_sha256).map_err(|_| "current WIT SHA-256 is invalid")?;
+    if wit_version.trim().is_empty() {
+        return Err("current WIT did not report its version".into());
+    }
+    Ok(())
+}
+
+fn validate_rebuild_manifest_core(
+    manifest: &RebuildManifest,
+    source_image_sha256: &str,
+    output_image_sha256: &str,
+    source_dol_sha256: &str,
     source_dol: &[u8],
 ) -> Result<(), String> {
     if manifest.schema_version != 1
@@ -331,14 +753,6 @@ fn validate_rebuild_manifest_evidence(
             "manifest source/output image or source DOL hashes do not match validation inputs"
                 .into(),
         );
-    }
-    // Current tool hashes prove the inputs are hashable and are checked again
-    // after validation to prevent replacement during the run. They are not
-    // compared with the historical provenance hashes stored in the manifest.
-    parse_sha256(dolphintool_sha256).map_err(|_| "current DolphinTool SHA-256 is invalid")?;
-    parse_sha256(wit_sha256).map_err(|_| "current WIT SHA-256 is invalid")?;
-    if wit_version.trim().is_empty() {
-        return Err("current WIT did not report its version".into());
     }
     if manifest.source_image_sha256 == manifest.output_image_sha256 {
         return Err("replacement manifest unexpectedly describes an unchanged ISO".into());
@@ -1029,6 +1443,108 @@ mod tests {
             wit_sha256: "5".repeat(64),
             wit_version: "wit: Wiimms ISO Tool v3.02a r7679".into(),
         }
+    }
+
+    fn validation_cache_fixture() -> (RebuildManifest, ValidationCacheRecord) {
+        let source = synthetic_dol();
+        let mut target = source.clone();
+        target[0x110..0x114].copy_from_slice(&0x60E7_0000u32.to_be_bytes());
+        let manifest = launch_manifest(&source, &target);
+        let stamp = stamp_from_manifest(&manifest, "6".repeat(64), "7".repeat(64));
+        (manifest, ValidationCacheRecord::new(stamp))
+    }
+
+    #[test]
+    fn validation_cache_is_strict_and_detects_corruption() {
+        let (_, record) = validation_cache_fixture();
+        let encoded = record.to_text();
+        assert_eq!(ValidationCacheRecord::parse_text(&encoded).unwrap(), record);
+        assert!(!encoded.contains("dolphintool_sha256"));
+        assert!(!encoded.contains("wit_sha256"));
+        assert!(!encoded.contains("wit_version"));
+
+        let corrupted = encoded.replacen("output_image_sha256=2", "output_image_sha256=3", 1);
+        assert!(ValidationCacheRecord::parse_text(&corrupted)
+            .unwrap_err()
+            .contains("digest"));
+        assert!(
+            ValidationCacheRecord::parse_text(&encoded.replace("game_id=RMGP01\n", ""))
+                .unwrap_err()
+                .contains("missing field")
+        );
+        assert!(
+            ValidationCacheRecord::parse_text(&format!("{encoded}unexpected=x\n"))
+                .unwrap_err()
+                .contains("unknown field")
+        );
+        assert!(ValidationCacheRecord::parse_text(&"x".repeat(4097))
+            .unwrap_err()
+            .contains("size bound"));
+    }
+
+    #[test]
+    fn validation_cache_invalidates_for_content_manifest_patch_and_policy_changes() {
+        let (manifest, record) = validation_cache_fixture();
+        let baseline = record.stamp.clone();
+        assert!(validation_cache_matches(&record, &baseline));
+
+        for changed in [
+            ValidationCacheStamp {
+                source_image_sha256: "8".repeat(64),
+                ..baseline.clone()
+            },
+            ValidationCacheStamp {
+                output_image_sha256: "8".repeat(64),
+                ..baseline.clone()
+            },
+            ValidationCacheStamp {
+                source_dol_sha256: "8".repeat(64),
+                ..baseline.clone()
+            },
+            ValidationCacheStamp {
+                target_dol_sha256: "8".repeat(64),
+                ..baseline.clone()
+            },
+            ValidationCacheStamp {
+                delta_sha256: "8".repeat(64),
+                ..baseline.clone()
+            },
+            ValidationCacheStamp {
+                manifest_sha256: "8".repeat(64),
+                ..baseline.clone()
+            },
+            ValidationCacheStamp {
+                allstars_sha256: "8".repeat(64),
+                ..baseline.clone()
+            },
+            ValidationCacheStamp {
+                policy_id: "mg1-future-policy".into(),
+                ..baseline.clone()
+            },
+        ] {
+            assert!(!validation_cache_matches(&record, &changed));
+        }
+        let mut bad_policy = baseline.clone();
+        bad_policy.policy_id = "mg1-future-policy".into();
+        assert!(validate_cache_stamp(&bad_policy).is_err());
+
+        // Dolphin, DolphinTool, and WIT versions are deliberately not cache
+        // inputs. The historical tool fields stay in the manifest but do not
+        // appear in the stamp; current DolphinTool header behavior is checked.
+        assert!(manifest.to_text().contains("dolphintool_sha256="));
+        assert!(baseline.to_text().contains("policy_id="));
+        assert!(!baseline.to_text().contains("dolphintool"));
+        assert!(!baseline.to_text().contains("wit_"));
+    }
+
+    #[test]
+    fn force_revalidate_bypasses_cache_lookup() {
+        assert!(should_lookup_validation_cache(false));
+        assert!(!should_lookup_validation_cache(true));
+        let (_, record) = validation_cache_fixture();
+        assert!(validation_cache_matches(&record, &record.stamp));
+        // The force flag is handled before lookup, even when the record is valid.
+        assert!(!should_lookup_validation_cache(true));
     }
 
     #[test]

@@ -36,7 +36,7 @@ cargo run --release -p multigalaxy -- rebuild-iso `
   '<matching Petari PAL symbols.txt>'
 ```
 
-The completed local test verifies PAL RMGP01 revision 0, the pinned source DOL, WIT partition integrity before/after, output DOL and game-file hashes, source immutability, and deterministic recomposition. `dev-launch --patched-image` accepts only a WIT `rebuild-iso-dol` manifest and revalidates both ISO extractions, image/DOL hashes, actual DolphinTool PAL-header operations, WIT partition/extraction operations, VCDIFF, and AllStars non-overlap before configuring the isolated profile. Historical DolphinTool/WIT binary hashes remain provenance fields; current tools are checked for stable identity during validation and by their actual operations, not against historical binary hashes or versions. It does not enable the M4 mailbox unless `--gecko-bridge-probe` is separately provided. The changed-byte ISO has a user-confirmed live boot regression on 2609a; this is not trampoline validation. See [Wii image rebuild evidence](references/wii-image-rebuild.md).
+The completed local test verifies PAL RMGP01 revision 0, the pinned source DOL, WIT partition integrity before/after, output DOL and game-file hashes, source immutability, and deterministic recomposition. On a cold cache, `dev-launch --patched-image` performs that full validation. Subsequent launches hash the full source/output ISOs, DOL, manifest, and prepared AllStars patch; the current DolphinTool must still identify the source and output as PAL. Only then may it reuse the previous WIT partition/extraction evidence. `--force-revalidate` reruns the full path. Historical DolphinTool/WIT binary hashes remain provenance, not version locks. M4 is enabled only with explicit `--gecko-bridge-probe`. The changed-byte ISO has user-confirmed basic boot/movement evidence on 2609a and 2609b; this is not trampoline validation and does not claim AllStars on 2609b. See [Wii image rebuild evidence](references/wii-image-rebuild.md).
 
 For a separately built and hash-pinned candidate DOL, use `rebuild-iso-dol` with the exact PAL source DOL, symbol map, candidate DOL, candidate SHA-256, and external AllStars folder. It rejects changes outside DOL text or overlapping AllStars writes and verifies the re-extracted target bytes. This is not a trampoline generator and is not ready for Dolphin boot until the changed output has passed an offline WIT round trip and the hook's code location is verified. The exact candidate command is recorded in [Wii image rebuild evidence](references/wii-image-rebuild.md).
 
@@ -68,7 +68,17 @@ cargo run --release -p multigalaxy -- dev-launch development.local.toml `
   --wit $Wit
 ```
 
-The launcher infers DolphinTool beside the configured Dolphin executable. It hashes the explicit source/output ISOs, captures current tool identities to detect replacement during validation, verifies PAL identity and WIT partitions, extracts both images, confirms the source DOL and exact authorized candidate DOL, checks deterministic delta and unchanged DATA files, and rejects AllStars overlap. Historical tool hashes in the manifest do not lock later validators to those binaries. The operation is intentionally disk intensive. It keeps mandatory AllStars and the copied controller profile; M4 remains off unless `--gecko-bridge-probe` is explicitly added. The live 2609a baseline and capability policy are in [Dolphin capability compatibility](references/dolphin-version-migration.md).
+The launcher infers DolphinTool beside the configured Dolphin executable. On a cold cache it hashes the source/output ISOs, validates PAL headers, runs WIT partition verification/extraction, confirms the source and authorized candidate DOL, checks deterministic delta and unchanged DATA files, and rejects AllStars overlap. On a cache hit it hashes all game/manifest/patch contents and validates PAL headers with current DolphinTool, then reuses only the prior WIT extraction/partition result. Historical tool hashes are provenance, not locks. The cache is a local performance record, not a signature: a hostile same-user account able to rewrite both cache and game files could forge it. M4 remains off unless `--gecko-bridge-probe` is explicitly added. See [Dolphin capability compatibility](references/dolphin-version-migration.md).
+
+On this development PC, no-launch cold validation took 192,110 ms and warm validation took 52,437 ms (72.7% lower). Both warm ISO files are still fully SHA-256 hashed; only WIT verification/extraction is skipped. Use the no-launch cached validator for timing; add `--force-revalidate` to bypass the cache:
+
+```powershell
+cargo run --release -p multigalaxy -- validate-rebuilt-iso-cached `
+  $DolphinTool $Wit `
+  'target\mg1-disc-pipeline\source.iso' `
+  'target\mg1-disc-pipeline\changed-neutral-nop.iso' `
+  'reference\original\main.dol' $AllStars
+```
 
 ## Local Windows development profile
 
@@ -94,6 +104,15 @@ cargo run -p multigalaxy -- dev-launch development.local.toml 'target\mg1-stock-
 ```
 
 The probe polls for the game ID for 60 seconds by default. Adjust this with `--bridge-startup-timeout-secs=90`; the supported range is 5–300 seconds. It logs elapsed time, PID, mapped-view bytes, observed ID bytes, and validation state. The bridge command prints changing counters, acknowledgements, validated X/Y/Z, update frequency, and round-trip timing. Type `Q` to stop. See [performance.md](performance.md) for user-reported bridge-on/off measurements and [stock-dolphin-bridge.md](stock-dolphin-bridge.md) for safeguards.
+
+The user has also reported a successful read-only M4 preflight on Dolphin 2609b. This did not test writable ACK feedback. The separate ACK-only command is explicitly opted into and must be run with no other bridge writers attached:
+
+```powershell
+$DolphinPid = [uint32](Read-Host 'Enter the running Dolphin PID')
+cargo run --release -p multigalaxy -- test-m4-ack development.local.toml $DolphinPid --confirm-single-ack-write
+```
+
+It waits for a live mailbox heartbeat, writes one distinct ACK token, waits at most three seconds for game echo, and restores the previous value only if the same mailbox remains valid and the ACK still contains its token. It does not start Dolphin or networking. See [M4 2609b evidence and procedure](references/m4-2609b-validation.md).
 
 ## M4 localhost position relay
 

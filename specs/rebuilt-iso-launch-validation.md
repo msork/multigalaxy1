@@ -1,6 +1,6 @@
 # WIT-rebuilt ISO launch validation
 
-Status: implemented; synthetic tests and actual local validation-only run pass. No Dolphin launch is performed by the validator.
+Status: implemented with persistent validation cache; synthetic tests and actual cold/warm local validation pass. No Dolphin launch is performed by either validator.
 
 ## Objective
 
@@ -22,10 +22,13 @@ Allow `dev-launch` to launch a separate ISO produced by `rebuild-iso-dol` only a
 - Revalidate candidate changes are only in existing text and do not overlap mandatory AllStars writes.
 - Preserve mandatory AllStars configuration and controller profile. Do not add/remove M4 bridge codes unless the corresponding explicit option is present.
 - Perform all validation before writing the isolated GameSettings/profile or starting Dolphin.
+- `dev-launch --patched-image` reuses a validated local cache only after full content hashes match. `--force-revalidate` explicitly bypasses it. Standalone `validate-rebuilt-iso` remains a full validation command.
 
 ## Technical design
 
-Strict manifest parser with exact known fields and no duplicate/unknown keys. Hash full source/output images; verify tool identities and WIT version; run WIT partition verification and extraction to a unique temporary directory; run DolphinTool header validation; compare extracted DOL hashes and bytes; recompute VCDIFF from source/candidate; compare all extracted `files/**` hashes. Use RAII cleanup for temporary extraction. The explicit launch options are `--patched-image <output.iso> --source-iso <source.iso> --wit <wit.exe>`.
+Full validation hashes source/output images and the adjacent manifest; checks tool stability; runs current DolphinTool PAL headers and WIT partition verification/extraction; compares extracted source/target DOL hashes and bytes; recomputes VCDIFF; compares all extracted `files/**` hashes; and rechecks image/manifest/tool identities after the operation. WIT/DolphinTool historical hashes remain provenance, not locks. On cache hits, hash the full source/output images, pinned DOL, manifest, and canonical AllStars settings, validate manifest/cache policy and integrity, run current DolphinTool PAL-header operations, and recheck image/manifest/tool stability. Only WIT verification/extraction/DATA comparison is reused from the prior full validation.
+
+Cache file is `<output.iso>.mg1validation-cache`, strict schema v1 with canonical record digest. The key omits Dolphin, DolphinTool, and WIT versions/hashes. Cache schema and `VALIDATION_POLICY_ID` must be bumped when the corresponding validation semantics change. Cache entries are trusted local performance records after full validation, not cryptographic signatures. A same-user attacker who can rewrite both the cache and the game files can forge the unkeyed digest; every launch still hashes full game-image contents, and malformed or mismatched cache records cause full validation.
 
 ## Dependencies
 
@@ -38,10 +41,11 @@ Launch-time validation is I/O intensive. The manifest is an integrity record, no
 ## Acceptance criteria
 
 - Synthetic tests cover valid changed target, malformed/duplicate/missing fields, wrong image/source/DOL/tool hashes, unsupported format/revision/patch ID, and unexpected target bytes.
-- Launcher wiring proves clean launch does not require WIT options, patched launch requires all three paths, and bridge-probe default remains false.
+- Launcher wiring proves clean launch does not require WIT options, patched launch requires all three paths, bridge-probe default remains false, and force mode is accepted only for patched-image launch.
+- Cache tests cover stale manifest/source/output identity, DOL/VCDIFF/AllStars/policy changes, corruption, tool-version independence, and force bypass.
 - No Dolphin process is started by automated tests.
 - Manual command for the disposable neutral candidate is documented. Runtime boot remains unverified until performed interactively.
 
 ## Testing strategy
 
-Rust unit tests with synthetic DOLs/manifests and launch argument-set validation; `cargo fmt`, workspace tests/build, PAL map validation, and the `validate-rebuilt-iso` no-launch command. Any Dolphin boot is a separate manual test and must use the prepared isolated profile.
+Rust unit tests with synthetic DOLs/manifests/cache records and launch argument-set validation; `cargo fmt`, workspace tests/build, PAL map validation, and both full and cached no-launch validation commands. Any Dolphin boot is a separate manual test and must use the prepared isolated profile.
