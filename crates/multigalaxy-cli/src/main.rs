@@ -269,6 +269,30 @@ fn verify_live_m4_mailbox(
 }
 
 #[cfg(windows)]
+fn read_ack_prewrite_sample(
+    memory: &stock_memory::StockMem1,
+    mailbox: gecko_bridge::Mailbox,
+) -> Result<gecko_bridge::AckPrewriteSample, String> {
+    Ok(gecko_bridge::AckPrewriteSample {
+        mailbox,
+        counter: memory.read_guest_word(mailbox.counter_address())?,
+        acknowledgement: memory.read_guest_word(mailbox.acknowledgement_address())?,
+        echo: memory.read_guest_word(mailbox.echo_address())?,
+    })
+}
+
+#[cfg(windows)]
+fn format_ack_prewrite_sample(sample: gecko_bridge::AckPrewriteSample) -> String {
+    format!(
+        "mailbox=0x{:08x},counter=0x{:08x},ack=0x{:08x},echo=0x{:08x}",
+        sample.mailbox.snapshot_address(),
+        sample.counter,
+        sample.acknowledgement,
+        sample.echo
+    )
+}
+
+#[cfg(windows)]
 struct AckRollbackGuard {
     memory: stock_memory::StockMem1,
     dol: Vec<u8>,
@@ -380,18 +404,34 @@ fn run_test_m4_ack(config_path: &std::path::Path, pid: u32) -> Result<(), String
     if mailbox_rechecked != mailbox {
         return Err("M4 mailbox identity changed before ACK; no write attempted".into());
     }
-    let previous_ack = memory.read_guest_word(mailbox.acknowledgement_address())?;
-    let previous_echo = memory.read_guest_word(mailbox.echo_address())?;
-    if previous_ack != previous_echo {
-        return Err(format!("M4 ACK is not quiescent before test (ack=0x{previous_ack:08x}, echo=0x{previous_echo:08x}); stop other bridge clients and retry; no write attempted"));
+    let before_final = read_ack_prewrite_sample(&memory, mailbox)?;
+    let previous_ack = before_final.acknowledgement;
+    if previous_ack != before_final.echo {
+        return Err(format!("M4 ACK is not quiescent before test ({}); stop other bridge clients and retry; no write attempted", format_ack_prewrite_sample(before_final)));
     }
-    if verify_live_m4_mailbox(&mut memory, &dol, pid)? != mailbox
-        || memory.read_guest_word(mailbox.acknowledgement_address())? != previous_ack
-        || memory.read_guest_word(mailbox.echo_address())? != previous_echo
-    {
-        return Err(
-            "M4 mailbox or ACK changed during final pre-write check; no write attempted".into(),
-        );
+    let final_check_started = Instant::now();
+    let final_mailbox_result = verify_live_m4_mailbox(&mut memory, &dol, pid);
+    let final_check_elapsed = final_check_started.elapsed();
+    let final_mailbox = match final_mailbox_result {
+        Ok(found) => found,
+        Err(error) => {
+            return Err(format!(
+                "M4 final pre-write check rejected: mailbox validation failed after {} ms; before=[{}]; after=unavailable; no write was attempted; reason={error}",
+                final_check_elapsed.as_millis(),
+                format_ack_prewrite_sample(before_final)
+            ));
+        }
+    };
+    let after_final = read_ack_prewrite_sample(&memory, final_mailbox)?;
+    let changed = gecko_bridge::ack_prewrite_changed_fields(mailbox, before_final, after_final);
+    if !changed.is_empty() {
+        return Err(format!(
+            "M4 final pre-write check rejected after {} ms; changed_fields={}; before=[{}]; after=[{}]; counter_change_is_diagnostic_only; no write was attempted",
+            final_check_elapsed.as_millis(),
+            changed.join(","),
+            format_ack_prewrite_sample(before_final),
+            format_ack_prewrite_sample(after_final)
+        ));
     }
 
     let test_value = gecko_bridge::ack_probe_value(previous_ack);

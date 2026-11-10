@@ -404,6 +404,38 @@ pub struct Mailbox {
     base: u32,
 }
 
+/// Read-only sample of the four mailbox control words used by the ACK
+/// preflight. The heartbeat is diagnostic only; it is expected to advance
+/// during a live game and is not an instability condition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AckPrewriteSample {
+    pub mailbox: Mailbox,
+    pub counter: u32,
+    pub acknowledgement: u32,
+    pub echo: u32,
+}
+
+/// Return only the conditions that must remain stable between the final
+/// read-only preflight snapshots. Counter changes are intentionally excluded:
+/// the game increments it while running.
+pub fn ack_prewrite_changed_fields(
+    expected: Mailbox,
+    before: AckPrewriteSample,
+    after: AckPrewriteSample,
+) -> Vec<&'static str> {
+    let mut changed = Vec::new();
+    if before.mailbox != expected || after.mailbox != expected {
+        changed.push("mailbox_identity");
+    }
+    if before.acknowledgement != after.acknowledgement {
+        changed.push("acknowledgement");
+    }
+    if before.echo != after.echo {
+        changed.push("echo");
+    }
+    changed
+}
+
 pub(crate) fn ack_probe_value(previous: u32) -> u32 {
     previous.wrapping_add(0x1357_9bdf)
 }
@@ -691,6 +723,58 @@ mod tests {
         assert!(may_restore_probe_ack(probe, probe, true));
         assert!(!may_restore_probe_ack(previous, probe, true));
         assert!(!may_restore_probe_ack(probe, probe, false));
+    }
+
+    #[test]
+    fn ack_prewrite_diagnostics_accept_stable_control_words_and_report_heartbeat_separately() {
+        let mailbox = Mailbox { base: 0x8000_25a0 };
+        let before = AckPrewriteSample {
+            mailbox,
+            counter: 40,
+            acknowledgement: 9,
+            echo: 9,
+        };
+        let after = AckPrewriteSample {
+            mailbox,
+            counter: 47,
+            acknowledgement: 9,
+            echo: 9,
+        };
+        assert!(ack_prewrite_changed_fields(mailbox, before, after).is_empty());
+        assert_ne!(before.counter, after.counter);
+    }
+
+    #[test]
+    fn ack_prewrite_diagnostics_identify_changed_mailbox_ack_and_echo() {
+        let mailbox = Mailbox { base: 0x8000_25a0 };
+        let before = AckPrewriteSample {
+            mailbox,
+            counter: 40,
+            acknowledgement: 9,
+            echo: 9,
+        };
+        let ack_changed = AckPrewriteSample {
+            acknowledgement: 10,
+            ..before
+        };
+        assert_eq!(
+            ack_prewrite_changed_fields(mailbox, before, ack_changed),
+            vec!["acknowledgement"]
+        );
+        let echo_changed = AckPrewriteSample { echo: 10, ..before };
+        assert_eq!(
+            ack_prewrite_changed_fields(mailbox, before, echo_changed),
+            vec!["echo"]
+        );
+        let other_mailbox = Mailbox { base: 0x8000_2650 };
+        let moved = AckPrewriteSample {
+            mailbox: other_mailbox,
+            ..before
+        };
+        assert_eq!(
+            ack_prewrite_changed_fields(mailbox, before, moved),
+            vec!["mailbox_identity"]
+        );
     }
 
     #[test]
