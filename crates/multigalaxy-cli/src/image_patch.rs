@@ -1,7 +1,8 @@
-//! Stage 1 xdelta image pipeline: locate the PAL `main.dol` inside an
-//! uncompressed Wii image by signature + full SHA-256, apply a size-preserving
-//! in-place patch to a user-owned copy via a pure-Rust VCDIFF round-trip, and
-//! record a manifest. The original image is never modified.
+//! Stage 1 experimental image pipeline: locate a plaintext PAL `main.dol`
+//! byte-for-byte inside a user-owned image copy, apply a size-preserving
+//! identity VCDIFF result, and record a manifest. This does not decrypt Wii
+//! partitions, verify/rebuild cluster hashes, or support RVZ/raw encrypted
+//! Wii images. It is not approved for live testing.
 //!
 //! Stage 1 proves the pipeline, not hook semantics: the patched window
 //! reproduces the original bytes exactly (identity patch).
@@ -81,9 +82,10 @@ pub fn window_words(dol: &[u8], guest: u32) -> Result<[u32; WINDOW_WORDS], Strin
     Ok(words)
 }
 
-/// Locate exactly one copy of `dol` in an uncompressed Wii image by scanning
-/// for the DOL header prefix and verifying the full SHA-256 of the candidate
-/// region. Fail closed on zero or multiple matches.
+/// Locate exactly one plaintext copy of `dol` by scanning an image byte stream
+/// for its DOL header prefix and verifying the full SHA-256 of the candidate
+/// region. This is not Wii partition parsing and cannot find encrypted DOL
+/// bytes in a normal raw Wii disc image. Fail closed on zero/multiple matches.
 pub fn locate_dol_in_image(image: &[u8], dol: &[u8]) -> Result<usize, String> {
     if image.len() < dol.len() + 0x80 {
         return Err("image too small to contain the disc header and DOL".into());
@@ -103,7 +105,7 @@ pub fn locate_dol_in_image(image: &[u8], dol: &[u8]) -> Result<usize, String> {
         }
         off += 4;
     }
-    found.ok_or_else(|| "pinned PAL DOL not found in image (is it an uncompressed ISO?)".into())
+    found.ok_or_else(|| "pinned PAL DOL was not found as plaintext in the image; encrypted Wii partitions, RVZ, partition extraction/decryption, and cluster-hash rebuilding are unsupported".into())
 }
 
 /// Build the Stage 1 patched DOL (identity window) and its VCDIFF delta,
@@ -126,13 +128,15 @@ pub fn stage1_patch(dol: &[u8]) -> Result<(Vec<u8>, Vec<u8>), String> {
             words, expected
         ));
     }
-    let patched = dol.to_vec(); // identity patch: pipeline proof only
-    let delta = vcdiff::encode(dol, &patched);
+    let identity_target = dol.to_vec(); // identity patch: no gameplay changes
+    let delta = vcdiff::encode(dol, &identity_target);
     let decoded = vcdiff::decode(dol, &delta)?;
-    if decoded != patched {
+    if decoded != identity_target {
         return Err("VCDIFF round-trip mismatch".into());
     }
-    Ok((patched, delta))
+    // Use the decoder output as the actual splice input. It is byte-identical
+    // today, but this ensures the image-writing path consumes the VCDIFF result.
+    Ok((decoded, delta))
 }
 
 /// Apply the Stage 1 patch to a copy of `source` at `output`. Source is opened
@@ -177,6 +181,9 @@ pub fn patch_image(source: &Path, output: &Path, dol: &[u8]) -> Result<PatchMani
         window_guest: WINDOW_GUEST,
         window_len: WINDOW_LEN,
     };
+    if manifest.source_image_sha256 != manifest.output_image_sha256 {
+        return Err("Stage 1 identity patch unexpectedly changed the full image".into());
+    }
     let manifest_path = output.with_extension("mg1patch.txt");
     std::fs::write(&manifest_path, manifest.to_text())
         .map_err(|e| format!("cannot write manifest: {e}"))?;
@@ -225,11 +232,37 @@ pub fn validate_patched_image(image_path: &Path, dol: &[u8]) -> Result<PatchMani
             .map_err(|_| "bad window_guest")?,
         window_len: get("window_len")?.parse().map_err(|_| "bad window_len")?,
     };
+    if manifest.schema_version != 1
+        || manifest.patch_id != "stage1-trampoline-identity"
+        || manifest.game_id != "RMGP01"
+        || manifest.revision != 0
+        || manifest.window_guest != WINDOW_GUEST
+        || manifest.window_len != WINDOW_LEN
+    {
+        return Err(
+            "manifest does not describe the supported PAL RMGP01 Rev 0 Stage 1 identity patch"
+                .into(),
+        );
+    }
     if manifest.output_image_sha256 != hex(&sha256(&image)) {
         return Err("manifest output hash does not match the image".into());
     }
+    if manifest.source_image_sha256 != manifest.output_image_sha256 {
+        return Err("Stage 1 identity manifest source/output image hashes differ".into());
+    }
     if manifest.source_dol_sha256 != hex(&sha256(dol)) {
         return Err("manifest source DOL hash does not match the pinned PAL DOL".into());
+    }
+    if manifest.target_dol_sha256 != hex(&sha256(dol)) {
+        return Err("Stage 1 identity target DOL hash does not match the pinned PAL DOL".into());
+    }
+    if manifest.delta_sha256.len() != 64
+        || !manifest
+            .delta_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("manifest delta_sha256 is not a 64-digit hexadecimal digest".into());
     }
     Ok(manifest)
 }
@@ -260,7 +293,8 @@ mod tests {
         assert!(locate_dol_in_image(&dup, &dol).is_err());
         let mut absent = image.clone();
         absent.truncate(0x1400 + 0x100);
-        assert!(locate_dol_in_image(&absent, &dol).is_err());
+        let error = locate_dol_in_image(&absent, &dol).unwrap_err();
+        assert!(error.contains("encrypted Wii partitions"));
     }
 
     /// Synthetic DOL with text[0] at guest 0x80004000, file offset 0x100,
@@ -290,7 +324,12 @@ mod tests {
     #[test]
     fn stage1_patch_is_identity_and_round_trips() {
         let dol = synthetic_dol();
+        assert_eq!(WINDOW_GUEST, 0x802B_62D8);
+        assert_eq!(WINDOW_WORDS, 5);
+        assert_eq!(WINDOW_LEN, 20);
+        assert_eq!(WINDOW_GUEST + WINDOW_LEN as u32, 0x802B_62EC);
         let words = window_words(&dol, WINDOW_GUEST).unwrap();
+        assert_eq!(words[4], 0x3800_0000); // word at 0x802B62E8; end is exclusive at 0x...62EC
         let (patched, delta) = stage1_patch(&dol).unwrap();
         assert_eq!(patched, dol);
         assert_eq!(vcdiff::decode(&dol, &delta).unwrap(), dol);
@@ -312,11 +351,58 @@ mod tests {
         assert_eq!(std::fs::read(&src).unwrap(), before, "source untouched");
         assert_eq!(manifest.source_image_sha256, hex(&sha256(&image)));
         let out_image = std::fs::read(&out).unwrap();
+        assert_eq!(
+            out_image, image,
+            "Stage 1 identity output is byte-for-byte unchanged"
+        );
+        assert_eq!(manifest.source_image_sha256, manifest.output_image_sha256);
         assert_eq!(manifest.output_image_sha256, hex(&sha256(&out_image)));
         assert!(out.with_extension("mg1patch.txt").exists());
         assert!(validate_patched_image(&out, &dol).is_ok());
         // refusing to overwrite
         assert!(patch_image(&src, &out, &dol).is_err());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn source_image_hash_is_recorded_not_a_pinned_whole_image_allowlist() {
+        let dir = std::env::temp_dir().join(format!("mg1-imgsourcehash-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let dol = synthetic_dol();
+        let mut image = synthetic_image(&dol);
+        image[0x200] = 0x5A; // unrelated image byte changes the full-image digest
+        let src = dir.join("source.iso");
+        let out = dir.join("copy.iso");
+        std::fs::write(&src, &image).unwrap();
+        let manifest = patch_image(&src, &out, &dol).unwrap();
+        assert_eq!(manifest.source_image_sha256, hex(&sha256(&image)));
+        assert_eq!(manifest.source_image_sha256, manifest.output_image_sha256);
+        assert!(validate_patched_image(&out, &dol).is_ok());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn patched_image_validator_rejects_manifest_for_another_patch_or_window() {
+        let dir = std::env::temp_dir().join(format!("mg1-imgmanifest-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let dol = synthetic_dol();
+        let image = synthetic_image(&dol);
+        let src = dir.join("src.iso");
+        let out = dir.join("out.iso");
+        std::fs::write(&src, image).unwrap();
+        patch_image(&src, &out, &dol).unwrap();
+        let manifest_path = out.with_extension("mg1patch.txt");
+        let original = std::fs::read_to_string(&manifest_path).unwrap();
+        for (needle, replacement) in [
+            ("patch_id=stage1-trampoline-identity", "patch_id=other"),
+            ("window_len=20", "window_len=16"),
+            ("revision=0", "revision=1"),
+        ] {
+            std::fs::write(&manifest_path, original.replace(needle, replacement)).unwrap();
+            assert!(validate_patched_image(&out, &dol).is_err());
+        }
+        std::fs::write(&manifest_path, original).unwrap();
+        assert!(validate_patched_image(&out, &dol).is_ok());
         std::fs::remove_dir_all(&dir).ok();
     }
 }

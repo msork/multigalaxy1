@@ -1,40 +1,44 @@
-# Plan/spec: Stage 1 trampoline via xdelta-patched image (pivot from Gecko)
+# Stage 1 image pipeline audit: PAL RMGP01 Rev 0
 
-Status: **implemented (code + tests), live boot pending.** Stage 1 proves THE PIPELINE, not hook semantics: the 5-word window at `0x802B62D8..0x802B62EC` (`bl 0x802A6560; mr r3,r29; li r4,0; bl 0x802A6B20; li r0,0`) is replaced with byte-identical content (identity patch, pinned against the exact PAL DOL and verified against the real DOL). Acceptance means: patched image boots, hook window bytes verified read-only at runtime (`verify-hook` now reports `window=original` + words), rendering identical, rollback = launch the clean copy.
+Status: **NO-GO for live testing.** The current Stage 1 result is an identity/no-op copy, and the image code is not a Wii partition-aware patcher. No source image was modified and Dolphin was not launched during this audit.
 
-Explicit spec points (approved):
+## Audit findings
 
-1. Pipeline proof only — identity window; Stage 2 hook semantics unchanged and parked.
-2. Size-preserving in-place DOL patching at the located image offset; no FST/partition rebuild (that blocker stays documented for Stage 2+).
-3. Wii disc integrity: Wii data clusters carry ECC/hash material, but Dolphin 2609a does not verify cluster hashes unless disc-integrity verification is explicitly enabled (off by default), so a byte-patched ISO boots. Recorded here as the source-level expectation; the live boot is the user's acceptance step and must be recorded when observed.
-4. All identity gates fail closed: RMGP01 Rev 0 disc header, source image SHA-256, pinned DOL SHA-256 (`8200fb72…fbee`), Petari symbol hash, pinned window words, AllStars non-overlap (the window is disjoint from all 419 parsed AllStars writes). The original image is opened read-only and never modified; the patch applies only to a new user-owned output path (refuses to overwrite).
-5. Pure-Rust VCDIFF (RFC 3284 restricted profile) in `multigalaxy-patch::vcdiff`; `patch-image <dev.toml> <source-image> <output-image>` CLI; `dev-launch --patched-image <path>`; `verify-hook` extended to check the window. Gecko stays for AllStars only.
+### Hook window
 
-The Gecko thread landed and closed its bug (installer used `ori` instead of `oris`; see draw-only-hook-contract.md Addendum 4), so the second-writer question is settled: there is no second writer; the Gecko path remains the working carrier until the image route proves out.
+The five 32-bit words begin at guest address `0x802B62D8` and occupy `[0x802B62D8, 0x802B62EC)`. Their word addresses are `0x802B62D8`, `0x802B62DC`, `0x802B62E0`, `0x802B62E4`, and `0x802B62E8`; the last word is inclusive at `0x802B62E8`, and the end address `0x802B62EC` is exclusive. Length is exactly 20 bytes. The expected PAL Rev 0 words remain checked by `image_patch::stage1_patch` and the DOL map/signature path.
 
-## 1. Where the stub lives in PAL DOL text
+### Input image and Wii disc layout
 
-Scanned both DOL text sections of the exact PAL DOL (`text0` `0x80004000`+0x24E0, `text1` `0x800070A0`+0x5261E0) for nop (`0x60000000`) / zero runs: **no padding run ≥ 8 words (32 bytes) exists anywhere**, and section tails are real code, not padding. So there is no free 32-byte cave in the DOL text.
+`image_patch::locate_dol_in_image` is a plaintext byte scan starting at file offset `0x400`, stepping by four, and comparing a 64-byte prefix followed by the full DOL SHA-256. It does not parse the Wii partition table, read the partition DOL offset, decrypt AES-encrypted partition clusters, validate H0/H1/H2/H3 cluster hashes, update partition hashes, update FST/partition metadata, or handle RVZ. Dolphin's [WIA/RVZ format documentation](https://github.com/dolphin-emu/dolphin/blob/master/docs/WiaAndRvz.md) describes Wii partition data as encrypted and hashed, and explains that re-encryption/recalculated hashes are required when producing a disc image. Dolphin's [DiscExtractor](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/DiscIO/DiscExtractor.cpp) gets the boot DOL through partition-aware volume reads rather than searching raw file bytes. On a normal raw Wii ISO the executable resides in the encrypted data partition, so this scan cannot serve as DOL extraction. The old “uncompressed ISO” error wording and prior claim that byte-patched ISO boots were unsupported conclusions and are withdrawn. An extracted/decrypted plaintext byte stream is not by itself a bootable or integrity-correct rebuilt Wii image.
 
-Implemented Stage 1 placement: **inline at the callsite window**, not a cave. `0x802B62D8..0x802B62EC` is the 5-word window (`bl 0x802A6560; mr r3,r29; li r4,0; bl 0x802A6B20; li r0,0`) — enough for the whole Stage 1 trampoline inline, zero cave, zero displacement risk. Disjointness: the window is verified disjoint from all 419 parsed AllStars writes and every pinned observer signature; `patch-image` additionally re-verifies the pinned window words against the exact PAL DOL before writing. Stage 2's larger duplicate-draw stub has no inline space — it would need an appended DOL text section (header/size/hash change, re-fingerprint) or a proven-dead function; both require separate evidence and are out of scope for Stage 1.
+The patch-image CLI validates the configured development game through DolphinTool, but its separate `source-image` argument is not independently sent through DolphinTool. It receives only the six-byte disc ID/revision check and plaintext DOL scan in `image_patch`. `dev-launch --patched-image` checks its output manifest and plaintext DOL but does not ask DolphinTool to validate that alternate image. This is insufficient evidence that either argument is a valid bootable PAL Wii image.
 
-## 2. Patch mechanics
+### Hash gates
 
-- Scope: extracted `main.dol` delta (preferred per `docs/references/xdelta-deployment-assessment.md`); never byte-patch the RVZ (compressed container). The image extract/rebuild (RVZ → decompressed → patch DOL → repack or overlay) is the documented implementation blocker: it must use a validated path (official DolphinTool or equivalent), write a **new user-owned temp image**, verify output hash, and never touch the original. Dolphin 2609a boots RVZ; the patched copy must be presented as a bootable image, not a bare DOL (SMG1 reads assets from disc).
-- Identity: pre-patch, validate game ID `RMGP01` Rev 0, exact source-image SHA-256, source-DOL SHA-256 (`8200fb72…fbee`), Petari symbol hash, and every hook's expected original bytes; post-patch, verify target-DOL size/SHA-256 and all PAL signatures. Manifest per the assessment (schema, patch id/sha, xdelta version/options, source hashes, target hashes, AllStars/mailbox fingerprints, non-overlap). Fail closed everywhere; unknown build = no patch.
-- AllStars + shoulder swaps stay Gecko (unchanged); one variable at a time.
+- The `patch-image` CLI validates the supplied original `main.dol` against the exact PAL RMGP01 Rev 0 DOL/symbol map using `player_probe::verify_pal_inputs`; `locate_dol_in_image` also requires the plaintext DOL candidate bytes to hash exactly to that supplied DOL. `patch-image` does not currently parse AllStars writes for overlap, but its target DOL is unchanged, so this identity patch has no changed write sites. Any future non-identity patch must add and test an explicit AllStars overlap check.
+- The source image SHA-256 is calculated and recorded. It is **not compared to a preapproved full-image digest**; this is intentional for client-local language variants, but means it is not a compatibility gate. The source-image path also is not checked by DolphinTool.
+- The output image SHA-256 is verified against the manifest at `dev-launch --patched-image` time. The Stage 1 DOL target hash is now required to equal the pinned source DOL hash. Manifest metadata is checked for the exact schema, patch ID, PAL identity, and window.
+- Because this identity patch must change no bytes, validation also requires manifest source/output image hashes to match. This ties its no-op result together but does not authenticate an unknown source image or replace an image-format/rebuild validator. The VCDIFF bytes are not persisted as a sidecar, so their manifest digest is format-checked but cannot be recomputed by `dev-launch`.
 
-## 3. Rust tooling
+### What the identity patch proves
 
-The workspace has **zero external dependencies** (dependency-free SHA-256 precedent). Plan: pure-Rust, xdelta3-compatible VCDIFF encode/decode in `multigalaxy-patch` (no external binary; manifest still records tool version + deterministic options). CLI surface in `multigalaxy-cli`: `patch-image <manifest> <source image> <output image>` (generate/apply with full identity gates) and a `dev-launch --patched-image <path>` flag that launches the patched temp copy in the isolated profile. Rollback = launch the original image (flag off); `verify-hook` unchanged for host-side read-only verification.
+Stage 1 verifies the pinned window, emits a restricted-profile VCDIFF stream, decodes that stream, and uses the decoded result as the DOL splice input. Synthetic tests exercise this codec path and image-offset splice against an unencrypted fixture. For this identity target, the complete output image is byte-for-byte equal to the input; no DOL bytes change. It therefore tests DOL location, codec round-trip, and a no-op copy/manifest path. It does **not** prove a changed-byte VCDIFF application, Wii partition rebuilding, hash-cluster repair, Dolphin boot, rendering behavior, or a valid runtime hook.
 
-## 4. Sequencing
+The five-word hook window remains an identity replacement. It is not a trampoline installation.
 
-1. Pure-Rust VCDIFF codec + manifest validation + synthetic round-trip tests (multigalaxy-patch).
-2. `patch-image` generating a DOL-scoped delta with the inline Stage 1 trampoline; AllStars disjointness asserted against the parsed 419 writes.
-3. Image extract/rebuild pipeline feasibility proof (the blocker) — only then wire `dev-launch --patched-image`.
-4. Live acceptance per the unchanged Stage 1 criteria.
+### `dev-launch --patched-image`, AllStars, and M4
 
-## 5. Go/no-go
+`dev-launch` prepares the isolated RMGP01 GameSettings before selecting the image path. Mandatory AllStars and both verified shoulder-swap Gecko patches are always configured. Selecting `--patched-image` only changes the disc path; the current identity output cannot modify AllStars hook sites or M4 code.
 
-Image route is **NO-GO until** the extract/rebuild pipeline is proven bootable on stock Dolphin 2609a with AllStars enabled and identical rendering; Gecko route remains the fallback carrier and is currently bug-fixed (Addendum 4). Rendering remains **NO-GO**; Stage 2 parked.
+The M4 mailbox Gecko payload is opt-in through `--gecko-bridge-probe`; `--patched-image` alone does not enable it. The two options can be combined, and the profile builder prepends the mailbox payload while retaining the mandatory AllStars settings. Thus AllStars preservation is built into this launch path; M4 remains available only when explicitly enabled and still requires its separate runtime verification. No image boot or M4 test was performed here.
+
+## Acceptance and disposition
+
+Do not run live testing with the current patch-image output as evidence of a patched Wii image. Mark the image pipeline **NO-GO** for live testing. Keep the original RVZ untouched and keep stock Dolphin, AllStars, and M4 paths unchanged.
+
+Before any future live image test, implement or adopt a verified, reversible path that accepts the user's actual PAL source (including RVZ if supported), validates the source image via DolphinTool, extracts/decrypts the data partition, locates DOL using partition metadata, applies a non-identity synthetic/test delta to extracted DOL bytes, rebuilds/re-encrypts the partition and all integrity hashes correctly, emits a distinct image, then validates its full hash and DolphinTool ID/revision. Only after offline rebuild tests pass should an interactive boot be attempted. Preserve locale assets by changing only the intended DOL; do not require one fixed whole-image hash for all translated images, but always record and verify the actual source hash when applying a real delta.
+
+## Validation evidence
+
+Static review and synthetic tests only. No real RVZ/ISO was read or written by this audit, no Dolphin process was launched, and no live hook/window was tested. `--patched-image` must remain **NO-GO for live testing** until the image format/rebuild blocker is resolved.
