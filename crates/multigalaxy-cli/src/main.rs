@@ -842,6 +842,38 @@ fn run_rebuild_iso_dol(
     Ok(())
 }
 
+fn run_validate_rebuilt_iso(
+    dolphintool: &std::path::Path,
+    wit: &std::path::Path,
+    source: &std::path::Path,
+    output: &std::path::Path,
+    dol_path: &std::path::Path,
+    allstars_dir: &std::path::Path,
+) -> Result<(), String> {
+    let dol = fs::read(dol_path).map_err(|e| format!("cannot read pinned PAL main.dol: {e}"))?;
+    let allstars = controller_patch::prepare_allstars(allstars_dir, &dol)?;
+    let writes = parse_onframe_patch(&allstars.settings)
+        .map_err(|e| format!("cannot parse required AllStars writes: {e}"))?;
+    let manifest = disc_rebuild::validate_rebuilt_iso_for_launch(
+        dolphintool,
+        wit,
+        source,
+        output,
+        &dol,
+        &writes,
+    )?;
+    println!(
+        "rebuilt_iso=valid patch_id={} source_image_sha256={} source_dol_sha256={} target_dol_sha256={} output_image_sha256={} wit_version={}",
+        manifest.patch_id,
+        manifest.source_image_sha256,
+        manifest.source_dol_sha256,
+        manifest.target_dol_sha256,
+        manifest.output_image_sha256,
+        manifest.wit_version
+    );
+    Ok(())
+}
+
 #[cfg(windows)]
 fn run_observe_heaps(config_path: &std::path::Path, pid: u32) -> Result<(), String> {
     const EXPECTED_HANDLER_SHA256: &str =
@@ -1224,6 +1256,22 @@ fn validate_dev_inputs(config: &dev_config::DevelopmentConfig) -> Result<(), Str
     }
     verify_pal_game_image(&config.dolphin, &config.game)?;
     Ok(())
+}
+
+fn validate_rebuilt_iso_options(
+    patched_image: Option<&str>,
+    source_iso: Option<&str>,
+    wit: Option<&str>,
+) -> Result<(), String> {
+    match (patched_image, source_iso, wit) {
+        (None, None, None) => Ok(()),
+        (Some(_), Some(_), Some(_)) => Ok(()),
+        (Some(_), _, _) => Err(
+            "--patched-image requires both --source-iso and --wit for WIT manifest validation"
+                .into(),
+        ),
+        (None, _, _) => Err("--source-iso and --wit are only valid with --patched-image".into()),
+    }
 }
 
 fn parse_dolphintool_header(output: &str) -> Result<(), String> {
@@ -2649,6 +2697,16 @@ fn run() -> Result<(), String> {
             std::path::Path::new(&args[9]),
         );
     }
+    if args.len() == 7 && args[0] == "validate-rebuilt-iso" {
+        return run_validate_rebuilt_iso(
+            std::path::Path::new(&args[1]),
+            std::path::Path::new(&args[2]),
+            std::path::Path::new(&args[3]),
+            std::path::Path::new(&args[4]),
+            std::path::Path::new(&args[5]),
+            std::path::Path::new(&args[6]),
+        );
+    }
     if args.len() == 3 && args[0] == "observe-scheduler" {
         let pid = args[2]
             .to_str()
@@ -2890,6 +2948,8 @@ fn run() -> Result<(), String> {
         let mut gecko_bridge_probe = false;
         let mut trampoline_dry_run = false;
         let mut patched_image: Option<String> = None;
+        let mut source_iso: Option<String> = None;
+        let mut wit_executable: Option<String> = None;
         let mut bridge_startup_timeout = Duration::from_secs(60);
         let mut custom_bridge_timeout = false;
         let mut option_index = 4usize;
@@ -2922,14 +2982,39 @@ fn run() -> Result<(), String> {
                     patched_image = Some(value.to_string_lossy().into_owned());
                     option_index += 1;
                 }
+                "--source-iso" => {
+                    let Some(value) = args.get(option_index + 1) else {
+                        return Err("--source-iso requires a path".into());
+                    };
+                    if source_iso.is_some() {
+                        return Err("--source-iso may be specified only once".into());
+                    }
+                    source_iso = Some(value.to_string_lossy().into_owned());
+                    option_index += 1;
+                }
+                "--wit" => {
+                    let Some(value) = args.get(option_index + 1) else {
+                        return Err("--wit requires a path".into());
+                    };
+                    if wit_executable.is_some() {
+                        return Err("--wit may be specified only once".into());
+                    }
+                    wit_executable = Some(value.to_string_lossy().into_owned());
+                    option_index += 1;
+                }
                 _ => {
                     return Err(
-                        "dev-launch options: [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <path>] [--bridge-startup-timeout-secs=5..300]".into(),
+                        "dev-launch options: [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <output.iso> --source-iso <source.iso> --wit <wit.exe>] [--bridge-startup-timeout-secs=5..300]".into(),
                     )
                 }
             }
             option_index += 1;
         }
+        validate_rebuilt_iso_options(
+            patched_image.as_deref(),
+            source_iso.as_deref(),
+            wit_executable.as_deref(),
+        )?;
         if gecko_bridge_probe && (debug || gdb_unattached) {
             return Err("--gecko-bridge-probe uses stock Dolphin's named MEM1 mapping and must run without --debug or --debug-unattached".into());
         }
@@ -2980,6 +3065,40 @@ fn run() -> Result<(), String> {
         } else {
             None
         };
+        let game_path = if let Some(ref patched) = patched_image {
+            let source = source_iso.as_deref().ok_or("missing --source-iso")?;
+            let wit = wit_executable.as_deref().ok_or("missing --wit")?;
+            let dolphin_tool = config
+                .dolphin
+                .parent()
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .join(if cfg!(windows) {
+                    "DolphinTool.exe"
+                } else {
+                    "dolphin-tool"
+                });
+            let allstars_writes = parse_onframe_patch(&patch.settings)
+                .map_err(|e| format!("invalid prepared AllStars patch: {e}"))?;
+            let manifest = disc_rebuild::validate_rebuilt_iso_for_launch(
+                &dolphin_tool,
+                std::path::Path::new(wit),
+                std::path::Path::new(source),
+                std::path::Path::new(patched),
+                &dol,
+                &allstars_writes,
+            )?;
+            println!(
+                "WIT-rebuilt image validated: patch_id={} source_image_sha256={} source_dol_sha256={} target_dol_sha256={} output_image_sha256={}",
+                manifest.patch_id,
+                manifest.source_image_sha256,
+                manifest.source_dol_sha256,
+                manifest.target_dol_sha256,
+                manifest.output_image_sha256
+            );
+            std::path::PathBuf::from(patched)
+        } else {
+            config.game.clone()
+        };
         configure_isolated_profile(
             &user_dir,
             &patch,
@@ -2990,17 +3109,6 @@ fn run() -> Result<(), String> {
             gecko_bridge_probe,
             trampoline_dry_run,
         )?;
-        let game_path = if let Some(ref patched) = patched_image {
-            let manifest =
-                image_patch::validate_patched_image(std::path::Path::new(patched), &dol)?;
-            println!(
-                "patched image validated: patch_id={} output_image_sha256={}",
-                manifest.patch_id, manifest.output_image_sha256
-            );
-            std::path::PathBuf::from(patched)
-        } else {
-            config.game.clone()
-        };
         let mut child = spawn_game(
             &config.dolphin,
             &user_dir,
@@ -3548,7 +3656,7 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
     if args.len() != 2 {
-        return Err("usage: multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy patch-image <development.local.toml> <source-image> <output-image> [legacy plaintext-only experiment] | multigalaxy rebuild-iso <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> | multigalaxy rebuild-iso-dol <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> <target-main.dol> <target-sha256> <AllStars-patch-folder> | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <path>] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
+        return Err("usage: multigalaxy inspect-render-prototype <PAL-main.dol> <Petari-symbols.txt> | multigalaxy observe-heaps <development.local.toml> <Dolphin-pid> | multigalaxy observe-mario-model <development.local.toml> <Dolphin-pid> | multigalaxy observe-resource-holder <development.local.toml> <Dolphin-pid> | multigalaxy observe-model-joints <development.local.toml> <Dolphin-pid> | multigalaxy verify-hook <development.local.toml> <Dolphin-pid> | multigalaxy patch-image <development.local.toml> <source-image> <output-image> [legacy plaintext-only experiment] | multigalaxy rebuild-iso <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> | multigalaxy rebuild-iso-dol <DolphinTool.exe> <wit.exe> <source.iso> <new-output.iso> <PAL-main.dol> <Petari-symbols.txt> <target-main.dol> <target-sha256> <AllStars-patch-folder> | multigalaxy validate-rebuilt-iso <DolphinTool.exe> <wit.exe> <source.iso> <rebuilt.iso> <PAL-main.dol> <AllStars-patch-folder> | multigalaxy observe-scheduler <development.local.toml> <Dolphin-pid> | multigalaxy observe-callback-lists <development.local.toml> <Dolphin-pid> | multigalaxy observe-penguins <development.local.toml> <Dolphin-pid> | multigalaxy inspect-memory <development.local.toml> <Dolphin-pid> <guest-hex-address> <length> [bytes|u32|pointer|f32] | multigalaxy sync-server <127.0.0.1:port> | multigalaxy sync-client <development.local.toml> <Dolphin-pid> <127.0.0.1:port> <Mario|Luigi> | multigalaxy dev-setup <development.local.toml> <fresh-user-dir> | multigalaxy dev-launch <development.local.toml> <prepared-user-dir> <gdb-port-or-0> [--debug | --debug-unattached] [--unmute] [--gecko-bridge-probe] [--trampoline-dry-run] [--patched-image <output.iso> --source-iso <source.iso> --wit <wit.exe>] [--bridge-startup-timeout-secs=5..300] | multigalaxy bench-dolphin <pid> <seconds> <normal|gdb-unattached|gdb-idle|gdb-sampling|stock-bridge-off|stock-bridge-on> | multigalaxy launch <Dolphin.exe> <fresh-user-dir> <game.rvz> <gdb-port-or-0> <AllStars-patch-folder> <PAL-main.dol> [--mute] [--gdb|--no-gdb] | multigalaxy validate-pal-game <Dolphin.exe> <game.rvz> | multigalaxy inspect-allstars <patch-folder> <PAL-main.dol> | multigalaxy readmem <port> <guest-hex-address> <length> | multigalaxy validate-mario-map <PAL-main.dol> <Petari-symbols.txt> | multigalaxy probe-mario <port> <PAL-main.dol> <Petari-symbols.txt> [interval-ms] | multigalaxy verify-loaded <port> <main.dol> | multigalaxy verify-loaded-full <port> <main.dol>".into());
     }
     let a = fs::read(&args[0]).map_err(|e| format!("cannot read original: {e}"))?;
     let b = fs::read(&args[1]).map_err(|e| format!("cannot read modified: {e}"))?;
@@ -3664,6 +3772,23 @@ mod tests {
     }
 
     #[test]
+    fn rebuilt_iso_options_are_all_or_none_without_adding_launch_modes() {
+        assert!(validate_rebuilt_iso_options(None, None, None).is_ok());
+        assert!(
+            validate_rebuilt_iso_options(Some("out.iso"), Some("src.iso"), Some("wit.exe")).is_ok()
+        );
+        assert!(
+            validate_rebuilt_iso_options(Some("out.iso"), None, Some("wit.exe"))
+                .unwrap_err()
+                .contains("--source-iso")
+        );
+        assert!(validate_rebuilt_iso_options(None, Some("src.iso"), Some("wit.exe")).is_err());
+
+        let isolated = dolphin_config(None, false, true, true);
+        assert!(isolated.contains("EnableCheats = True"));
+    }
+
+    #[test]
     fn isolated_dev_profile_activates_mandatory_patch_and_profile_without_touching_sources() {
         let root = std::env::temp_dir().join(format!(
             "mg1-profile-test-{}-{}",
@@ -3704,6 +3829,7 @@ mod tests {
         assert!(gfx_ini.contains("ShowVPS = True"));
         assert!(gfx_ini.contains("ShowSpeed = True"));
         assert!(game_ini.contains("[OnFrame_Enabled]"));
+        assert!(!game_ini.contains("MultiGalaxy1 Stock Dolphin Mailbox Probe"));
         assert!(game_ini.contains("WiimoteSource0 = 1"));
         assert!(game_ini.contains("WiimoteProfile1 = Pro Con to Classic Con"));
         assert_eq!(copied_profile, profile_bytes);

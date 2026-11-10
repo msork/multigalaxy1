@@ -193,6 +193,7 @@ pub fn patch_image(source: &Path, output: &Path, dol: &[u8]) -> Result<PatchMani
 }
 
 /// Validate that `image` is a Stage 1 patched copy with a matching manifest.
+#[cfg(test)]
 pub fn validate_patched_image(image_path: &Path, dol: &[u8]) -> Result<PatchManifest, String> {
     let image = std::fs::read(image_path).map_err(|e| format!("cannot read image: {e}"))?;
     let hdr_len = image.len().min(0x80);

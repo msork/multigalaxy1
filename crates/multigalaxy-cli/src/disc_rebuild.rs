@@ -49,6 +49,66 @@ impl RebuildManifest {
             self.wit_version
         )
     }
+
+    pub fn parse_text(text: &str) -> Result<Self, String> {
+        const FIELDS: [&str; 13] = [
+            "schema_version",
+            "patch_id",
+            "game_id",
+            "revision",
+            "input_format",
+            "source_image_sha256",
+            "output_image_sha256",
+            "source_dol_sha256",
+            "target_dol_sha256",
+            "delta_sha256",
+            "dolphintool_sha256",
+            "wit_sha256",
+            "wit_version",
+        ];
+        let mut values = std::collections::BTreeMap::new();
+        for (line_index, line) in text.lines().enumerate() {
+            let (key, value) = line.split_once('=').ok_or_else(|| {
+                format!("WIT rebuild manifest line {} is malformed", line_index + 1)
+            })?;
+            if !FIELDS.contains(&key) {
+                return Err(format!("WIT rebuild manifest has unknown field {key:?}"));
+            }
+            if values.insert(key, value).is_some() {
+                return Err(format!("WIT rebuild manifest repeats field {key:?}"));
+            }
+        }
+        if values.len() != FIELDS.len() {
+            let missing = FIELDS
+                .iter()
+                .find(|field| !values.contains_key(**field))
+                .copied()
+                .unwrap_or("unknown");
+            return Err(format!("WIT rebuild manifest is missing field {missing:?}"));
+        }
+        let take = |key: &'static str| values.get(key).copied().unwrap_or_default();
+        let parse_u32 = |key: &'static str| {
+            take(key)
+                .parse::<u32>()
+                .map_err(|_| format!("WIT rebuild manifest field {key} is not an integer"))
+        };
+        Ok(Self {
+            schema_version: parse_u32("schema_version")?,
+            patch_id: take("patch_id").to_owned(),
+            game_id: take("game_id").to_owned(),
+            revision: u16::try_from(parse_u32("revision")?)
+                .map_err(|_| "WIT rebuild manifest revision is out of range")?,
+            input_format: take("input_format").to_owned(),
+            source_image_sha256: take("source_image_sha256").to_owned(),
+            output_image_sha256: take("output_image_sha256").to_owned(),
+            source_dol_sha256: take("source_dol_sha256").to_owned(),
+            target_dol_sha256: take("target_dol_sha256").to_owned(),
+            delta_sha256: take("delta_sha256").to_owned(),
+            dolphintool_sha256: take("dolphintool_sha256").to_owned(),
+            wit_sha256: take("wit_sha256").to_owned(),
+            wit_version: take("wit_version").to_owned(),
+        })
+    }
 }
 
 struct StagingDir(PathBuf);
@@ -113,6 +173,193 @@ pub fn rebuild_iso_with_dol(
         &delta,
         "stage1-hash-pinned-dol-replacement",
     )
+}
+
+/// Revalidate a WIT-built ISO before dev-launch. This checks both image
+/// identities, the pinned source and extracted target DOLs, the exact tools
+/// recorded in the manifest, partition integrity, and unchanged game files.
+pub fn validate_rebuilt_iso_for_launch(
+    dolphintool: &Path,
+    wit: &Path,
+    source: &Path,
+    output: &Path,
+    expected_dol: &[u8],
+    allstars_writes: &[PatchWrite],
+) -> Result<RebuildManifest, String> {
+    require_iso_extension("source", source)?;
+    require_iso_extension("rebuilt output", output)?;
+    for (label, path) in [
+        ("DolphinTool", dolphintool),
+        ("WIT", wit),
+        ("source ISO", source),
+        ("rebuilt ISO", output),
+    ] {
+        if !path.is_file() {
+            return Err(format!("{label} is missing or not a regular file"));
+        }
+    }
+    let source_abs = source
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve source ISO: {e}"))?;
+    let output_abs = output
+        .canonicalize()
+        .map_err(|e| format!("cannot resolve rebuilt ISO: {e}"))?;
+    if source_abs == output_abs {
+        return Err("source and rebuilt ISO paths must be different".into());
+    }
+    let manifest_text = fs::read_to_string(manifest_path(&output_abs))
+        .map_err(|e| format!("rebuilt ISO has no readable adjacent WIT manifest: {e}"))?;
+    let manifest = RebuildManifest::parse_text(&manifest_text)?;
+    eprintln!("rebuilt ISO validation phase=hash-images-and-tools");
+    let source_hash = hex(&hash_file(&source_abs)?);
+    let output_hash = hex(&hash_file(&output_abs)?);
+    let dolphin_tool_hash = hex(&hash_file(dolphintool)?);
+    let wit_hash = hex(&hash_file(wit)?);
+    let wit_version = one_line(&tool_output(wit, &["version".into()], None)?);
+    validate_rebuild_manifest_evidence(
+        &manifest,
+        &source_hash,
+        &output_hash,
+        &hex(&sha256(expected_dol)),
+        &dolphin_tool_hash,
+        &wit_hash,
+        &wit_version,
+        expected_dol,
+    )?;
+
+    eprintln!("rebuilt ISO validation phase=verify-disc-identities-and-partitions");
+    verify_dolphintool_header(dolphintool, &source_abs)?;
+    verify_dolphintool_header(dolphintool, &output_abs)?;
+    run_wit(wit, &["verify".into(), wit_path(&source_abs)?], None)?;
+    run_wit(wit, &["verify".into(), wit_path(&output_abs)?], None)?;
+
+    let output_parent = output_abs.parent().unwrap_or_else(|| Path::new("."));
+    let stage = make_staging_dir(output_parent)?;
+    let source_extract = stage.0.join("source-fst");
+    let output_extract = stage.0.join("rebuilt-fst");
+    eprintln!("rebuilt ISO validation phase=extract-and-compare-files-and-dols");
+    for (image, destination) in [
+        (&source_abs, &source_extract),
+        (&output_abs, &output_extract),
+    ] {
+        run_wit(
+            wit,
+            &[
+                "extract".into(),
+                wit_path(image)?,
+                wit_path(destination)?,
+                "--psel=data".into(),
+                "--pmode=none".into(),
+            ],
+            None,
+        )?;
+    }
+    let source_extracted_dol = fs::read(source_extract.join(DOL_RELATIVE))
+        .map_err(|e| format!("WIT could not extract source {DOL_RELATIVE}: {e}"))?;
+    if source_extracted_dol != expected_dol {
+        return Err("source ISO extracted DOL does not match the pinned PAL DOL".into());
+    }
+    let target_dol = fs::read(output_extract.join(DOL_RELATIVE))
+        .map_err(|e| format!("WIT could not extract rebuilt {DOL_RELATIVE}: {e}"))?;
+    validate_rebuild_target_dol(&manifest, expected_dol, &target_dol, allstars_writes)?;
+    verify_game_files_unchanged(&source_extract, &output_extract)?;
+    eprintln!("rebuilt ISO validation phase=recheck-image-and-tool-hashes");
+    if hex(&hash_file(&source_abs)?) != manifest.source_image_sha256
+        || hex(&hash_file(&output_abs)?) != manifest.output_image_sha256
+        || hex(&hash_file(dolphintool)?) != manifest.dolphintool_sha256
+        || hex(&hash_file(wit)?) != manifest.wit_sha256
+    {
+        return Err("an image or validation tool changed during launch validation".into());
+    }
+    Ok(manifest)
+}
+
+fn validate_rebuild_manifest_evidence(
+    manifest: &RebuildManifest,
+    source_image_sha256: &str,
+    output_image_sha256: &str,
+    source_dol_sha256: &str,
+    dolphintool_sha256: &str,
+    wit_sha256: &str,
+    wit_version: &str,
+    source_dol: &[u8],
+) -> Result<(), String> {
+    if manifest.schema_version != 1
+        || manifest.patch_id != "stage1-hash-pinned-dol-replacement"
+        || manifest.game_id != "RMGP01"
+        || manifest.revision != 0
+        || manifest.input_format != "ISO"
+    {
+        return Err("manifest is not a supported PAL RMGP01 Rev 0 WIT replacement build".into());
+    }
+    for (name, value) in [
+        ("source_image_sha256", &manifest.source_image_sha256),
+        ("output_image_sha256", &manifest.output_image_sha256),
+        ("source_dol_sha256", &manifest.source_dol_sha256),
+        ("target_dol_sha256", &manifest.target_dol_sha256),
+        ("delta_sha256", &manifest.delta_sha256),
+        ("dolphintool_sha256", &manifest.dolphintool_sha256),
+        ("wit_sha256", &manifest.wit_sha256),
+    ] {
+        parse_sha256(value).map_err(|_| format!("manifest {name} is not a valid SHA-256"))?;
+    }
+    if manifest.source_image_sha256 != source_image_sha256
+        || manifest.output_image_sha256 != output_image_sha256
+        || manifest.source_dol_sha256 != source_dol_sha256
+        || manifest.dolphintool_sha256 != dolphintool_sha256
+        || manifest.wit_sha256 != wit_sha256
+        || manifest.wit_version != wit_version
+    {
+        return Err("manifest hashes or WIT version do not match launch inputs".into());
+    }
+    if manifest.source_image_sha256 == manifest.output_image_sha256 {
+        return Err("replacement manifest unexpectedly describes an unchanged ISO".into());
+    }
+    if manifest.source_dol_sha256 == manifest.target_dol_sha256 {
+        return Err("replacement manifest unexpectedly describes an unchanged DOL".into());
+    }
+    // Validate the explicit target identity using synthetic bytes here; the
+    // full target is checked after WIT extracts the output ISO.
+    if hex(&sha256(source_dol)) != manifest.source_dol_sha256 {
+        return Err("manifest source DOL hash does not match the pinned PAL DOL".into());
+    }
+    Ok(())
+}
+
+fn require_iso_extension(label: &str, path: &Path) -> Result<(), String> {
+    if path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.eq_ignore_ascii_case("iso"))
+        != Some(true)
+    {
+        return Err(format!(
+            "{label} must be an ISO; RVZ and other formats are unsupported"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_rebuild_target_dol(
+    manifest: &RebuildManifest,
+    source_dol: &[u8],
+    target_dol: &[u8],
+    allstars_writes: &[PatchWrite],
+) -> Result<(), String> {
+    if hex(&sha256(target_dol)) != manifest.target_dol_sha256 {
+        return Err("rebuilt ISO extracted DOL hash does not match the manifest target".into());
+    }
+    validate_dol_replacement(
+        source_dol,
+        target_dol,
+        &manifest.target_dol_sha256,
+        allstars_writes,
+    )?;
+    let delta = vcdiff::encode(source_dol, target_dol);
+    if hex(&sha256(&delta)) != manifest.delta_sha256 {
+        return Err("recomputed source-to-target VCDIFF hash does not match the manifest".into());
+    }
+    Ok(())
 }
 
 fn rebuild_iso_target(
@@ -736,6 +983,179 @@ mod tests {
             .starts_with("schema_version=1\npatch_id=stage1-trampoline-identity-wit-rebuild\n"));
         assert!(!first.contains("C:\\"));
         assert!(!first.contains("timestamp"));
+    }
+
+    fn launch_manifest(source: &[u8], target: &[u8]) -> RebuildManifest {
+        RebuildManifest {
+            schema_version: 1,
+            patch_id: "stage1-hash-pinned-dol-replacement".into(),
+            game_id: "RMGP01".into(),
+            revision: 0,
+            input_format: "ISO".into(),
+            source_image_sha256: "1".repeat(64),
+            output_image_sha256: "2".repeat(64),
+            source_dol_sha256: hex(&sha256(source)),
+            target_dol_sha256: hex(&sha256(target)),
+            delta_sha256: hex(&sha256(&vcdiff::encode(source, target))),
+            dolphintool_sha256: "4".repeat(64),
+            wit_sha256: "5".repeat(64),
+            wit_version: "wit: Wiimms ISO Tool v3.02a r7679".into(),
+        }
+    }
+
+    #[test]
+    fn strict_wit_manifest_parser_round_trips_and_rejects_ambiguous_fields() {
+        let source = synthetic_dol();
+        let mut target = source.clone();
+        target[0x110..0x114].copy_from_slice(&0x60E7_0000u32.to_be_bytes());
+        let manifest = launch_manifest(&source, &target);
+        assert_eq!(
+            RebuildManifest::parse_text(&manifest.to_text()).unwrap(),
+            manifest
+        );
+
+        let duplicate = format!(
+            "{}source_dol_sha256={}\n",
+            manifest.to_text(),
+            "f".repeat(64)
+        );
+        assert!(RebuildManifest::parse_text(&duplicate)
+            .unwrap_err()
+            .contains("repeats"));
+        let unknown = format!("{}unexpected=yes\n", manifest.to_text());
+        assert!(RebuildManifest::parse_text(&unknown)
+            .unwrap_err()
+            .contains("unknown field"));
+        let missing = manifest.to_text().replace("revision=0\n", "");
+        assert!(RebuildManifest::parse_text(&missing)
+            .unwrap_err()
+            .contains("missing field"));
+    }
+
+    #[test]
+    fn launch_manifest_authorizes_exact_changed_target_without_requiring_source_hash_equality() {
+        let source = synthetic_dol();
+        let mut target = source.clone();
+        target[0x110..0x114].copy_from_slice(&0x60E7_0000u32.to_be_bytes());
+        let manifest = launch_manifest(&source, &target);
+        validate_rebuild_manifest_evidence(
+            &manifest,
+            &manifest.source_image_sha256,
+            &manifest.output_image_sha256,
+            &manifest.source_dol_sha256,
+            &manifest.dolphintool_sha256,
+            &manifest.wit_sha256,
+            &manifest.wit_version,
+            &source,
+        )
+        .unwrap();
+        assert_ne!(manifest.source_dol_sha256, manifest.target_dol_sha256);
+        assert_ne!(manifest.source_image_sha256, manifest.output_image_sha256);
+        validate_rebuild_target_dol(&manifest, &source, &target, &[]).unwrap();
+
+        let mut unexpected_target = target.clone();
+        unexpected_target[0x114] ^= 1;
+        assert!(validate_rebuild_target_dol(&manifest, &source, &unexpected_target, &[]).is_err());
+        let mut allstars_target = target.clone();
+        allstars_target[0x110..0x114].copy_from_slice(&0x60E7_0000u32.to_be_bytes());
+        let writes = [PatchWrite {
+            address: 0x8000_4010,
+            value: 0x6000_0000,
+        }];
+        // This synthetic write maps to file offset 0x110 (guest 0x80004010).
+        assert!(
+            validate_rebuild_target_dol(&manifest, &source, &allstars_target, &writes)
+                .unwrap_err()
+                .contains("overlaps a mandatory AllStars write")
+        );
+
+        let mut wrong_output = manifest.clone();
+        wrong_output.output_image_sha256 = "6".repeat(64);
+        assert!(validate_rebuild_manifest_evidence(
+            &wrong_output,
+            &manifest.source_image_sha256,
+            &manifest.output_image_sha256,
+            &manifest.source_dol_sha256,
+            &manifest.dolphintool_sha256,
+            &manifest.wit_sha256,
+            &manifest.wit_version,
+            &source,
+        )
+        .is_err());
+        let mut wrong_source_dol = manifest.clone();
+        wrong_source_dol.source_dol_sha256 = "7".repeat(64);
+        assert!(validate_rebuild_manifest_evidence(
+            &wrong_source_dol,
+            &manifest.source_image_sha256,
+            &manifest.output_image_sha256,
+            &manifest.source_dol_sha256,
+            &manifest.dolphintool_sha256,
+            &manifest.wit_sha256,
+            &manifest.wit_version,
+            &source,
+        )
+        .is_err());
+        let mut wrong_tools = manifest.clone();
+        wrong_tools.wit_sha256 = "8".repeat(64);
+        assert!(validate_rebuild_manifest_evidence(
+            &wrong_tools,
+            &manifest.source_image_sha256,
+            &manifest.output_image_sha256,
+            &manifest.source_dol_sha256,
+            &manifest.dolphintool_sha256,
+            &manifest.wit_sha256,
+            &manifest.wit_version,
+            &source,
+        )
+        .is_err());
+        let mut wrong_version = manifest.clone();
+        wrong_version.wit_version = "another WIT build".into();
+        assert!(validate_rebuild_manifest_evidence(
+            &wrong_version,
+            &manifest.source_image_sha256,
+            &manifest.output_image_sha256,
+            &manifest.source_dol_sha256,
+            &manifest.dolphintool_sha256,
+            &manifest.wit_sha256,
+            &manifest.wit_version,
+            &source,
+        )
+        .is_err());
+        let mut wrong_revision = manifest.clone();
+        wrong_revision.revision = 1;
+        assert!(validate_rebuild_manifest_evidence(
+            &wrong_revision,
+            &manifest.source_image_sha256,
+            &manifest.output_image_sha256,
+            &manifest.source_dol_sha256,
+            &manifest.dolphintool_sha256,
+            &manifest.wit_sha256,
+            &manifest.wit_version,
+            &source,
+        )
+        .unwrap_err()
+        .contains("PAL RMGP01 Rev 0"));
+        let mut wrong_patch = manifest.clone();
+        wrong_patch.patch_id = "unknown-patch".into();
+        assert!(validate_rebuild_manifest_evidence(
+            &wrong_patch,
+            &manifest.source_image_sha256,
+            &manifest.output_image_sha256,
+            &manifest.source_dol_sha256,
+            &manifest.dolphintool_sha256,
+            &manifest.wit_sha256,
+            &manifest.wit_version,
+            &source,
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn rebuilt_iso_validation_rejects_unsupported_image_extensions() {
+        assert!(require_iso_extension("source", Path::new("game.rvz"))
+            .unwrap_err()
+            .contains("RVZ and other formats are unsupported"));
+        assert!(require_iso_extension("output", Path::new("game.iso")).is_ok());
     }
 
     #[test]

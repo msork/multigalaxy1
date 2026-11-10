@@ -28,9 +28,39 @@ cargo run --release -p multigalaxy -- rebuild-iso `
   '<matching Petari PAL symbols.txt>'
 ```
 
-The completed local test verifies PAL RMGP01 revision 0, the pinned extracted DOL, WIT partition integrity before/after, output DOL and game-file hashes, source immutability, and deterministic recomposition. It has **not** been launched in Dolphin. The manifest is not currently understood by `dev-launch --patched-image`; do not use that flag for this output. See [Wii image rebuild evidence](references/wii-image-rebuild.md).
+The completed local test verifies PAL RMGP01 revision 0, the pinned source DOL, WIT partition integrity before/after, output DOL and game-file hashes, source immutability, and deterministic recomposition. `dev-launch --patched-image` accepts only a WIT `rebuild-iso-dol` manifest and revalidates both ISO extractions, hashes, tool versions, PAL headers, and AllStars non-overlap before configuring the isolated profile. It does not enable the M4 mailbox unless `--gecko-bridge-probe` is separately provided. No Dolphin boot has been tested. See [Wii image rebuild evidence](references/wii-image-rebuild.md).
 
 For a separately built and hash-pinned candidate DOL, use `rebuild-iso-dol` with the exact PAL source DOL, symbol map, candidate DOL, candidate SHA-256, and external AllStars folder. It rejects changes outside DOL text or overlapping AllStars writes and verifies the re-extracted target bytes. This is not a trampoline generator and is not ready for Dolphin boot until the changed output has passed an offline WIT round trip and the hook's code location is verified. The exact candidate command is recorded in [Wii image rebuild evidence](references/wii-image-rebuild.md).
+
+Before launch, validate a WIT-rebuilt image without starting Dolphin:
+
+```powershell
+$DolphinTool = '<path to DolphinTool.exe beside your Dolphin installation>'
+$Wit = '<path to Wiimms ISO Tool wit.exe>'
+$AllStars = '<path to the external AllStars PAL patch folder>'
+
+cargo run --release -p multigalaxy -- validate-rebuilt-iso `
+  $DolphinTool `
+  $Wit `
+  'target\mg1-disc-pipeline\source.iso' `
+  'target\mg1-disc-pipeline\changed-neutral-nop.iso' `
+  'reference\original\main.dol' `
+  $AllStars
+```
+
+The disposable changed-byte candidate can be launched from an interactive PowerShell on the visible desktop after `dev-setup` has prepared `target\mg1-dev-profile`:
+
+```powershell
+$Wit = '<path to Wiimms ISO Tool wit.exe>'
+
+cargo run --release -p multigalaxy -- dev-launch development.local.toml `
+  'target\mg1-dev-profile' 0 `
+  --patched-image 'target\mg1-disc-pipeline\changed-neutral-nop.iso' `
+  --source-iso 'target\mg1-disc-pipeline\source.iso' `
+  --wit $Wit
+```
+
+The launcher infers DolphinTool beside the configured Dolphin executable. It hashes the explicit source/output ISOs and tools, verifies PAL identity and WIT partitions, extracts both images, confirms the source DOL and exact authorized candidate DOL, checks deterministic delta and unchanged DATA files, and rejects AllStars overlap. The operation is intentionally disk intensive. It keeps mandatory AllStars and the copied controller profile; M4 remains off unless `--gecko-bridge-probe` is explicitly added. No Dolphin boot has yet been performed.
 
 ## Local Windows development profile
 
