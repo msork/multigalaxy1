@@ -2,7 +2,7 @@
 
 ## Objective
 
-Exchange fresh PAL Mario position snapshots between two independent Rust clients, each attached read-only to its own official Dolphin process when the feature-specific mapping and mailbox checks pass. Use a localhost TCP server as the authoritative admission, freshness, sequence, and presence relay. Dolphin 2609b has passed live preflight and one ACK write/echo/rollback; two-instance movement relay remains unverified. This milestone does not create remote in-game actors.
+Exchange fresh PAL Mario position snapshots between two independent Rust clients, each attached read-only to its own official Dolphin process when the feature-specific mapping and mailbox checks pass. Use a localhost TCP server as the authoritative admission, freshness, sequence, and presence relay. User-confirmed live position reception in both directions passed on Dolphin 2609b, PAL RMGP01 Rev 0 (PIDs 9312/13420). This milestone does not create remote in-game actors or synchronize game-world behavior.
 
 ## Verified research and starting evidence
 
@@ -10,6 +10,7 @@ Exchange fresh PAL Mario position snapshots between two independent Rust clients
 - The named Windows MEM1 map is an undocumented Dolphin implementation detail, not a stable API. Static source review was against 2609a; runtime mapping, PAL identity, handler, and mailbox checks are required on every process. Dolphin 2609b has passed these checks and one controlled ACK write/echo/rollback.
 - The previously validated AllStars patch and per-instance isolated profiles remain required. Each participant owns a separate Dolphin process and profile.
 - Counter/ACK bridge performance was user-reported at 100% and 59.94 FPS/VPS both off and on; the expanded position publisher/network path has not been benchmarked.
+- **Live M4 checkpoint, user-confirmed:** separate isolated Mario and Luigi Dolphins used separate Gecko ACK writers; both read-only sync clients connected to `127.0.0.1:39845`. Mario→Luigi and Luigi→Mario position reception were observed. Luigi movement produced changing XYZ in Mario's client, generally about 58 Hz with reported ages 0–16 ms. No AllStars activation, rendered remote character, game-world synchronization, pause/transition recovery, or multiplayer performance claim follows from this observation. See [runtime record](../docs/references/m4-two-client-2609b.md).
 
 ## Functional requirements
 
@@ -29,7 +30,7 @@ The server validates and relays snapshots but does not simulate gameplay. Per-co
 
 ## Dependencies
 
-No new external crates. Standard-library TCP, threads, channels, mutexes, monotonic timers, and existing `StockMem1`/Gecko validation are sufficient. Client attachment uses a Windows stock Dolphin named-memory mapping and PAL RMGP01 Rev 0; 2609b has read-only and ACK feedback evidence, but the live network relay remains to be tested.
+No new external crates. Standard-library TCP, threads, channels, mutexes, monotonic timers, and existing `StockMem1`/Gecko validation are sufficient. Client attachment uses a Windows stock Dolphin named-memory mapping and PAL RMGP01 Rev 0; the 2609b live position relay passed in the user-run two-instance test, while other Dolphin builds remain capability-gated and unverified.
 
 ## Risks and failure handling
 
@@ -45,10 +46,11 @@ No new external crates. Standard-library TCP, threads, channels, mutexes, monoto
 
 - Synthetic protocol tests cover round trips, exact lengths, unsupported versions/kinds/IDs, maximum frame bounds, nonfinite/out-of-range coordinates, stale/future timestamps, and out-of-order sequences.
 - Synthetic two-client integration test starts a localhost server, connects Mario and Luigi, sends sequenced positions, verifies each peer receives the other's presence/XYZ, then verifies peer removal after disconnect.
-- A manual two-instance test uses two distinct isolated profiles and Dolphin PIDs, validates both mailboxes, and observes both clients print the other player's changing position and update rate. No stale player remains after disconnect, pause, or scene transition.
+- **Passed, user-confirmed on 2609b:** two distinct isolated profiles and PIDs, both clients connected, and changing position reception in each direction. The user reports the Luigi→Mario stream at generally ~58 Hz and 0–16 ms age.
+- Still required: separately record preflight output for each PID, test disconnect/stale-peer removal and pause/scene transitions, and measure effect on game speed/FPS/VPS. These are not inferred from the bidirectional position pass.
 - Automated format, workspace tests, workspace build, and exact PAL map validation pass.
 - User-visible live relay is reported separately from synthetic tests. No rendering, gameplay writes, NetPlay, progression sync, or custom Dolphin build is introduced.
 
 ## Test strategy
 
-Unit-test frame codec and validators with synthetic bytes. Run a loopback integration test in-process using two clients and a temporary localhost port. Then run the two user-side Dolphin instances with separate isolated profiles, same PAL game, and mandatory AllStars patch. Record both PIDs, game identity, mailbox status, positions/update rate, disconnect handling, and any FPS/VPS impact. Until the interactive run is observed, live synchronization remains unverified.
+Unit-test frame codec and validators with synthetic bytes. Run a loopback integration test in-process using two clients and a temporary localhost port. Then run the two user-side Dolphin instances with separate isolated profiles, same PAL game, and mandatory AllStars patch. Record both PIDs, game identity, mailbox status, positions/update rate, disconnect handling, and any FPS/VPS impact. The two-client position relay is live-verified as described above; gameplay synchronization and remote rendering remain outside this acceptance result.

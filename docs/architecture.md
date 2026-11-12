@@ -29,7 +29,7 @@ Player slots are stable identities with transform, velocity, facing, animation, 
 
 ## Stock Dolphin boundary
 
-A launcher alone cannot expose or render game actors. A reversible Gecko mailbox using Dolphin's named Windows MEM1 mapping has user-observed live counter/ACK operation at ~60 Hz on Dolphin 2609a. On Dolphin 2609b, read-only preflight and one bounded ACK write/echo/rollback passed. The M4 network relay has not been live-tested with two Dolphin instances. No Dolphin release is locked for ordinary play; the optional mailbox remains gated by handler capability and runtime process/game/mapping checks. GDB remains development-only; MemoryWatcher is not compiled into Windows 2609a. Remote rendering remains blocked by the M5 lifecycle/state-ownership gates. See [stock bridge research](stock-dolphin-bridge.md) and [M4 2609b validation](references/m4-2609b-validation.md).
+A launcher alone cannot expose or render game actors. A reversible Gecko mailbox using Dolphin's named Windows MEM1 mapping has user-observed live counter/ACK operation at ~60 Hz on Dolphin 2609a. On Dolphin 2609b, read-only preflight, one bounded ACK write/echo/rollback, and a user-confirmed two-client bidirectional position relay passed. The relay is not gameplay synchronization or rendering. No Dolphin release is locked for ordinary play; the optional mailbox remains gated by handler capability and runtime process/game/mapping checks. GDB remains development-only; MemoryWatcher is not compiled into Windows 2609a. Remote rendering remains blocked by the M5 lifecycle/state-ownership gates. See [stock bridge research](stock-dolphin-bridge.md) and [M4 live checkpoint](references/m4-two-client-2609b.md).
 
 ## PAL and localization
 

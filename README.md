@@ -5,11 +5,11 @@ Rust-first, online-only multiplayer modification research for PAL Super Mario Ga
 ## Current status
 
 - M0 research and PAL DOL analysis tooling are in progress.
-- The M4 Rust localhost position relay and PAL Mario coordinate mailbox are implemented; two-instance live synchronization is not yet verified.
-- A read-only preflight and one bounded ACK write/echo/rollback passed on Dolphin 2609b. This is bridge feedback validation, not multiplayer validation.
+- M4 two-instance position relay passed a user-run Dolphin 2609b test on PAL RMGP01 Rev 0: Mario→Luigi and Luigi→Mario position reception both worked. This verifies position relay only, not synchronized gameplay or remote rendering.
+- Each instance used an isolated profile and its own Gecko ACK writer; both clients connected to localhost. Luigi movement produced changing XYZ at generally ~58 Hz with reported receive ages of 0–16 ms in Mario's client.
 - Russian, French, and English client-local localization is a required acceptance case, not a tested feature.
 - The PAL AllStars controller patch with both shoulder swaps is mandatory on every launcher path; source fingerprints and PAL Rev 0 compatibility are checked before Dolphin starts.
-- Dolphin compatibility is capability-based; the general launcher has no Dolphin release or executable-hash allowlist. The changed-byte ISO has user-confirmed basic boot and controllable Mario on 2609a and 2609b. M4 read-only validation and ACK feedback passed on 2609b; two-instance relay and AllStars runtime activation remain unverified there.
+- Dolphin compatibility is capability-based; the general launcher has no Dolphin release or executable-hash allowlist. The changed-byte ISO has user-confirmed basic boot and controllable Mario on 2609a and 2609b. M4 read-only validation, ACK feedback, and two-client position relay passed on 2609b; AllStars runtime activation remains unverified there.
 - See [milestones](docs/milestones.md), [testing evidence](docs/testing.md), and [online architecture](docs/networking.md).
 
 ## Development
@@ -28,4 +28,4 @@ Original MultiGalaxy1 code is released under the [WTFPL Version 2](LICENSE). Thi
 
 ## Stock Dolphin bridge status
 
-MultiGalaxy1 uses an unmodified official Dolphin installation. The retired Dolphin fork is not part of the project. A Windows Gecko counter/echo bridge has live evidence on Dolphin 2609a, and a bounded ACK write/echo/rollback passed on 2609b through Dolphin's undocumented named MEM1 mapping. Two-instance position relay, AllStars runtime activation on 2609b, and online actor synchronization remain unverified. AllStars stays mandatory on launcher paths. See [bridge evidence and interactive test instructions](docs/stock-dolphin-bridge.md).
+MultiGalaxy1 uses an unmodified official Dolphin installation. The retired Dolphin fork is not part of the project. A Windows Gecko counter/echo bridge has live evidence on Dolphin 2609a; read-only validation, bounded ACK write/echo/rollback, and a two-client position relay passed on Dolphin 2609b through Dolphin's undocumented named MEM1 mapping. Remote actor rendering, AllStars runtime activation on 2609b, and gameplay synchronization remain unverified. AllStars stays mandatory on launcher paths. See [bridge evidence](docs/stock-dolphin-bridge.md) and the [M4 live checkpoint](docs/references/m4-two-client-2609b.md).

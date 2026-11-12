@@ -20,7 +20,7 @@ ack_write=not_performed
 network=not_started
 ```
 
-This verifies the running process identity/session, compatible MEM1 mapping extent, live PAL signatures, expected Gecko handler resource, and unique stable mailbox. It does **not** verify writable mapping access, ACK echo, two-client relay, AllStars activation, or M5 rendering.
+This verifies the running process identity/session, compatible MEM1 mapping extent, live PAL signatures, expected Gecko handler resource, and unique stable mailbox. At that point, it did **not** verify writable mapping access, ACK echo, two-client relay, AllStars activation, or M5 rendering. Later ACK and two-client results are recorded below.
 
 ## Writable ACK feedback passed
 
@@ -30,7 +30,7 @@ The user subsequently confirmed that the explicit ACK-only test passed on Dolphi
 m4_ack_test=passed pid=4712 mailbox=0x800025a0 test_write=1 rollback_write=1 ack_restored=0x4dd6ed41 network=not_started
 ```
 
-This is verified writable mailbox feedback and rollback for this process/build. It does not validate the two-client relay, AllStars runtime behavior, progression, or multiplayer.
+This is verified writable mailbox feedback and rollback for this process/build. At the time of the ACK-only test, no network session had been started. The later two-client relay checkpoint is recorded separately below; this ACK test alone does not validate AllStars runtime behavior, progression, or gameplay synchronization.
 
 ## Controlled ACK-only experiment
 
@@ -89,10 +89,18 @@ If ACK changes in the window, stop every ACK-writing bridge process and repeat t
 
 The interactive `dev-launch --gecko-bridge-probe` host process itself writes ACKs. In the PowerShell window running that probe, type `Q` to stop/unmap the host writer; the launcher drops its child handle without killing Dolphin. Then run `diagnose-m4-ack` again. Proceed to the explicitly confirmed ACK test only if the diagnostic shows no ACK changes and the echo has caught up, with the counter still advancing. If another ACK writer remains, do not run the ACK test.
 
-## Two-client movement regression after ACK passes
+## M4 two-client position relay passed
 
-This has **not** been run on 2609b. Use two prepared isolated profiles and two independent Dolphin instances, both with PAL RMGP01 Rev 0 and the mailbox-enabled launch option. Start the localhost server, then attach one `sync-client` to each PID. Move Mario in one instance and confirm the other console receives current position updates; reverse direction and confirm again. Also record disconnect/peer removal. The existing M4 protocol is unchanged. Do not treat the read-only preflight or ACK-only test as multiplayer success.
+The user confirmed a live run on Dolphin 2609b, PAL RMGP01 Rev 0:
+
+- Mario Dolphin PID `9312`; Luigi Dolphin PID `13420`.
+- Each used a separate isolated Dolphin profile and its own Gecko ACK writer.
+- Both read-only sync clients connected to `127.0.0.1:39845`.
+- Mario→Luigi and Luigi→Mario position reception were observed.
+- Luigi movement produced changing XYZ coordinates in Mario's client, generally about 58 Hz with reported receive ages of 0–16 ms.
+
+This verifies the M4 position relay between two live Dolphin instances. It does not verify remote visual rendering, in-game character detection, physics/input/progression synchronization, pause or scene-transition recovery, disconnect cleanup, AllStars activation on 2609b, or broader gameplay performance. See the repeat procedure in [networking.md](../networking.md#two-instance-interactive-workflow).
 
 ## Next M5 step
 
-Only after the two-client M4 test passes should remote position data be fed into a visual test. M5 remains NO-GO: independent J3D mutable state, GX state restoration, matrix/packet lifetime, and scene teardown are unresolved. No remote actor/render hook is authorized by this bridge validation.
+M4 bidirectional position reception is now confirmed. M5 remains NO-GO: independent J3D mutable state, GX state restoration, matrix/packet lifetime, the prior failed hook dry-run, and scene teardown are unresolved. Follow the [M5 staged implementation plan](../../specs/M5-remote-rendering-implementation-plan.md). No remote actor/render hook is authorized by this bridge validation.
